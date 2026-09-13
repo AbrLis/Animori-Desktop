@@ -19,15 +19,29 @@
 //
 // КАДР УХОДИТ ИЗ ОКНА ДВУМЯ ПУТЯМИ
 // Картинка в картинке и трансляция лежат в player-cast.ts: оба умения живут
-// на теге <video>, а экрану остаются кнопка, подпись и порядок шагов.
-// Маленькое окно и театр исключают друг друга: перед уходом кадра в окошко
-// полный экран складывается, иначе развёрнутое окно накрыло бы окошко собой.
+// на теге <video>, а экрану остаются кнопка, подпись и порядок шагов. Порядок
+// здесь и есть главное: окошко — родное движка или своё — требует живого жеста
+// человека и тратит его целиком, а жест не переживает ожиданий. Поэтому вопрос
+// об окошке уходит ПЕРВЫМ, а театр складывается вдогонку, пока движок думает.
+// Прежде было наоборот: сначала складывался театр (а это ещё и ответ моста),
+// и к вопросу об окошке жеста уже не оставалось — кнопка не делала ничего.
 // Кнопки картинки в картинке нет вовсе, когда движок её не умеет: кнопка,
-// которая умеет только жаловаться, хуже отсутствующей.
+// которая умеет только жаловаться, хуже отсутствующей. Первый ответ приходит
+// при создании связки, а если движок отказал обоим путям насовсем, связка
+// говорит об этом сама и кнопка уходит с панели.
 //
 // Ссылка меняется в трёх случаях: другая серия, другая озвучка, другое
 // качество. Первые два начинают с запомненного места, третий — с текущей
 // секунды: иначе переключение на 480p выглядело бы как потеря просмотра.
+//
+// СРОК ССЫЛКИ ЧЕЛОВЕКА НЕ КАСАЕТСЯ
+// Кнопки «Взять ссылку заново» на панели больше нет. Подписанный адрес живёт
+// часы, и это наша забота, а не смотрящего: экран сам следит за часами ссылки
+// и берёт новую заранее, пока старая ещё играет. Замена идёт тем же путём, что
+// и смена качества, — с посадкой на ту же секунду и без заслонки, — так что
+// видно от неё разве что колесо ожидания. Мёртвый адрес посреди серии лечится
+// так же молча. Открытое «Переспросить» осталось только на заслонке: там
+// человек и так смотрит на отказ, и врать ему нечем.
 //
 // ЗАСЛОНКА ГОВОРИТ ПРАВДУ И ГАСИТ КАДР
 // Отсутствие ссылки читалось одним способом — «Серия не выбрана», — а случаев
@@ -52,7 +66,7 @@ import { Logger } from '@/utils/logger'
 import { currentRoute } from '../router'
 
 import { attachCast, type Cast, type CastState } from './player-cast'
-import { attachPlayback, type Playback } from './player-hls'
+import { attachPlayback, type DeadKind, type Playback } from './player-hls'
 import {
   CALM_DELAY_MS,
   JUMP_SEC,
@@ -151,6 +165,19 @@ interface Key {
 /** Сколько держится плашка продолжения. Дальше она мешает смотреть. */
 const RESUME_SHOW_MS = 7000
 
+/**
+ * За сколько до конца подписи просим новый адрес. Запас больше проверки срока
+ * в ядре: там речь о том, годится ли ссылка к запуску вообще, а здесь — о том,
+ * чтобы замена прошла под живым потоком, а не после чёрного экрана.
+ */
+const RENEW_AHEAD_MS = 180000
+
+/** Как часто смотрим на часы ссылки. Реже секунд не нужно: счёт идёт на минуты. */
+const RENEW_TICK_MS = 20000
+
+/** Сколько молчаливых промахов терпим, прежде чем сказать человеку. */
+const RENEW_TRIES = 3
+
 const videoEl = ref<HTMLVideoElement | null>(null)
 const rootEl = ref<HTMLElement | null>(null)
 
@@ -195,6 +222,9 @@ const listOpen = ref(false)
 /** Кадр встал посреди серии: сеть не поспевает, но ошибки ещё нет. */
 const stalled = ref(false)
 
+/** Идёт молчаливая замена ссылки: наружу от неё только колесо ожидания. */
+const renewOn = ref(false)
+
 /** Доля полосы под указателем, -1 — указателя на ней нет. */
 const hoverShare = ref(-1)
 
@@ -226,6 +256,7 @@ const {
   pickHeight,
   nextEpisode,
   refresh,
+  renew,
   openCard,
 } = usePlayer(mediaId)
 
@@ -243,6 +274,19 @@ let calmTimer = 0
 
 /** Таймер плашки продолжения. */
 let resumeTimer = 0
+
+/** Присмотр за сроком ссылки: живёт столько же, сколько экран. */
+let renewTimer = 0
+
+/** Сколько раз подряд новая ссылка не пришла. */
+let renewMisses = 0
+
+/**
+ * Человек хочет, чтобы шло. Не то же, что `playing`: пауза от движка — обрыв
+ * потока, смена источника, конец буфера — сюда не пишется. Иначе молчаливая
+ * замена адреса после обрыва оставляла бы кадр стоять.
+ */
+let meant = false
 
 /** Полный экран окна: мост умеет только переключать, поэтому помним сами. */
 let windowWide = false
@@ -283,6 +327,12 @@ const veilWord = computed<string>(() => {
 const veilSpin = computed<boolean>(
   () => trouble.value === '' && (busy.value || stream.value === null),
 )
+
+/**
+ * Колесо посреди кадра: буфер не поспевает или мы молча меняем адрес. Второе
+ * человеку выглядит тем же самым, и объяснять тут нечего.
+ */
+const waiting = computed<boolean>(() => stalled.value || renewOn.value)
 
 /** Подпись кнопки качества: то, что играет сейчас. */
 const qualityNow = computed<string>(
@@ -427,16 +477,25 @@ function showResume(from: number): void {
   }, RESUME_SHOW_MS)
 }
 
-/** Открывает манифест. Та же серия — продолжаем с текущей секунды. */
+/**
+ * Открывает манифест. Та же серия — продолжаем с текущей секунды: так идут
+ * и смена качества, и молчаливая замена протухшего адреса.
+ *
+ * Секунду спрашиваем и у тега, и у своих часов: после обрыва потока движок
+ * мог обнулить currentTime вместе с буфером, а часы живут своей жизнью.
+ * Пауза при замене сохраняется: пускать кадр за человека — не наше дело.
+ */
 function start(url: string): void {
   const el = videoEl.value
   if (el === null || playback === null) return
 
   const key = spotKey(mediaId.value, voiceKey.value, episode.value)
   const same = key === spot
-  const from = same ? el.currentTime : peekSpot(key)
+  const from = same ? Math.max(el.currentTime, at.value) : peekSpot(key)
+  const andPlay = same ? meant : true
+
   spot = key
-  playback.open(url, from)
+  playback.open(url, from, andPlay)
   applyRate()
 
   // Про смену качества плашка молчит: место не менялось, менялась картинка.
@@ -463,6 +522,12 @@ function stopFrame(): void {
   stalled.value = false
   resumeAt.value = 0
   hoverShare.value = -1
+  meant = false
+
+  // Замена ссылки под погашенным кадром смысла не имеет: заслонка сама
+  // спросит новую, и промахи считаются заново.
+  renewOn.value = false
+  renewMisses = 0
 
   if (resumeTimer !== 0) {
     window.clearTimeout(resumeTimer)
@@ -473,6 +538,75 @@ function stopFrame(): void {
   // уехавшей до первого движения мыши.
   calm.value = false
   menu.value = ''
+}
+
+/** Сколько жизни осталось у нынешней ссылки. Бесконечность — срока нет вовсе. */
+function linkLeft(): number {
+  const ends = stream.value?.expiresAt ?? null
+  return ends === null ? Number.POSITIVE_INFINITY : ends - Date.now()
+}
+
+/**
+ * Молча берёт новый адрес. Заслонка не поднимается и часы не сбрасываются:
+ * когда адрес приезжает, наблюдатель за ссылкой зовёт start(), а тот садится
+ * на ту же секунду и сохраняет паузу.
+ */
+async function renewLink(why: string): Promise<boolean> {
+  if (renewOn.value) return false
+
+  renewOn.value = true
+
+  try {
+    const ok = await renew()
+
+    if (ok) {
+      renewMisses = 0
+      Logger('INFO', `Плеер: ссылка заменена молча (${why})`)
+      return true
+    }
+
+    renewMisses += 1
+    Logger('WARN', `Плеер: новая ссылка не пришла (${why}), промах ${renewMisses}`)
+    return false
+  } finally {
+    renewOn.value = false
+  }
+}
+
+/**
+ * Присмотр за сроком. Меняем адрес заранее, пока старый ещё играет: замена
+ * стоит секунды ожидания, а промах по сроку — чёрного экрана посреди серии.
+ *
+ * Сказать человеку есть о чём ровно в одном случае: ссылка уже мертва, и новую
+ * не дают который раз подряд. Всё остальное он видеть не должен.
+ */
+function watchLink(): void {
+  if (veil.value || renewOn.value) return
+
+  const left = linkLeft()
+  if (left === Number.POSITIVE_INFINITY || left > RENEW_AHEAD_MS) return
+
+  void renewLink('срок на исходе').then((ok) => {
+    if (ok) return
+    if (linkLeft() > 0 || renewMisses < RENEW_TRIES) return
+
+    trouble.value = 'Источник перестал давать ссылки на эту серию.'
+  })
+}
+
+/**
+ * Поток встал. Мёртвый адрес — норма нашей добычи, а не отказ: берём новый
+ * и продолжаем с той же секунды. Жалоба здесь подняла бы заслонку, а с ней
+ * ушли бы и кадр, и место в серии — из-за того, что подпись протухла.
+ *
+ * Сеть лечить новым адресом нечем, и такой отказ идёт человеку сразу.
+ */
+async function onStreamDead(text: string, kind: DeadKind): Promise<void> {
+  if (kind === 'link' && renewMisses < RENEW_TRIES) {
+    if (await renewLink('поток оборвался')) return
+  }
+
+  trouble.value = text
 }
 
 /** «Сначала»: человек не согласен с меткой. Забываем её, чтобы не спорить. */
@@ -542,6 +676,7 @@ function onEnded(): void {
 function onPlay(): void {
   playing.value = true
   stalled.value = false
+  meant = true
   wake()
 }
 
@@ -569,9 +704,12 @@ function doToggle(): void {
   wake()
 
   if (!el.paused) {
+    meant = false
     el.pause()
     return
   }
+
+  meant = true
 
   void el.play().catch((e: unknown) => {
     Logger('WARN', 'Плеер: запуск не случился', e)
@@ -753,19 +891,26 @@ function doFullscreen(): void {
 }
 
 /**
- * Кадр в маленькое окно и обратно. Театр перед этим складывается: развёрнутое
- * окно накрыло бы окошко собой, да и движок в ответ на полный экран сам гасит
- * картинку в картинке — вышло бы нажатие без последствий.
+ * Кадр в маленькое окно и обратно.
+ *
+ * Вопрос об окошке уходит первым, до любого ожидания: движок требует живого
+ * жеста человека и тратит его целиком. Театр складывается вдогонку, пока движок
+ * думает: развёрнутое окно накрыло бы окошко собой. Прежде складывание шло
+ * первым — с ожиданием моста внутри, — и к вопросу об окошке жеста уже
+ * не оставалось: нажатие не делало ничего.
  */
 async function movePip(): Promise<void> {
   const link = cast
   if (link === null || veil.value) return
 
-  if (!pipOn.value && wide.value) await setWide(false)
+  const going = !pipOn.value
+  const asked = link.togglePip()
 
-  // Ответ берём сразу, но правда всё равно за событием тега: окошко закрывают
-  // и своим крестиком, мимо наших кнопок.
-  pipOn.value = await link.togglePip()
+  if (going && wide.value) await setWide(false)
+
+  // Ответ берём последним, но правда всё равно за событием тега: окошко
+  // закрывают и своим крестиком, мимо наших кнопок.
+  pipOn.value = await asked
   wake()
 }
 
@@ -830,14 +975,16 @@ const leftKeys = computed<Key[]>(() => [
 ])
 
 /**
- * Правый кластер: ссылка, два пути кадра из окна и полный экран. Полный экран
- * всегда последний. Картинки в картинке в списке нет вовсе, когда движок её
- * не умеет: кнопка, умеющая только жаловаться, хуже отсутствующей.
+ * Правый кластер: два пути кадра из окна и полный экран. Полный экран всегда
+ * последний. Картинки в картинке в списке нет вовсе, когда движок её не умеет:
+ * кнопка, умеющая только жаловаться, хуже отсутствующей.
+ *
+ * Кнопки ссылки здесь больше нет. Она просила человека починить то, о чём он
+ * знать не должен: срок подписанного адреса — наше дело, и меняется адрес
+ * молча, сам, до того как умрёт.
  */
 const rightKeys = computed<Key[]>(() => {
-  const keys: Key[] = [
-    { tip: 'Взять ссылку заново', sign: SIGN.againHead, line: LINE.again, run: refresh },
-  ]
+  const keys: Key[] = []
 
   if (pipReady.value) {
     keys.push({
@@ -955,19 +1102,23 @@ onMounted(() => {
   const el = videoEl.value
   if (el !== null) {
     playback = attachPlayback(el, {
-      onFatal: (text) => {
-        trouble.value = text
+      onFatal: (text, kind) => {
+        void onStreamDead(text, kind)
       },
     })
 
     // Умения кадра вне окна спрашиваются один раз: движок по ходу дела мнения
-    // не меняет, а вот приёмники в сети приезжают и уезжают сами.
+    // не меняет, а вот приёмники в сети приезжают и уезжают сами. Исключение
+    // одно: путь, отказавший насовсем, связка хоронит и говорит об этом.
     cast = attachCast(el, {
       onPip: (on) => {
         pipOn.value = on
       },
       onCast: (state) => {
         castState.value = state
+      },
+      onPipReady: (able) => {
+        pipReady.value = able
       },
     })
     pipReady.value = cast.pipReady
@@ -988,6 +1139,10 @@ onMounted(() => {
   window.addEventListener('keydown', onKey)
   window.addEventListener('pointerdown', onDown)
 
+  // Присмотр за сроком ссылки. Часы у неё свои, и узнать о её смерти из
+  // оборвавшегося потока — значит узнать слишком поздно.
+  renewTimer = window.setInterval(watchLink, RENEW_TICK_MS)
+
   // Метки нужны и полке серий, и первому кадру: просим их пораньше.
   void whenWatchReady()
   void load()
@@ -1004,6 +1159,7 @@ watch(mediaId, () => {
   stalled.value = false
   resumeAt.value = 0
   menu.value = ''
+  meant = false
   void load()
 })
 
@@ -1045,6 +1201,10 @@ onBeforeUnmount(() => {
   window.removeEventListener('pointerdown', onDown)
   if (calmTimer !== 0) window.clearTimeout(calmTimer)
   if (resumeTimer !== 0) window.clearTimeout(resumeTimer)
+  if (renewTimer !== 0) {
+    window.clearInterval(renewTimer)
+    renewTimer = 0
+  }
   document.body.style.overflow = ''
 
   // Отложенная запись уход с экрана не переживёт: просим записать сейчас.
@@ -1107,13 +1267,15 @@ onBeforeUnmount(() => {
 
             <!-- Центр кадра. Оба знака центрует сетка обёртки, а не сдвиг
                  трансформацией: кольцу нужен свой поворот, и два разных списка
-                 трансформаций браузер сводил в одну матрицу — знак уезжал. -->
+                 трансформаций браузер сводил в одну матрицу — знак уезжал.
+                 Колесо главнее знака паузы: пока мы ждём буфер или новый адрес,
+                 кадр стоит не потому, что человек его остановил. -->
             <div v-if="!veil" class="am-play__mid" aria-hidden="true">
-              <span v-if="!playing" class="am-play__hold">
+              <span v-if="waiting" class="am-play__wait" />
+
+              <span v-else-if="!playing" class="am-play__hold">
                 <Icon :d="SIGN.play" />
               </span>
-
-              <span v-else-if="stalled" class="am-play__wait" />
             </div>
 
             <div v-if="veil" class="am-play__veil">
