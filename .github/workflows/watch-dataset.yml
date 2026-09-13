@@ -421,4 +421,54 @@ jobs:
             echo 'хуже его отсутствия.'
             echo ''
             echo 'Клиенты в это время живут на предыдущем выпуске, а чего в нём нет —'
-            echo 'спрашивают в сети по ходу. Ср
+            echo 'спрашивают в сети по ходу. Срочности нет, но и тянуть незачем.'
+            echo ''
+            echo '<!-- watch-dataset -->'
+          } > body.md
+
+          # Метка в теле, а не ярлык: ярлык надо сначала завести руками,
+          # и первый же прогон упал бы на его отсутствии.
+          number="$(gh issue list --state open --limit 100 --json number,body \
+            --jq 'map(select(.body | test("watch-dataset"))) | .[0].number // empty')"
+
+          if [ -n "$number" ]; then
+            gh issue edit "$number" --title "$title" --body-file body.md
+            echo "Задача #$number обновлена"
+          else
+            gh issue create --title "$title" --body-file body.md
+          fi
+
+      # Сам за собой убирает: выпуск вернулся — задача закрывается без человека.
+      # Иначе список задач копил бы мёртвые напоминания, а их перестают читать.
+      #
+      # Закрываем только когда в порядке оба первых ответа. Состояние unknown
+      # у свежести к закрытию не ведёт намеренно: таймаут Шикимори не должен
+      # выглядеть как починка.
+      #
+      # У карты условие мягче — не 'true', а не строгое 'false'. Её unknown
+      # означает выпуск старого формата, где раздела map нет вовсе, и строгое
+      # условие держало бы задачу открытой вечно даже после настоящей починки.
+      - name: Закрыть задачу, если всё в порядке
+        if: ${{ steps.age.outputs.stale == 'false' && steps.fresh.outputs.stale == 'false' && steps.map.outputs.stale != 'true' }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+          # Тот же GH_REPO и по той же причине, что в шаге выше. Здесь его
+          # отсутствие было вреднее всего: сторож не мог закрыть даже ту
+          # задачу, которую сам когда-то завёл.
+          GH_REPO: ${{ github.repository }}
+          DAYS: ${{ steps.age.outputs.days }}
+          TAG: ${{ steps.age.outputs.tag }}
+          LAG: ${{ steps.fresh.outputs.lag }}
+          MAP_DAYS: ${{ steps.map.outputs.days }}
+        run: |
+          set -euo pipefail
+
+          number="$(gh issue list --state open --limit 100 --json number,body \
+            --jq 'map(select(.body | test("watch-dataset"))) | .[0].number // empty')"
+
+          if [ -z "$number" ]; then
+            echo "Выпуск $TAG свежий ($DAYS дн., отставание $LAG номеров, карте $MAP_DAYS дн.), задач нет"
+            exit 0
+          fi
+
+          gh issue close "$number" --comment "Выпуск $TAG на месте: возраст $DAYS дн., отставание $LAG номеров, карте $MAP_DAYS дн. Сторож закрывает сам."
