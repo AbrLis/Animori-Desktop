@@ -8,22 +8,49 @@
 // Смена качества у нас — это другой манифест, а не другая дорожка внутри
 // одного: Kodik отдаёт каждое качество своим адресом без общего списка.
 // Поэтому open() всегда принимает секунду, с которой продолжать.
+//
+// ОТКАЗ РАЗЛИЧАЕТСЯ ПО ПРИЧИНЕ, А НЕ ПО ТЕКСТУ
+// Прежде наружу уходила одна строка на все случаи, и она же звала человека
+// нажать кнопку: «ссылка могла устареть — переспросите её». Причин две, и
+// лечатся они по-разному. Кончилась подпись адреса — площадка отвечает 403,
+// и это норма нашей добычи: лечится новым адресом, а не словами. Оборвалась
+// сеть — тут человеку и правда есть что проверить. Поэтому наверх уходит вид
+// отказа, а решение «молчать и переспросить» принимает экран.
 import Hls from 'hls.js'
 
 import { Logger } from '@/utils/logger'
 
+/**
+ * Почему поток дальше не пойдёт.
+ *
+ *   'link' — адрес больше не отдают: срок подписи вышел. Лечится новой
+ *            ссылкой, и человеку об этом знать незачем.
+ *   'net'  — оборвалась связь, площадка молчит или движок не умеет HLS.
+ *            Новый адрес тут ничего не изменит.
+ */
+export type DeadKind = 'link' | 'net'
+
 /** Что экран умеет с воспроизведением. */
 export interface Playback {
-  /** Открывает манифест и садится на startAt секунд. */
-  open: (url: string, startAt: number) => void
+  /**
+   * Открывает манифест и садится на startAt секунд.
+   *
+   * `andPlay` = false нужен молчаливой замене адреса на паузе: человек
+   * остановил кадр сам, и продолжать за него нельзя.
+   */
+  open: (url: string, startAt: number, andPlay?: boolean) => void
   /** Гасит воспроизведение и освобождает память под буферы. */
   close: () => void
 }
 
 /** Обратные вызовы экрана. */
 export interface PlaybackHooks {
-  /** Непоправимая ошибка: ссылка мертва или поток не читается. */
-  onFatal: (text: string) => void
+  /**
+   * Непоправимая ошибка: ссылка мертва или поток не читается. Текст — на
+   * случай, если экран решит сказать о ней человеку; вид отказа — чтобы
+   * он мог сначала попробовать вылечить всё сам.
+   */
+  onFatal: (text: string, kind: DeadKind) => void
 }
 
 /**
@@ -44,9 +71,31 @@ const TUNE = {
 /** Сколько раз поднимать загрузку после срыва сети, прежде чем сдаться. */
 const NET_TRIES = 2
 
+/**
+ * Чем площадка отвечает на мёртвую подпись. 403 — обычный её ответ, 401 и 410
+ * встречались на пробах. Текст ответа разбирать незачем: код однозначен,
+ * а слова у каждой площадки свои.
+ */
+const GONE = [401, 403, 410]
+
+/** Коды тега <video>: сетевой отказ и непонятный источник. */
+const ERR_NET = 2
+const ERR_SRC = 4
+
 /** Родной HLS есть только у WebKit; проверка дешёвая и честная. */
 function nativeHls(video: HTMLVideoElement): boolean {
   return video.canPlayType('application/vnd.apple.mpegurl') !== ''
+}
+
+/**
+ * Код ответа площадки из отказа библиотеки. Поле необязательное и в описаниях
+ * плавает от версии к версии, поэтому спрашиваем его по факту, а не по типу.
+ */
+function codeOf(data: unknown): number {
+  const box = data as { response?: { code?: unknown } }
+  const code = box.response?.code
+
+  return typeof code === 'number' ? code : 0
 }
 
 /**
@@ -59,6 +108,9 @@ export function attachPlayback(video: HTMLVideoElement, hooks: PlaybackHooks): P
   let tries = 0
   let want = 0
 
+  /** Пускать ли кадр после разбора манифеста. Слово за open(). */
+  let go = true
+
   /** Посадка на нужную секунду: раньше готовности перемотка молча теряется. */
   function seat(): void {
     if (want <= 0) return
@@ -67,6 +119,9 @@ export function attachPlayback(video: HTMLVideoElement, hooks: PlaybackHooks): P
   }
 
   function play(): void {
+    // Замена адреса на паузе кадр не пускает: пауза — слово человека.
+    if (!go) return
+
     void video.play().catch((e: unknown) => {
       // Автозапуск мог быть запрещён — это не отказ, кнопка на месте.
       Logger('WARN', 'Плеер: автозапуск не случился', e)
@@ -78,9 +133,34 @@ export function attachPlayback(video: HTMLVideoElement, hooks: PlaybackHooks): P
     hls = null
   }
 
+  /** Отказ родного пути: у тега свои коды, и они грубее библиотечных. */
+  const onNativeError: EventListener = () => {
+    const code = video.error?.code ?? 0
+
+    // Мёртвая подпись у родного пути выглядит сетевым отказом или испорченным
+    // источником: и то и другое лечится новым адресом, а не жалобой.
+    if (code === ERR_NET || code === ERR_SRC) {
+      Logger('WARN', `Плеер: тег не принял поток (код ${code}), похоже на мёртвую ссылку`)
+      hooks.onFatal('Ссылка на поток больше не действует.', 'link')
+      return
+    }
+
+    Logger('ERROR', `Плеер: тег остановил воспроизведение (код ${code})`)
+    hooks.onFatal('Поток оборвался. Проверьте сеть и нажмите «Переспросить».', 'net')
+  }
+
   /** Разбор отказа: сеть и звук лечатся на месте, остальное — наверх. */
-  function onError(details: string, kind: string): void {
+  function onError(details: string, kind: string, code: number): void {
     if (hls === null) return
+
+    // Срок подписи вышел. Повторять загрузку бессмысленно: тот же адрес
+    // площадка не отдаст ни с какой попытки.
+    if (GONE.includes(code)) {
+      Logger('WARN', `Плеер: площадка не отдаёт поток (${details}, код ${code})`)
+      drop()
+      hooks.onFatal('Ссылка на поток больше не действует.', 'link')
+      return
+    }
 
     if (kind === Hls.ErrorTypes.NETWORK_ERROR && tries < NET_TRIES) {
       tries += 1
@@ -97,19 +177,34 @@ export function attachPlayback(video: HTMLVideoElement, hooks: PlaybackHooks): P
 
     Logger('ERROR', `Плеер: воспроизведение остановлено (${details})`)
     drop()
-    hooks.onFatal('Поток оборвался. Ссылка могла устареть: переспросите её.')
+
+    // Сеть своё уже отработала выше, так что здесь она и есть сеть. Всё
+    // прочее пробуем вылечить новым адресом: у нашей добычи это первая
+    // и самая частая причина.
+    if (kind === Hls.ErrorTypes.NETWORK_ERROR) {
+      hooks.onFatal('Поток оборвался. Проверьте сеть и нажмите «Переспросить».', 'net')
+      return
+    }
+
+    hooks.onFatal('Источник не даёт рабочую ссылку на эту серию.', 'link')
   }
 
-  function open(url: string, startAt: number): void {
+  function open(url: string, startAt: number, andPlay = true): void {
     want = startAt
     tries = 0
+    go = andPlay
 
     // Родной путь: браузер сам разберёт манифест, обёртка лишняя.
     if (!Hls.isSupported()) {
       if (!nativeHls(video)) {
-        hooks.onFatal('Этот движок не умеет HLS: смотреть нечем.')
+        hooks.onFatal('Этот движок не умеет HLS: смотреть нечем.', 'net')
         return
       }
+
+      // Слушатель один на все открытия: иначе на смене качества их копилось
+      // бы по числу серий, и один отказ докладывался бы многократно.
+      video.removeEventListener('error', onNativeError)
+      video.addEventListener('error', onNativeError)
 
       video.src = url
       video.addEventListener('loadedmetadata', seat, { once: true })
@@ -129,7 +224,7 @@ export function attachPlayback(video: HTMLVideoElement, hooks: PlaybackHooks): P
 
     next.on(Hls.Events.ERROR, (_event, data) => {
       if (!data.fatal) return
-      onError(String(data.details), String(data.type))
+      onError(String(data.details), String(data.type), codeOf(data))
     })
 
     next.loadSource(url)
@@ -138,6 +233,7 @@ export function attachPlayback(video: HTMLVideoElement, hooks: PlaybackHooks): P
 
   function close(): void {
     drop()
+    video.removeEventListener('error', onNativeError)
     video.removeAttribute('src')
     video.load()
   }

@@ -8,6 +8,21 @@
 // Ссылки не кэшируются нигде: у Kodik они живут часы, и отдавать
 // протухшую вместо отказа хуже, чем спросить заново. А вот выбор человека —
 // озвучка, серия, качество — живёт в player-keep и переживает закрытие окна.
+//
+// СРОК ССЫЛКИ — НАШЕ ДЕЛО, А НЕ ЗАБОТА ЧЕЛОВЕКА
+// Спросить адрес заново можно двумя способами, и разница между ними видна
+// на экране:
+//
+//   refresh() — открытый: гасит кадр, поднимает заслонку, пишет жалобу.
+//               Годится там, где человек уже смотрит на отказ.
+//   renew()   — молчаливый: кадр остаётся на месте, заслонка не поднимается,
+//               trouble не трогается вовсе. Новый объект потока просто встаёт
+//               на место старого, а экран сам садится на ту же секунду.
+//
+// Нормальный путь — второй. Час смерти ссылки известен заранее (expiresAt),
+// значит менять её можно до того, как она умрёт, и знать про подписи и сроки
+// человеку незачем. Открытый путь остаётся на тот случай, когда молчаливый
+// не помог: источник и правда ничего не отдаёт.
 import { computed, ref, type ComputedRef, type Ref } from 'vue'
 
 import { fetchMediaCard, type MediaCard } from '@/api/anilist-media'
@@ -69,6 +84,8 @@ export interface PlayerView {
   pickHeight: (height: number) => void
   nextEpisode: () => void
   refresh: () => void
+  /** Молча взять свежий адрес того же, что играет. Ответ: вышло или нет. */
+  renew: () => Promise<boolean>
   openCard: () => void
 }
 
@@ -155,40 +172,74 @@ export function usePlayer(mediaId: Ref<number>): PlayerView {
     }
   }
 
-  /** Ссылки на выбранную серию. Запрашиваются в последний момент. */
-  async function resolve(mine: number): Promise<void> {
+  /**
+   * Ссылки на выбранную серию. Запрашиваются в последний момент.
+   *
+   * `quiet` — замена адреса под играющим кадром: ни заслонки, ни жалоб,
+   * ни обнулённого stream. Ответ говорит, вышло ли: решать, показывать
+   * ли отказ, будет экран.
+   */
+  async function askLink(mine: number, quiet: boolean): Promise<boolean> {
     const req = request()
     const row = voices.value.find((v) => v.key === voiceKey.value)
-    if (req === null || !row || episode.value === 0) return
+    if (req === null || !row || episode.value === 0) return false
 
     const source = getVideoSource(row.sourceId)
-    if (source === null) return
+    if (source === null) return false
 
-    stream.value = null
+    if (!quiet) stream.value = null
 
     try {
-      const found = await source.resolve(req, row.voiceId, episode.value)
-      if (mine !== run) return
+      let found = await source.resolve(req, row.voiceId, episode.value)
+      if (mine !== run) return false
+
+      // Час в подписи округляется вверх, поэтому ссылка на исходе срока — это
+      // чаще всего невезение, а не приговор: второй вопрос обычно приносит
+      // следующий час. Спрашиваем сами, а не зовём человека нажать кнопку.
+      if (found !== null && !isStreamFresh(found)) {
+        Logger('WARN', `Плеер: источник ${row.sourceId} отдал ссылку на исходе срока, спрашиваю снова`)
+
+        const again = await source.resolve(req, row.voiceId, episode.value)
+        if (mine !== run) return false
+        if (again !== null && isStreamFresh(again)) found = again
+      }
 
       if (found === null) {
-        trouble.value = 'Источник не дал ссылку на эту серию. Попробуйте другую озвучку.'
-        return
+        if (!quiet) {
+          trouble.value = 'Источник не дал ссылку на эту серию. Попробуйте другую озвучку.'
+        }
+        return false
       }
 
       // Протухшая ссылка до плеера не дойдёт: чёрный экран хуже отказа.
       if (!isStreamFresh(found)) {
-        Logger('WARN', `Плеер: источник ${row.sourceId} отдал ссылку на исходе срока`)
-        trouble.value = 'Ссылка источника успела устареть. Нажмите «Переспросить».'
-        return
+        Logger('WARN', `Плеер: источник ${row.sourceId} отдаёт только просроченные ссылки`)
+        if (!quiet) {
+          trouble.value = 'Источник отдаёт только просроченные ссылки. Попробуйте другую озвучку.'
+        }
+        return false
       }
 
       const track = pickTrack(found.tracks, height.value)
       stream.value = track === null ? found : { ...found, preferred: track }
-      trouble.value = ''
+      if (!quiet) trouble.value = ''
+      return true
     } catch (e) {
-      if (mine !== run) return
+      if (mine !== run) return false
+
+      if (quiet) {
+        Logger('WARN', 'Плеер: молчаливая замена ссылки не удалась', e)
+        return false
+      }
+
       trouble.value = describe(e)
+      return false
     }
+  }
+
+  /** Открытый заход за ссылкой: с заслонкой и жалобой, если не вышло. */
+  async function resolve(mine: number): Promise<void> {
+    await askLink(mine, false)
   }
 
   /** Серии выбранной озвучки, затем ссылки на нужную из них. */
@@ -364,10 +415,19 @@ export function usePlayer(mediaId: Ref<number>): PlayerView {
     if (next) pickEpisode(next.number)
   }
 
-  /** Переспросить ссылки: цепочка могла рассыпаться, а срок — выйти. */
+  /** Переспросить ссылки открыто: человек уже смотрит на отказ. */
   function refresh(): void {
     trouble.value = ''
     void resolve(++run)
+  }
+
+  /**
+   * Молчаливая замена адреса. Кадр не гасится и жалоба не пишется: пока
+   * старая ссылка ещё жива, человеку не на что смотреть, а когда новая
+   * приедет, экран пересядет на ту же секунду сам.
+   */
+  async function renew(): Promise<boolean> {
+    return await askLink(++run, true)
   }
 
   /**
@@ -415,6 +475,7 @@ export function usePlayer(mediaId: Ref<number>): PlayerView {
     pickHeight,
     nextEpisode,
     refresh,
+    renew,
     openCard,
   }
 }
