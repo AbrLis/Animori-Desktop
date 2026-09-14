@@ -28,9 +28,15 @@
 
 /* Герой карточки: баннер фоном, текст поверх тёмной завеси.
    Цвет текста поверх баннера не тематический: завеса под ним тёмная
-   и в светлой теме. Объявлен один раз, дальше только var(). */
+   и в светлой теме. Объявлен один раз, дальше только var().
+
+   Поля шапки тоже живут переменными: описание справа съедает их
+   отрицательными отступами, и два независимых clamp() в разных правилах
+   расходились от любой правки одного из них. */
 .am-hero {
   --am-on-art: #eef3fb;
+  --am-hero-pad-y: clamp(30px, 3.6vw, 56px);
+  --am-hero-pad-x: clamp(20px, 2vw, 34px);
 
   position: relative;
   overflow: hidden;
@@ -68,12 +74,17 @@
     );
 }
 
+/* Постер с названием стоят по середине баннера: прежние поля были
+   в четыре раза больше сверху, чем снизу, и блок оседал на нижний край,
+   а над ним пустовала полоса картинки в палец шириной. Равные поля плюс
+   center — вся геометрия центровки: высоту шапке задаёт сам блок,
+   поэтому выравнивать его внутри неё нечем, кроме отступов. */
 .am-hero__body {
   position: relative;
   display: flex;
   gap: clamp(18px, 2vw, 30px);
-  align-items: flex-end;
-  padding: clamp(64px, 9vw, 116px) clamp(20px, 2vw, 34px) clamp(20px, 1.6vw, 28px);
+  align-items: center;
+  padding: var(--am-hero-pad-y) var(--am-hero-pad-x);
 }
 
 /* Постер той же формы, что плитка в сетках: переход из списка в карточку
@@ -102,7 +113,6 @@
   flex-direction: column;
   gap: 8px;
   min-width: 0;
-  padding-bottom: 6px;
 }
 
 .am-hero__title {
@@ -128,20 +138,21 @@
    Это не панель поверх картинки, а правая полоса самого баннера:
    отрицательные поля съедают отступы шапки, и блок идёт от верхнего
    края до нижнего и до правого края. Рамки и скругления сняты
-   намеренно — с ними текст читался наклейкой поверх кадра. */
+   намеренно — с ними текст читался наклейкой поверх кадра.
+
+   Слой размытия лежит за содержимым блока, а не за всей шапкой,
+   поэтому здесь свой контекст наложения. */
 .am-hero__note {
+  position: relative;
   display: flex;
   flex: 1;
   flex-direction: column;
   gap: 8px;
   align-self: stretch;
   min-width: 0;
-  margin:
-    calc(-1 * clamp(64px, 9vw, 116px))
-    calc(-1 * clamp(20px, 2vw, 34px))
-    calc(-1 * clamp(20px, 1.6vw, 28px))
-    0;
-  padding: 16px clamp(20px, 2vw, 34px) 16px clamp(30px, 3.2vw, 56px);
+  margin: calc(-1 * var(--am-hero-pad-y)) calc(-1 * var(--am-hero-pad-x)) calc(-1 * var(--am-hero-pad-y)) 0;
+  padding: 16px var(--am-hero-pad-x) 16px clamp(30px, 3.2vw, 56px);
+  isolation: isolate;
 }
 
 /* Размытие своим слоем, а не на самом блоке: маска гасит его влево,
@@ -163,12 +174,6 @@
   backdrop-filter: blur(var(--am-blur)) saturate(1.1);
   -webkit-mask-image: linear-gradient(90deg, transparent 0%, #000 34%);
   mask-image: linear-gradient(90deg, transparent 0%, #000 34%);
-}
-
-/* Слой размытия лежит за содержимым блока, а не за всей шапкой. */
-.am-hero__note {
-  position: relative;
-  isolation: isolate;
 }
 
 .am-hero__noteh {
@@ -206,8 +211,12 @@
   width: 100%;
 }
 
+/* Кегль плавающий и заметно крупнее панельного: полоса описания
+   в шапке шириной в полбаннера, и 13.5px терялись в ней мелочью,
+   оставляя под коротким текстом пустую полосу во всю высоту. */
 .am-about--art {
-  font-size: 13.5px;
+  font-size: clamp(14.5px, 1.05vw, 17px);
+  line-height: 1.62;
   color: color-mix(in srgb, var(--am-on-art) 86%, transparent);
 }
 
@@ -368,70 +377,57 @@
   box-shadow: 0 0 10px rgb(var(--am-accent-rgb) / 0.7);
 }
 
-/* Доска карточки: описание, колонка записи, музыка, франшиза
-   и люди на именованных областях. На узком окне описание здесь же,
-   на широком оно уходит в шапку, и раскладка меняется сама:
-   области выбираются через :has(), а не классом от логики.
-   position: relative здесь не для красоты: на широком окне виджет
-   франшизы становится абсолютным и опирается на свою область доски. */
+/* Доска карточки: описание, запись, оценки, музыка, франшиза и люди
+   раскладываются потоком, а не по именованным областям.
+
+   Области обещали «красиво при любой ширине», а давали обратное:
+   под коротким описанием оставался чёрный прогал в полэкрана, шаблон
+   приходилось описывать заново на каждом рубеже ширины, а липкая колонка
+   записи внутри растянутой области наползала на музыку и франшизу.
+
+   Колонки и высоты считает media-board.ts: он ставит число колонок
+   по ширине доски и переводит натуральную высоту каждой плитки в шаги
+   вертикальной сетки, а dense-поток закрывает оставшиеся дыры сам.
+   Правила ниже — состояние до первой перекладки: обычная сетка
+   с плитками в порядке разметки. */
 .am-board {
-  position: relative;
   display: grid;
-  grid-template-areas:
-    "about mine"
-    "about tune"
-    "fran fran"
-    "folk folk";
-  grid-template-columns: minmax(0, 84ch) 380px;
+  grid-auto-flow: row dense;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
   gap: var(--am-gap);
   align-items: start;
-  justify-content: start;
   margin-top: var(--am-gap);
 }
 
-/* У половины тайтлов тем нет и виджет музыки не рисуется вовсе:
-   без этой ветки от пустой области оставался лишний просвет. */
-.am-board:not(:has(.am-tune)) {
-  grid-template-areas:
-    "about mine"
-    "fran fran"
-    "folk folk";
+/* Шаг вертикальной сетки приходит из скрипта вместе со span у плиток.
+   Без него строки остаются автоматическими: раскладка теряет плотность,
+   но не рассыпается. */
+.am-board--flow {
+  grid-auto-rows: var(--am-board-row, 8px);
 }
 
-.am-split__main {
-  grid-area: about;
-}
-
-/* Колонка записи липнет к верху: при описании на два экрана своя оценка
-   и счёт частей уезжали за край окна. */
-.am-split__side {
-  position: sticky;
-  top: 76px;
-  grid-area: mine;
-}
-
+/* Обёртки логики сквозные: плиткой сетка считает саму панель. У половины
+   тайтлов тем нет и виджет музыки не рисуется вовсе — пустая коробка
+   не должна занимать место в потоке. */
 .am-split__main,
-.am-split__side {
-  display: flex;
-  flex-direction: column;
-  gap: var(--am-gap);
-  min-width: 0;
-}
-
-/* Обёртка музыки сквозная: сетка видит саму панель, и когда тем нет,
-   область не занимает пустая коробка. */
+.am-split__side,
 .am-board__tune {
   display: contents;
 }
 
-.am-board .am-tune {
-  grid-area: tune;
+.am-board > *,
+.am-board .am-tune,
+.am-board .am-about-box,
+.am-board .am-mine,
+.am-board .am-rates {
   min-width: 0;
 }
 
+/* Люди — полка во всю ширину доски: ряд портретов в одной колонке
+   вставал лестницей, а прокрутка полки теряла смысл. */
 .am-board__folk {
   display: flex;
-  grid-area: folk;
+  grid-column: 1 / -1;
   flex-direction: column;
   gap: var(--am-gap);
   min-width: 0;
@@ -658,18 +654,17 @@
   font-variant-numeric: tabular-nums;
 }
 
-/* Франшиза — хронология строками на полный ряд доски. Полка больших
-   постеров здесь не работала: три тайтла съедали полэкрана, а год,
-   название и метки под каждым постером вставали лесенкой. */
+/* Франшиза — хронология строками. Полка больших постеров здесь
+   не работала: три тайтла съедали полэкрана, а год, название и метки
+   под каждым постером вставали лесенкой. */
 .am-fran {
   display: flex;
-  grid-area: fran;
   flex-direction: column;
   gap: 14px;
 }
 
 /* Строки раскладываются в столько колонок, сколько влезает в ширину
-   доски: длинная хронология не вытягивается в простыню на весь экран,
+   плитки: длинная хронология не вытягивается в простыню на весь экран,
    а короткая не оставляет пустыря справа. Прокрутка полки снята:
    скрытое за правым краем в хронологии никто не искал. */
 .am-fran .am-rail {
@@ -832,97 +827,7 @@
   color: var(--am-faint);
 }
 
-/* Широкое окно: описание ушло в шапку, и доска остаётся за виджетами:
-   запись узкой колонкой, музыка рядом — ей нужна ширина под таймлайн. */
-@media (min-width: 1400px) {
-  .am-board {
-    grid-template-areas:
-      "mine tune"
-      "fran fran"
-      "folk folk";
-    grid-template-columns: 380px minmax(0, 1fr);
-    justify-content: stretch;
-  }
-
-  .am-board:not(:has(.am-tune)) {
-    grid-template-areas:
-      "mine fran"
-      "folk folk";
-  }
-}
-
-/* Очень широкое окно: три виджета в ряд, люди ниже во всю ширину.
-   Раньше области зависели от длины хронологии (классы --fran-long
-   и --fran-short), и карточка перестраивалась целиком от одного лишнего
-   сиквела. Теперь раскладка одна, а решает её сама разметка. */
-@media (min-width: 1700px) {
-  /* Франшизы у тайтла нет вовсе (блока в разметке нет): правый край
-     доски отдаётся людям, иначе справа оставалась пустота в полэкрана. */
-  .am-board:has(.am-tune):not(:has(.am-fran)) {
-    grid-template-areas: "mine tune folk";
-    grid-template-columns: 380px minmax(0, 1fr) minmax(320px, 1fr);
-  }
-
-  /* Нижняя граница первого ряда есть не зря: высоту виджету задают
-     соседи слева, а у короткой записи и пары тем франшиза иначе
-     сжалась бы в полоску с прокруткой на десяток тайтлов. */
-  .am-board:has(.am-tune):has(.am-fran) {
-    grid-template-areas:
-      "mine tune fran"
-      "folk folk folk";
-    grid-template-columns: 380px minmax(0, 1fr) minmax(300px, 1fr);
-    grid-template-rows: minmax(320px, auto) auto;
-  }
-
-  /* Виджет вынут из потока сетки: абсолютный элемент внутри
-     relative-доски лежит ровно в своей области, но её высоту не растит.
-     Поэтому длина виджета всегда одна и та же, сколько бы тайтлов
-     в хронологии ни было. */
-  .am-board:has(.am-tune):has(.am-fran) .am-fran {
-    position: absolute;
-    inset: 0;
-    grid-area: fran;
-    min-height: 0;
-    overflow: hidden;
-  }
-
-  /* В узкой колонке колонка ровно одна, а не влезшие тайтлы
-     прокручиваются внутри виджета. */
-  .am-board:has(.am-tune):has(.am-fran) .am-fran .am-rail {
-    display: flex;
-    flex: 1;
-    flex-direction: column;
-    gap: 2px;
-    min-height: 0;
-    overflow-x: hidden;
-    overflow-y: auto;
-  }
-}
-
 @media (max-width: 1180px) {
-  .am-board {
-    grid-template-areas:
-      "about"
-      "mine"
-      "tune"
-      "fran"
-      "folk";
-    grid-template-columns: minmax(0, 1fr);
-  }
-
-  .am-board:not(:has(.am-tune)) {
-    grid-template-areas:
-      "about"
-      "mine"
-      "fran"
-      "folk";
-  }
-
-  /* В одну колонку липкая запись не нужна: она и так сразу под описанием. */
-  .am-split__side {
-    position: static;
-  }
-
   .am-hero__cover {
     width: clamp(132px, 30vw, 168px);
   }
