@@ -82,15 +82,18 @@ function lay(board: HTMLElement): void {
   // встала, поэтому мерить до этого нечего.
   for (const el of list) keep(el, 'gridColumn', `span ${wantCols(el, cols)}`)
 
-  const tall = list.map((el) => el.getBoundingClientRect().height)
+  // Меряем все плитки разом и держим высоту рядом с плиткой: два
+  // параллельных массива пришлось бы сводить по индексу, а строгая сборка
+  // о таком соответствии не знает и считает элемент возможным пропуском.
+  const sized = list.map((el) => ({ el, high: el.getBoundingClientRect().height }))
 
   board.style.setProperty('--am-board-row', `${ROW}px`)
   board.classList.add('am-board--flow')
 
-  list.forEach((el, at) => {
-    const steps = Math.max(1, Math.ceil((tall[at] + gap) / (ROW + gap)))
+  for (const { el, high } of sized) {
+    const steps = Math.max(1, Math.ceil((high + gap) / (ROW + gap)))
     keep(el, 'gridRowEnd', `span ${steps}`)
-  })
+  }
 }
 
 /**
