@@ -121,6 +121,72 @@
   color: color-mix(in srgb, var(--am-on-art) 62%, transparent);
 }
 
+/* Описание в шапке (только широкое окно, блок рисуется разметкой).
+   Правая половина баннера пустовала, пока самый читаемый текст
+   карточки сидел панелью ниже. Стекло, а не плотная заливка:
+   под блоком должна угадываться картинка. */
+.am-hero__note {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 10px;
+  align-self: flex-end;
+  min-width: 0;
+  max-width: 78ch;
+  padding: 14px 8px 14px 16px;
+  background: var(--am-glass-2);
+  border: 1px solid color-mix(in srgb, var(--am-on-art) 13%, transparent);
+  border-radius: var(--am-r-l);
+  backdrop-filter: blur(var(--am-blur-strong)) saturate(1.2);
+}
+
+/* Высота блока задана жёстко и совпадает с постером (ширина постера
+   на полтора: у него пропорция 2/3). Болтливый источник иначе растягивал
+   баннер на два экрана, поэтому лишнее уходит в прокрутку, а не под
+   кнопку «читать полностью»: та ломала бы шапку в момент нажатия. */
+.am-hero__note {
+  max-height: calc(clamp(150px, 13vw, 226px) * 1.5);
+}
+
+.am-hero__noteh {
+  flex: none;
+  margin: 0;
+  color: color-mix(in srgb, var(--am-on-art) 74%, transparent);
+}
+
+/* Прокручивается только текст: ссылки на источники лежат ниже
+   самой прокрутки и видны всегда. overscroll-behavior держит колесо
+   внутри: иначе после последней строки страница улетала вниз. */
+.am-hero__scroll {
+  min-height: 0;
+  padding-right: 8px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+  scrollbar-color: color-mix(in srgb, var(--am-on-art) 30%, transparent) transparent;
+}
+
+/* В шапке ограничение длины строки даёт сама колонка, а цвет
+   берётся от текста поверх картинки, а не от темы. */
+.am-about--art {
+  max-width: none;
+  font-size: 13.5px;
+  color: color-mix(in srgb, var(--am-on-art) 84%, transparent);
+}
+
+.am-about__tail--art {
+  flex: none;
+  margin: 0;
+  padding-top: 10px;
+  padding-right: 8px;
+  color: color-mix(in srgb, var(--am-on-art) 58%, transparent);
+  border-top: 1px solid color-mix(in srgb, var(--am-on-art) 12%, transparent);
+}
+
+.am-about__tail--art .am-about__link {
+  color: color-mix(in srgb, var(--am-on-art) 78%, transparent);
+}
+
 .am-pills {
   display: flex;
   flex-wrap: wrap;
@@ -265,8 +331,10 @@
   box-shadow: 0 0 10px rgb(var(--am-accent-rgb) / 0.7);
 }
 
-/* Доска карточки: описание, колонка записи, франшиза и люди на одних
-   областях. На узком окне франшиза — полка на полный ряд, люди ниже.
+/* Доска карточки: описание, колонка записи, музыка, франшиза
+   и люди на именованных областях. На узком окне описание здесь же,
+   на широком оно уходит в шапку, и раскладка меняется сама:
+   области выбираются через :has(), а не классом от логики.
    position: relative здесь не для красоты: на широком окне виджет
    франшизы становится абсолютным и опирается на свою область доски. */
 .am-board {
@@ -274,6 +342,7 @@
   display: grid;
   grid-template-areas:
     "about mine"
+    "about tune"
     "fran fran"
     "folk folk";
   grid-template-columns: minmax(0, 84ch) 380px;
@@ -281,6 +350,15 @@
   align-items: start;
   justify-content: start;
   margin-top: var(--am-gap);
+}
+
+/* У половины тайтлов тем нет и виджет музыки не рисуется вовсе:
+   без этой ветки от пустой области оставался лишний просвет. */
+.am-board:not(:has(.am-tune)) {
+  grid-template-areas:
+    "about mine"
+    "fran fran"
+    "folk folk";
 }
 
 .am-split__main {
@@ -300,6 +378,17 @@
   display: flex;
   flex-direction: column;
   gap: var(--am-gap);
+  min-width: 0;
+}
+
+/* Обёртка музыки сквозная: сетка видит саму панель, и когда тем нет,
+   область не занимает пустая коробка. */
+.am-board__tune {
+  display: contents;
+}
+
+.am-board .am-tune {
+  grid-area: tune;
   min-width: 0;
 }
 
@@ -706,38 +795,53 @@
   color: var(--am-faint);
 }
 
-/* Широкое окно: франшиза — третья колонка доски, люди всегда рядом ниже
-   во всю ширину. Раньше области зависели от длины хронологии
-   (классы --fran-long и --fran-short), и карточка перестраивалась целиком
-   от одного лишнего сиквела. Теперь раскладка одна, а решает её
-   сама разметка через :has(), а не класс от логики. */
-@media (min-width: 1700px) {
-  /* Франшизы у тайтла нет вовсе (блока в разметке нет): правый край
-     доски отдаётся людям, иначе справа от записи оставалась пустота
-     в полэкрана. */
-  .am-board:not(:has(.am-fran)) {
-    grid-template-areas: "about mine folk";
-    grid-template-columns: minmax(0, 84ch) 380px minmax(320px, 1fr);
+/* Широкое окно: описание ушло в шапку, и доска остаётся за виджетами:
+   запись узкой колонкой, музыка рядом — ей нужна ширина под таймлайн. */
+@media (min-width: 1400px) {
+  .am-board {
+    grid-template-areas:
+      "mine tune"
+      "fran fran"
+      "folk folk";
+    grid-template-columns: 380px minmax(0, 1fr);
     justify-content: stretch;
   }
 
-  /* Нижняя граница первого ряда есть не зря: высоту виджету задаёт
-     описание, а у короткого описания в три строки франшиза иначе
-     сжалась бы в полоску с прокруткой на десяток тайтлов. */
-  .am-board:has(.am-fran) {
+  .am-board:not(:has(.am-tune)) {
     grid-template-areas:
-      "about mine fran"
+      "mine fran"
+      "folk folk";
+  }
+}
+
+/* Очень широкое окно: три виджета в ряд, люди ниже во всю ширину.
+   Раньше области зависели от длины хронологии (классы --fran-long
+   и --fran-short), и карточка перестраивалась целиком от одного лишнего
+   сиквела. Теперь раскладка одна, а решает её сама разметка. */
+@media (min-width: 1700px) {
+  /* Франшизы у тайтла нет вовсе (блока в разметке нет): правый край
+     доски отдаётся людям, иначе справа оставалась пустота в полэкрана. */
+  .am-board:has(.am-tune):not(:has(.am-fran)) {
+    grid-template-areas: "mine tune folk";
+    grid-template-columns: 380px minmax(0, 1fr) minmax(320px, 1fr);
+  }
+
+  /* Нижняя граница первого ряда есть не зря: высоту виджету задают
+     соседи слева, а у короткой записи и пары тем франшиза иначе
+     сжалась бы в полоску с прокруткой на десяток тайтлов. */
+  .am-board:has(.am-tune):has(.am-fran) {
+    grid-template-areas:
+      "mine tune fran"
       "folk folk folk";
-    grid-template-columns: minmax(0, 84ch) 380px minmax(280px, 1fr);
-    grid-template-rows: minmax(300px, auto) auto;
-    justify-content: stretch;
+    grid-template-columns: 380px minmax(0, 1fr) minmax(300px, 1fr);
+    grid-template-rows: minmax(320px, auto) auto;
   }
 
   /* Виджет вынут из потока сетки: абсолютный элемент внутри
      relative-доски лежит ровно в своей области, но её высоту не растит.
-     Поэтому длина виджета всегда одна и та же — ровно по описанию,
-     сколько бы тайтлов в хронологии ни было. */
-  .am-fran {
+     Поэтому длина виджета всегда одна и та же, сколько бы тайтлов
+     в хронологии ни было. */
+  .am-board:has(.am-tune):has(.am-fran) .am-fran {
     position: absolute;
     inset: 0;
     grid-area: fran;
@@ -747,7 +851,7 @@
 
   /* В узкой колонке колонка ровно одна, а не влезшие тайтлы
      прокручиваются внутри виджета. */
-  .am-fran .am-rail {
+  .am-board:has(.am-tune):has(.am-fran) .am-fran .am-rail {
     display: flex;
     flex: 1;
     flex-direction: column;
@@ -763,9 +867,18 @@
     grid-template-areas:
       "about"
       "mine"
+      "tune"
       "fran"
       "folk";
     grid-template-columns: minmax(0, 1fr);
+  }
+
+  .am-board:not(:has(.am-tune)) {
+    grid-template-areas:
+      "about"
+      "mine"
+      "fran"
+      "folk";
   }
 
   /* В одну колонку липкая запись не нужна: она и так сразу под описанием. */
