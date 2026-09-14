@@ -374,15 +374,13 @@ onBeforeUnmount(() => {
     <div class="am-sheet__box">
       <!-- Шапка стоит на месте: прокручивается только тело ниже. -->
       <header class="am-sheet__head">
-        <!-- Та же капсула возврата, что в шапке окна: стрелка нарисована,
-             а не набрана знаком ← из шрифта. -->
-        <button v-if="depth > 0" class="am-ps-back" type="button" @click="goBackPerson">
-          <span class="am-ps-back__sign" aria-hidden="true">
-            <svg class="am-ps-back__arrow" viewBox="0 0 16 16">
-              <path d="M9.9 3.3 5.2 8l4.7 4.7" />
-            </svg>
-          </span>
-          <span>Назад</span>
+        <button
+          v-if="depth > 0"
+          class="am-btn am-btn--ghost am-ps-back"
+          type="button"
+          @click="goBackPerson"
+        >
+          ← Назад
         </button>
 
         <div class="am-ps-top">
@@ -526,7 +524,14 @@ onBeforeUnmount(() => {
                   {{ va.name.full.slice(0, 1) }}
                 </span>
                 <span class="am-ps-va__name">{{ vaName(va) }}</span>
-                <span class="am-ps-va__go" aria-hidden="true">→</span>
+                <!-- Стрелка нарисована, а не набрана знаком → из шрифта:
+                     глиф шёл тоньше остального интерфейса и висел в строке
+                     без своего места. -->
+                <span class="am-ps-va__go" aria-hidden="true">
+                  <svg class="am-ps-va__chev" viewBox="0 0 16 16">
+                    <path d="M6.1 3.3 10.8 8l-4.7 4.7" />
+                  </svg>
+                </span>
               </button>
             </div>
           </template>
@@ -652,70 +657,9 @@ onBeforeUnmount(() => {
   transform: translateY(-1px);
 }
 
-/* Шаг назад по цепочке «персонаж → сэйю»: сидит над шапкой слева.
-   Капсула собрана здесь, а не взята у общей .am-btn: у кнопки своё
-   содержимое — знак в кружке перед словом. Отступ слева меньше правого:
-   у кружка есть своя подложка, и равные отступы читались бы дырой. */
+/* Шаг назад по цепочке «персонаж → сэйю»: сидит над шапкой слева. */
 .am-ps-back {
-  display: inline-flex;
-  gap: 8px;
   align-self: flex-start;
-  align-items: center;
-  min-height: 34px;
-  padding: 0 15px 0 5px;
-  font: inherit;
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--am-dim);
-  cursor: pointer;
-  background: var(--am-fill-1);
-  border: 1px solid var(--am-line-soft);
-  border-radius: var(--am-r-cap);
-  transition:
-    color var(--am-fast) var(--am-ease),
-    background-color var(--am-fast) var(--am-ease),
-    border-color var(--am-fast) var(--am-ease),
-    box-shadow var(--am-mid) var(--am-ease);
-}
-
-/* Едет одна стрелка, а не вся кнопка: сдвиг капсулы тащил бы за собой
-   рамку и кольцо фокуса. */
-.am-ps-back:hover,
-.am-ps-back:focus-visible {
-  color: var(--am-text);
-  background: var(--am-hover);
-  border-color: rgb(var(--am-accent-rgb) / 0.45);
-  box-shadow: 0 8px 20px rgb(var(--am-accent-rgb) / 0.16);
-}
-
-.am-ps-back__sign {
-  display: grid;
-  flex: none;
-  place-items: center;
-  width: 24px;
-  height: 24px;
-  color: var(--am-accent);
-  background: var(--am-accent-soft);
-  border-radius: var(--am-r-cap);
-  transition:
-    background-color var(--am-fast) var(--am-ease),
-    transform var(--am-fast) var(--am-ease);
-}
-
-.am-ps-back:hover .am-ps-back__sign,
-.am-ps-back:focus-visible .am-ps-back__sign {
-  background: rgb(var(--am-accent-rgb) / 0.22);
-  transform: translateX(-2px);
-}
-
-.am-ps-back__arrow {
-  width: 14px;
-  height: 14px;
-  fill: none;
-  stroke: currentColor;
-  stroke-width: 2;
-  stroke-linecap: round;
-  stroke-linejoin: round;
 }
 
 /* Шапка */
@@ -922,7 +866,7 @@ onBeforeUnmount(() => {
   align-items: center;
   width: 100%;
   min-width: 0;
-  padding: 7px 12px;
+  padding: 7px 8px 7px 12px;
   font: inherit;
   color: inherit;
   text-align: left;
@@ -972,17 +916,41 @@ onBeforeUnmount(() => {
   transition: color var(--am-fast) var(--am-ease);
 }
 
-/* Стрелка говорит, что строка ведёт дальше: без неё клик не угадать. */
+/* Стрелка говорит, что строка ведёт дальше: без неё клик не угадать.
+   Свой кружок у неё не для красоты: голая стрелка у края капсулы
+   проваливалась в фон и стояла без своего места в строке. */
 .am-ps-va__go {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 26px;
+  height: 26px;
   margin-left: auto;
-  font-size: 14px;
   color: var(--am-faint);
-  transition: transform var(--am-fast) var(--am-ease);
+  background: var(--am-fill-2);
+  border-radius: var(--am-r-cap);
+  transition:
+    color var(--am-fast) var(--am-ease),
+    background-color var(--am-fast) var(--am-ease),
+    transform var(--am-fast) var(--am-ease);
 }
 
-.am-ps-va:hover .am-ps-va__go {
+.am-ps-va:hover .am-ps-va__go,
+.am-ps-va:focus-visible .am-ps-va__go {
   color: var(--am-accent);
+  background: var(--am-accent-soft);
   transform: translateX(3px);
+}
+
+/* Шеврон линиями: толщина и скругление концов не зависят от шрифта. */
+.am-ps-va__chev {
+  width: 13px;
+  height: 13px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
 }
 
 /* Скелетон */
@@ -1021,13 +989,12 @@ onBeforeUnmount(() => {
 
   .am-sheet__close:hover > span,
   .am-sheet__close:focus-visible > span,
-  .am-ps-back:hover .am-ps-back__sign,
-  .am-ps-back:focus-visible .am-ps-back__sign,
   .am-ps-work:hover .am-ps-work__art,
   .am-ps-work:focus-visible .am-ps-work__art,
   .am-ps-va:hover,
   .am-ps-va:focus-visible,
-  .am-ps-va:hover .am-ps-va__go {
+  .am-ps-va:hover .am-ps-va__go,
+  .am-ps-va:focus-visible .am-ps-va__go {
     transform: none;
   }
 }
