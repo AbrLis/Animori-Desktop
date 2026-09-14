@@ -120,8 +120,8 @@ function hasBelow(one: Spot, all: Spot[]): boolean {
   })
 }
 
-/** Одна перекладка доски в три захода: ширина, натуральная высота,
- *  добор нижних плиток до общего низа. */
+/** Одна перекладка доски: ширина, натуральная высота, добор за счёт
+ *  переполнения и добор нижних плиток до общего низа. */
 function lay(board: HTMLElement): void {
   const wide = board.clientWidth
   if (wide <= 0) return
@@ -154,12 +154,32 @@ function lay(board: HTMLElement): void {
   // Заход второй. Высота шагами сетки — после неё поток уже знает,
   // где какая плитка лежит и кто кому сосед снизу. Растяжка безопасна:
   // строк выдано ровно под измеренную высоту, сжать плитку она не может.
+  const step = new Map<HTMLElement, number>()
+
   for (const { el, high } of sized) {
-    keep(el, 'gridRowEnd', `span ${rows(high, gap)}`)
+    const steps = rows(high, gap)
+    step.set(el, steps)
+    keep(el, 'gridRowEnd', `span ${steps}`)
     keep(el, 'alignSelf', 'stretch')
   }
 
-  const spots: Spot[] = sized.map(({ el, high }) => {
+  // Заход третий. Проверка переполнения: если содержимое доехало уже
+  // после измерения, плитка стоит в строках под пустой верстке и текст
+  // вылезает за панель. Растянутая плитка больше не меняет внешний
+  // размер, и наблюдатель размеров такой рост просто не видит — поэтому
+  // спрашиваем сами. Плитки со своей прокруткой внутри сюда не попадают:
+  // их содержимое держит скроллер, а не сама панель.
+  for (const { el } of sized) {
+    const over = el.scrollHeight - el.clientHeight
+    if (over <= NEAR) continue
+
+    const steps = step.get(el) ?? 1
+    const add = Math.ceil(over / (ROW + gap))
+    step.set(el, steps + add)
+    keep(el, 'gridRowEnd', `span ${steps + add}`)
+  }
+
+  const spots: Spot[] = sized.map(({ el }) => {
     const box = el.getBoundingClientRect()
 
     return {
@@ -168,13 +188,13 @@ function lay(board: HTMLElement): void {
       right: box.right,
       top: box.top,
       bottom: box.bottom,
-      steps: rows(high, gap),
+      steps: step.get(el) ?? 1,
     }
   })
 
   if (spots.length === 0) return
 
-  // Заход третий. Низ доски — самый глубокий край среди плиток; всё,
+  // Заход четвёртый. Низ доски — самый глубокий край среди плиток; всё,
   // что кончается выше и ничего под собой не держит, добирает строки
   // до него. Списку хронологии в такой плитке потолок снимается: высоту
   // держит уже сама плитка, и добор уходит в лишние строки списка,
@@ -198,19 +218,41 @@ function lay(board: HTMLElement): void {
 
 /**
  * Держит раскладку доски в согласии с её содержимым: ширина окна, доехавшие
- * картинки, подъехавшие темы музыки — любой сдвиг размеров пересчитывает
- * колонки и высоты. Наблюдатель висит и на самой доске, и на каждой плитке:
- * высота доски от внутреннего роста меняется не всегда, а высота плитки —
- * всегда.
+ * картинки, подъехавшие темы музыки и части франшизы — любой сдвиг
+ * пересчитывает колонки и высоты.
+ *
+ * Следим двумя наблюдателями. Размеры — сама доска, плитки и их внутренние
+ * блоки: плитка, растянутая на выданные строки, свой размер больше не меняет,
+ * и поздний ответ сети без этого оставался бы незамеченным. Состав разметки —
+ * MutationObserver: виджет может появиться или наполниться спустя секунды
+ * после первой отрисовки.
  */
 export function useBoardFlow(board: Ref<HTMLElement | null>): void {
   const watched = new Set<HTMLElement>()
   let eye: ResizeObserver | null = null
+  let ear: MutationObserver | null = null
   let turn = 0
   let busy = false
   let again = false
 
-  /** Плитки под наблюдением: ушедшие снимаются, новые добавляются.
+  /** Что стоит мерить: сами плитки и их прямые блоки. Глубже не лезем:
+   *  рост любой внутренности всё равно меняет размер своего блока,
+   *  а наблюдателей на каждой строке списка было бы сотни. */
+  function marks(box: HTMLElement): HTMLElement[] {
+    const out: HTMLElement[] = []
+
+    for (const el of tiles(box)) {
+      out.push(el)
+
+      for (const inner of Array.from(el.children)) {
+        if (inner instanceof HTMLElement) out.push(inner)
+      }
+    }
+
+    return out
+  }
+
+  /** Блоки под наблюдением: ушедшие снимаются, новые добавляются.
    *  Перезаводить наблюдение целиком нельзя — каждый observe отвечает
    *  первым срабатыванием, и перекладка звала бы себя по кругу. */
   function follow(box: HTMLElement): void {
@@ -222,7 +264,7 @@ export function useBoardFlow(board: Ref<HTMLElement | null>): void {
       watched.delete(el)
     }
 
-    for (const el of tiles(box)) {
+    for (const el of marks(box)) {
       if (watched.has(el)) continue
       eye.observe(el)
       watched.add(el)
@@ -262,11 +304,22 @@ export function useBoardFlow(board: Ref<HTMLElement | null>): void {
     })
   }
 
+  /** Наблюдение за составом разметки. Следим только за появлением и уходом
+   *  узлов: свои же записи в style и классы тогда не будят перекладку. */
+  function listen(box: HTMLElement): void {
+    ear?.disconnect()
+    ear = new MutationObserver(plan)
+    ear.observe(box, { childList: true, subtree: true })
+  }
+
   onMounted(() => {
     eye = new ResizeObserver(plan)
 
     const box = board.value
-    if (box) eye.observe(box)
+    if (box) {
+      eye.observe(box)
+      listen(box)
+    }
 
     plan()
   })
@@ -280,10 +333,13 @@ export function useBoardFlow(board: Ref<HTMLElement | null>): void {
       eye.unobserve(gone)
       for (const el of watched) eye.unobserve(el)
       watched.clear()
+      ear?.disconnect()
+      ear = null
     }
 
     if (box) {
       eye.observe(box)
+      listen(box)
       plan()
     }
   })
@@ -295,6 +351,8 @@ export function useBoardFlow(board: Ref<HTMLElement | null>): void {
     again = false
     eye?.disconnect()
     eye = null
+    ear?.disconnect()
+    ear = null
     watched.clear()
   })
 }
