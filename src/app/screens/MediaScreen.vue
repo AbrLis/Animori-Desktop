@@ -521,4 +521,23 @@ watch(mediaId, () => {
 .am-hero--told .am-hero__scroll {
   flex: 0 1 auto;
 }
+
+/* Стекло гаснет ко всем трём краям блока, а не только влево: у блока
+   ниже баннера размытие кончалось прямой линией, и сверху и снизу
+   оставались резкие незаблюренные полосы кадра.
+
+   Масок две, пересечением: одним градиентом не задать разную длину
+   растворения по горизонтали и по вертикали. Вертикальная мягче
+   горизонтальной — блок ниже, чем шире, и длинный переход съел бы
+   середину со стеклом под текстом. */
+.am-hero--told .am-hero__note::before {
+  -webkit-mask-image:
+    linear-gradient(90deg, transparent 0%, #000 34%),
+    linear-gradient(180deg, transparent 0%, #000 18%, #000 82%, transparent 100%);
+  mask-image:
+    linear-gradient(90deg, transparent 0%, #000 34%),
+    linear-gradient(180deg, transparent 0%, #000 18%, #000 82%, transparent 100%);
+  -webkit-mask-composite: source-in;
+  mask-composite: intersect;
+}
 </style>
