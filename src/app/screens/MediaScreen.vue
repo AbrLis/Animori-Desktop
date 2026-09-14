@@ -7,11 +7,21 @@
 // в media-screen.css. Собранный в одном файле экран переставал поддаваться
 // точечной правке.
 //
-// Порядок модулей: герой с действиями у постера, описание широкой
-// колонкой, своя запись, оценки площадок и музыка справа, ниже
-// франшиза и люди. Главные действия стояли в правой колонке и на
-// широком окне уезжали от названия на полметра.
-import { computed, onMounted, ref, watch } from 'vue'
+// ОПИСАНИЕ ПЕРЕЕЗЖАЕТ В ШАПКУ НА ШИРОКОМ ОКНЕ
+//
+// На широком окне справа от постера пустовало полшапки, а самое
+// читаемое место занимала панель описания ниже. Теперь описание
+// лежит поверх баннера рядом с названием, а освободившееся место
+// внизу отдано виджетам.
+//
+// Переезд решается запросом ширины в скрипте, а не двумя копиями
+// блока с display: none: разметка описания живая, и второй его разбор
+// на каждой карточке даром не нужен.
+//
+// Порядок модулей: герой с действиями и описанием, ниже своя запись,
+// музыка, франшиза и люди. Главные действия стояли в правой колонке
+// и на широком окне уезжали от названия на полметра.
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 
 import EntrySheet from '../components/EntrySheet.vue'
 import PeopleBox from '../components/PeopleBox.vue'
@@ -24,6 +34,18 @@ import { scoreText, useMediaCard } from './media-card'
 
 /** Открыто ли окно правки записи. */
 const sheetOpen = ref(false)
+
+/** Граница «широкого окна»: та же, что у раскладки шапки в CSS. */
+const WIDE_AT = '(min-width: 1400px)'
+
+/** Широкое ли окно: от этого зависит, где живёт описание. */
+const wide = ref(false)
+
+let watchWide: MediaQueryList | null = null
+
+function onWide(event: MediaQueryListEvent): void {
+  wide.value = event.matches
+}
 
 const mediaId = computed<number>(() => {
   const raw = Number(currentRoute.value.params.id ?? '')
@@ -87,7 +109,17 @@ function playHint(state: 'yes' | 'no' | null): string {
 }
 
 onMounted(() => {
+  const mq = window.matchMedia(WIDE_AT)
+  wide.value = mq.matches
+  mq.addEventListener('change', onWide)
+  watchWide = mq
+
   void load()
+})
+
+onBeforeUnmount(() => {
+  watchWide?.removeEventListener('change', onWide)
+  watchWide = null
 })
 
 // Переход с карточки на карточку не пересобирает экран: грузим сами.
@@ -116,7 +148,7 @@ watch(mediaId, () => {
       </div>
 
       <template v-if="card">
-        <div class="am-hero">
+        <div class="am-hero" :class="{ 'am-hero--told': wide }">
           <div class="am-hero__art" :style="heroStyle" />
           <div class="am-hero__veil" />
 
@@ -188,11 +220,40 @@ watch(mediaId, () => {
                 </button>
               </div>
             </div>
+
+            <!-- Описание в шапке: только на широком окне, иначе оно остаётся
+                 панелью ниже. Текст со своей прокруткой: баннер не должен
+                 вытягиваться на два экрана из-за болтливого источника, а ссылки
+                 на источники стоят под прокруткой и видны всегда. -->
+            <div v-if="wide" class="am-hero__note">
+              <h3 class="am-h3 am-hero__noteh">Описание</h3>
+
+              <div class="am-hero__scroll">
+                <RichText v-if="about" class="am-about am-about--art" :text="about" />
+                <p v-else class="am-hero__sub">Описания ни один источник не дал.</p>
+              </div>
+
+              <p v-if="aboutLinks.length > 0" class="am-about__tail am-about__tail--art">
+                <template v-for="(link, at) in aboutLinks" :key="link.key">
+                  <span v-if="at > 0" class="am-about__dot" aria-hidden="true">·</span>
+                  <a
+                    v-tip="link.hint"
+                    class="am-about__link"
+                    :href="link.url"
+                    @click.prevent="onOpen(link.url)"
+                    >{{ link.text }}</a
+                  >
+                </template>
+              </p>
+            </div>
           </div>
         </div>
 
         <div class="am-board">
-          <div class="am-split__main">
+          <!-- На широком окне панели описания здесь нет: текст ушёл в шапку,
+               а его место на доске заняли виджеты. Области сетки решает сама
+               разметка через :has(), а не класс от логики. -->
+          <div v-if="!wide" class="am-split__main">
             <div class="am-panel am-about-box">
               <h3 class="am-h3">Описание</h3>
               <!-- Разметка источника живая: ссылки, спойлеры и начертания рисует
@@ -263,12 +324,14 @@ watch(mediaId, () => {
                 </li>
               </ul>
             </div>
-
-            <!-- Музыка идёт третьей панелью справа: строки тем узкие, и в колонке
-                 записи они стоят ровно, а не растягиваются на всю доску. Блок
-                 молчит, когда тем нет или MAL ID не разрешён. -->
-            <TuneBox :mal-id="card.malId" />
           </aside>
+
+          <!-- Музыка — своя область доски, а не третья панель в колонке записи:
+               плееру нужна ширина под таймлайн, а липкая колонка из трёх панелей
+               перерастала окно. Блок молчит, когда тем нет или MAL ID не разрешён. -->
+          <div class="am-board__tune">
+            <TuneBox :mal-id="card.malId" />
+          </div>
 
           <div v-if="franchiseRows.length > 0" class="am-panel am-fran">
             <h3 class="am-h3">Франшиза</h3>
@@ -395,28 +458,8 @@ watch(mediaId, () => {
 <style scoped src="./media-screen.css"></style>
 
 <!-- Оформление карточки франшизы живёт в media-screen.css. Здесь только метка
-     доступности и поведение правой колонки: несколько правил рядом
-     с разметкой, которая их завела. -->
+     доступности: пара правил рядом с разметкой, которая их завела. -->
 <style scoped>
-/* Третья панель в липкой колонке способна перерасти окно: запись, оценки
-   и восемь тем вместе длиннее экрана, а липкий блок выше окна перестаёт
-   прилипать вовсе. Собственная прокрутка держит колонку на месте. */
-.am-split__side {
-  max-height: calc(100vh - 92px);
-  overflow-y: auto;
-  scrollbar-width: thin;
-  overscroll-behavior: contain;
-}
-
-/* В одну колонку колонка записи уже не липкая: коробка с прокруткой
-   внутри страницы там только мешает. */
-@media (max-width: 1180px) {
-  .am-split__side {
-    max-height: none;
-    overflow: visible;
-  }
-}
-
 /* Тот же знак, что на плитках, только мельче. Постер здесь — сама картинка,
    а не слой с углами, поэтому знак стоит строкой под ней, а не поверх. */
 .am-part__play {
