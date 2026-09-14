@@ -7,6 +7,16 @@
 // в media-screen.css, раскладка доски в media-board.ts. Собранный в одном
 // файле экран переставал поддаваться точечной правке.
 //
+// ЧТО ЖИВЁТ В ШАПКЕ
+//
+// В шапке собрано всё, что читается за полсекунды: название, факты,
+// действия, оценки площадок ярлычками под постером и описание
+// на широком окне. Доска ниже остаётся для того, во что надо
+// всматриваться: музыка, франшиза, люди.
+//
+// Своей записи плиткой больше нет: её состояние видно по кнопке
+// и пилюле своей оценки в герое, а подробности — в окне правки.
+//
 // ОПИСАНИЕ ПЕРЕЕЗЖАЕТ В ШАПКУ НА ШИРОКОМ ОКНЕ
 //
 // На широком окне справа от постера пустовало полшапки, а самое
@@ -17,10 +27,6 @@
 // Переезд решается запросом ширины в скрипте, а не двумя копиями
 // блока с display: none: разметка описания живая, и второй его разбор
 // на каждой карточке даром не нужен.
-//
-// Порядок модулей: герой с действиями и описанием, ниже своя запись,
-// музыка, франшиза и люди. Главные действия стояли в правой колонке
-// и на широком окне уезжали от названия на полметра.
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 
 import EntrySheet from '../components/EntrySheet.vue'
@@ -73,13 +79,10 @@ const {
   listLabel,
   mainTitle,
   heroStyle,
-  donePart,
-  progressText,
   about,
   aboutLinks,
   facts,
   ratings,
-  mineFacts,
   franchiseRows,
   franchiseHidden,
   load,
@@ -161,14 +164,31 @@ watch(mediaId, () => {
           <div class="am-hero__veil" />
 
           <div class="am-hero__body">
-            <img
-              v-if="card.cover"
-              class="am-hero__cover"
-              :src="card.cover"
-              :alt="mainTitle"
-              decoding="async"
-            />
-            <span v-else class="am-hero__cover am-hero__cover--empty" aria-hidden="true">?</span>
+            <!-- Постер и оценки площадок одной колонкой: ярлычки стоят под
+                 картинкой и по её ширине, чтобы читаться её подписью,
+                 а не ещё одним рядом пилюль у названия. -->
+            <div class="am-hero__stack">
+              <img
+                v-if="card.cover"
+                class="am-hero__cover"
+                :src="card.cover"
+                :alt="mainTitle"
+                decoding="async"
+              />
+              <span v-else class="am-hero__cover am-hero__cover--empty" aria-hidden="true">?</span>
+
+              <ul v-if="ratings.length > 0" class="am-hero__marks">
+                <li
+                  v-for="rate in ratings"
+                  :key="rate.key"
+                  v-tip="`Средняя оценка на ${rate.label}`"
+                  class="am-hero__mark"
+                >
+                  <span class="am-hero__marksrc">{{ rate.label }}</span>
+                  <span class="am-hero__markval">{{ rate.value }}</span>
+                </li>
+              </ul>
+            </div>
 
             <div class="am-hero__text">
               <h2 class="am-hero__title">{{ mainTitle }}</h2>
@@ -284,59 +304,9 @@ watch(mediaId, () => {
             </div>
           </div>
 
-          <aside class="am-split__side">
-            <div class="am-panel am-mine">
-              <div class="am-mine__head">
-                <h3 class="am-h3">Моя запись</h3>
-                <button class="am-mine__edit" type="button" @click="sheetOpen = true">
-                  {{ listed ? 'Изменить' : 'Добавить' }}
-                </button>
-              </div>
-
-              <template v-if="listed">
-                <div class="am-mine__progress">
-                  <div class="am-mine__prow">
-                    <span class="am-mine__pname">Эпизоды</span>
-                    <span class="am-mine__pval">{{ progressText }}</span>
-                  </div>
-                  <span class="am-line am-mine__line">
-                    <span class="am-line__fill" :style="{ width: donePart }" />
-                  </span>
-                </div>
-
-                <dl v-if="mineFacts.length > 0" class="am-mine__rows">
-                  <div v-for="fact in mineFacts" :key="fact.key" class="am-mine__row">
-                    <dt class="am-mine__rname">{{ fact.name }}</dt>
-                    <dd class="am-mine__rval">{{ fact.value }}</dd>
-                  </div>
-                </dl>
-
-                <p v-if="notes" class="am-mine__note">{{ notes }}</p>
-              </template>
-
-              <p v-else class="am-mine__none">Этого аниме нет в ваших списках.</p>
-            </div>
-
-            <div v-if="ratings.length > 0" class="am-panel am-rates">
-              <h3 class="am-h3">Оценки площадок</h3>
-
-              <ul class="am-rates__list">
-                <li
-                  v-for="rate in ratings"
-                  :key="rate.key"
-                  v-tip="`Средняя оценка на ${rate.label}`"
-                  class="am-rates__row"
-                >
-                  <span class="am-rates__src">{{ rate.label }}</span>
-                  <span class="am-rates__val">★ {{ rate.value }}</span>
-                </li>
-              </ul>
-            </div>
-          </aside>
-
-          <!-- Музыка — такая же плитка потока, как запись и оценки: колонку
-               ей выбирает раскладка. Обёртка сквозная: блок молчит, когда тем нет
-               или MAL ID не разрешён, и пустого места в сетке после себя не оставляет. -->
+          <!-- Музыка — плитка потока: колонку ей выбирает раскладка. Обёртка
+               сквозная: блок молчит, когда тем нет или MAL ID не разрешён,
+               и пустого места в сетке после себя не оставляет. -->
           <div class="am-board__tune">
             <TuneBox :mal-id="card.malId" />
           </div>
@@ -465,9 +435,9 @@ watch(mediaId, () => {
 
 <style scoped src="./media-screen.css"></style>
 
-<!-- Оформление карточки франшизы живёт в media-screen.css. Здесь только метка
-     доступности и проба вида с описанием: правила рядом с разметкой,
-     которая их завела. -->
+<!-- Основное оформление живёт в media-screen.css. Здесь метка доступности
+     и пробы вида с шапкой: правила рядом с разметкой, которая их завела.
+     Приживутся — переедут к остальным правилам шапки. -->
 <style scoped>
 /* Тот же знак, что на плитках, только мельче. Постер здесь — сама картинка,
    а не слой с углами, поэтому знак стоит строкой под ней, а не поверх. */
@@ -505,6 +475,81 @@ watch(mediaId, () => {
   background: currentcolor;
   border-radius: 1px;
   transform: rotate(-45deg);
+}
+
+/* Колонка постера: ширина живёт здесь, а не на картинке, чтобы ярлычки
+   под ней переносились ровно по её краю, а не по своей сумме. */
+.am-hero__stack {
+  display: flex;
+  flex: none;
+  flex-direction: column;
+  gap: 12px;
+  width: clamp(150px, 13vw, 226px);
+}
+
+.am-hero__stack .am-hero__cover {
+  width: 100%;
+}
+
+/* Оценки площадок — ярлычки под постером: четыре цифры не стоили целой
+   плитки на доске. Растут в две колонки равной ширины: из потока
+   разной длины строки выходили рваными, а сетка держит их столбиками. */
+.am-hero__marks {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+/* Стекло той же выделки, что пилюли у названия: плотная заливка
+   на светлом кадре читалась заплатками. Название площадки сверху
+   мелким, цифра под ним крупно: в строку длинные имена площадок
+   не влезали в ширину постера. */
+.am-hero__mark {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  padding: 5px 9px 6px;
+  background: color-mix(in srgb, var(--am-veil) 44%, transparent);
+  border: 1px solid color-mix(in srgb, var(--am-on-art) 14%, transparent);
+  border-radius: var(--am-r-m);
+  backdrop-filter: blur(10px) saturate(1.2);
+  transition: border-color var(--am-fast) var(--am-ease);
+}
+
+.am-hero__mark:hover {
+  border-color: color-mix(in srgb, var(--am-warn) 52%, transparent);
+}
+
+.am-hero__marksrc {
+  overflow: hidden;
+  font-size: 10px;
+  font-weight: 600;
+  line-height: 1.2;
+  color: color-mix(in srgb, var(--am-on-art) 54%, transparent);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+/* Звёздочка рисуется оформлением, а не разметкой: её не нужно
+   произносить скринридером — в подсказке строки и так есть слова. */
+.am-hero__markval {
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 1.15;
+  color: var(--am-on-art);
+  font-variant-numeric: tabular-nums;
+}
+
+.am-hero__markval::before {
+  margin-right: 4px;
+  font-size: 11px;
+  color: var(--am-warn);
+  content: '★';
 }
 
 /* Проба вида: описание стоит по горизонтальной оси баннера, как постер
