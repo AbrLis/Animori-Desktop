@@ -1,13 +1,16 @@
-<!-- Знак MyAnimeList: буквы MAL геометрией, а не фирменный файл. В открытых
-     наборах его нет, а вордмарк сайта — длинная надпись, и в плиту знака
-     она не ложится.
+<!-- Знак MyAnimeList: буквы MAL с иконки самого сайта.
 
-     viewBox тугой по буквам: квадрат знаку задаёт BrandMark, и пустые поля
-     внутри файла ужали бы надпись до нечитаемой мелочи. -->
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 11">
-  <path d="M2 10.5 V0.5 h1.9 l1.6 3.4 L7.1 0.5 H9 v10 H7.2 V4.9 L5.5 8.4 L3.8 4.9 v5.6 Z" />
-  <path d="M10.6 10.5 L13.4 0.5 L15.2 0.5 L12.4 10.5 Z" />
-  <path d="M18 10.5 L15.2 0.5 L13.4 0.5 L16.2 10.5 Z" />
-  <rect x="13" y="6.1" width="2.6" height="1.6" />
-  <path d="M19 0.5 h1.9 v8.2 H23 v1.8 h-4 Z" />
+     Растр, а не пути: открытого вектора у MAL нет, а нарисованные
+     нами буквы выходили кривыми — плотную «M» и перекладину «A»
+     на высоте 15 пикселей не спасала никакая правка штриха.
+     Картинка вчетверо крупнее знака на плите, поэтому дробный
+     масштаб окна её не мылит.
+
+     Буквы белые с прозрачным фоном: цвет плиты даёт BrandMark.vue,
+     и знак не носит с собой синего квадрата.
+
+     Строка с данными длиннее принятых 100 знаков намеренно:
+     в base64 внутри адреса переносы ставить нельзя. -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 132 75">
+  <image width="132" height="75" href="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAIQAAABLCAYAAACx+i/GAAALjElEQVR42u2de4xdVRXGf+vcO9MpWCBFhEJERC2CPIoKCBLEghSDUFGJQYU/MCjQqpDKKyiB8ExQSiCgIL4w0Bg1EkEhgEFNiNQoglqMIUoCAlqwpbRKH3PP5x9nbWZzOtOZex537p17V7JzZ+7jnLPX/va3Hnvtc0zSRuB2M1sqqWFmLWqQcGxJxwI/BLYDUsDaOEwKNIH7gFPNbKMkMzNRk0hKgMTMRnPvvw3YD9jbX/cEdgXmALOBBjDsrxa9so0+p8AQ8F0zOyvuW/hb0hDwE2ARsAVI2uxSy6/rdjNbIikxszR82ARmAWdIWmFmj9QBCknmr8PAFcBcQG2CIZZ5ruC6QGCu6NSVlfr7hwHvAxYAHwL2qPrUrpMjJM0xs/XjAL4BvMkHdbjEOeaO92HTOzsbuFnSUWb2Sg2zrmFmo5KucIW2Cg5o6gPVqhMIPiFa/t4BwCnAQuCQcQZBOUWPJ+0C/x3AgcAj/tv8WIzm9NGuDhsB5OMBIvEPDwK+Kem0TA+iClA444xKWgZc7IpOSh7WagBDoM6W0/LJwOeBw4Dtc5SL98GmYAba7VcLGAE+5oDoSP9jQBDNulOB35rZTW47VYGSW5LeDVzux0vq7FBBVjAzS73PxwIXAMdMAIJGhy7tUElNn0wd01eSQ10KXCZpQaSgMoqWpJ2B232WqcvAkJChIZV0NPAz4BcOhtSBIAdBo0PXHnS+PzC/bkbYFiACI8wFlktqxA5hwVkn4Crg4IL2rlYwmFnqnvsy4OfACZF9TToIAsaZmDu53qYNEMGDbQFHA+e6TS0yiIGCz3Q73OoyMDT8+naVdAfwNQ+DW5FZm9ZL9NeDO33iZIL3UuBaSSe4D9Bsd+ZJOgi4pksUHF9f0/v0TuBB4DTvr6aJEbYlR0ga9qjHpgsQFjmc35A0zz3vZArKNsAcQMuBnQskn+pmhlFJCzy5dYCHcEmXASHoegHwlk6ajWQb77eANwPXui9gU/AnQgx/HvDBEvmGusDQknQEcD+wl19fk+4Ti/JD87sBELE/cbqkZZPRVqTwjwNXd5MTGYW/hwN3k6WYuwask/gRH879P22AiCOPayQtmigUjRS+N3BbNOusS8CQintPzF7SbcBgqJRK9wXwZnxvjI5rYAAAAAASUVORK5CYII=" />
 </svg>
