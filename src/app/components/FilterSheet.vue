@@ -270,7 +270,7 @@ function onYears(): void {
 
 /**
  * Ввод в поле года. Всё, кроме цифр, снимается на месте и длина держится
- * в четырёх знаках: поле текстовое, и без этого в нём осели бы буквы.
+ * в четырёх знаках: поле текстовое, и без этого в нẹ́м осели бы буквы.
  * Значение возвращается в сам узел, иначе показ отстанет от состояния,
  * когда чистка вернула прежнюю строку и перерисовки не будет.
  */
@@ -592,12 +592,19 @@ onBeforeUnmount(() => {
                   <span v-if="groupCount(group) > 0" class="am-fold__num">
                     {{ groupCount(group) }}
                   </span>
+
+                  <!-- Знак раскрытия нарисован, а не набран символом: раньше
+                       здесь стоял ⌈ из шрифта, и в конце каждой строки читалась
+                       буква «Г». Шеврон тот же, что у стрелок года. -->
                   <span
                     class="am-fold__arrow"
                     :class="{ 'am-fold__arrow--on': openGroup === group.key }"
                     aria-hidden="true"
-                    >⌊</span
                   >
+                    <svg class="am-fold__chev" viewBox="0 0 12 8">
+                      <path d="M1.7 2.2 6 6.1 10.3 2.2" />
+                    </svg>
+                  </span>
                 </button>
 
                 <div v-if="openGroup === group.key" class="am-wrap am-fold__body">
@@ -875,14 +882,37 @@ onBeforeUnmount(() => {
   font-variant-numeric: tabular-nums;
 }
 
+/* Стрелка раскрытия в своём квадрате: у рисунка нет базовой линии,
+   и поворот идёт вокруг его собственного центра. */
 .am-fold__arrow {
+  display: grid;
   flex: 0 0 auto;
+  place-items: center;
+  width: 20px;
+  height: 20px;
   color: var(--am-faint);
-  transition: transform var(--am-mid) var(--am-ease);
+  transition:
+    color var(--am-fast) var(--am-ease),
+    transform var(--am-mid) var(--am-ease);
+}
+
+.am-fold__hit:hover .am-fold__arrow {
+  color: var(--am-text);
 }
 
 .am-fold__arrow--on {
+  color: var(--am-accent);
   transform: rotate(180deg);
+}
+
+.am-fold__chev {
+  width: 12px;
+  height: 8px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.7;
+  stroke-linecap: round;
+  stroke-linejoin: round;
 }
 
 .am-fold__body {
