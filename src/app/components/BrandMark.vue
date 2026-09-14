@@ -15,6 +15,9 @@
 //     другой продукт, и ставить его под «Диск» неверно. Узнаваемость
 //     здесь даёт фирменная плита, а глиф взят нейтральный и в один штрих
 //     с остальными значками приложения.
+//   myanimelist.svg — буквы MAL нашей геометрией: в открытых наборах знака
+//     нет, а вордмарк сайта в плиту не ложится. Узнаваемость и здесь даёт
+//     фирменная синяя плита.
 //
 // Почему не PNG: знак живёт на плите 24-28 пикселей, на трёх темах
 // и при дробном масштабе окна. Растр пришлось бы класть в двух-трёх
@@ -27,10 +30,11 @@
 import { computed } from 'vue'
 
 import anilistGlyph from '../brand/anilist.svg?raw'
+import malGlyph from '../brand/myanimelist.svg?raw'
 import shikimoriGlyph from '../brand/shikimori.svg?raw'
 import yandexDiskGlyph from '../brand/yandex-disk.svg?raw'
 
-type BrandName = 'anilist' | 'shikimori' | 'yandex-disk'
+type BrandName = 'anilist' | 'shikimori' | 'myanimelist' | 'yandex-disk'
 
 type Brand = {
   /** Содержимое файла знака: вставляется в разметку как есть. */
@@ -60,6 +64,14 @@ const BRANDS: Record<BrandName, Brand> = {
     plate: '#aad3e7',
     ink: '#16202c',
     size: '78%',
+  },
+  // Надпись широкая и низкая: поля ей нужны меньше остальных, иначе
+  // буквы садятся в середину плиты строчкой в пиксель высотой.
+  myanimelist: {
+    glyph: malGlyph,
+    plate: '#2e51a2',
+    ink: '#ffffff',
+    size: '80%',
   },
   'yandex-disk': {
     glyph: yandexDiskGlyph,
