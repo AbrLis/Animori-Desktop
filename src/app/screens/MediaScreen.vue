@@ -17,6 +17,10 @@
 // Своей записи плиткой больше нет: её состояние видно по кнопке
 // и пилюле своей оценки в герое, а подробности — в окне правки.
 //
+// Площадки на ярлычках названы эмблемами, а не словами: знак сервиса
+// узнаётся быстрее его имени, а «Шикимори» словом в ярлычок шириной
+// в треть постера не влезало вовсе.
+//
 // РАСКЛАДКА ДОСКИ
 //
 // Плиток осталось три, и две из них могут не прийти вовсе, поэтому
@@ -36,6 +40,7 @@
 // на каждой карточке даром не нужен.
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 
+import BrandMark from '../components/BrandMark.vue'
 import EntrySheet from '../components/EntrySheet.vue'
 import PeopleBox from '../components/PeopleBox.vue'
 import RichText from '../components/RichText.vue'
@@ -47,6 +52,17 @@ import { scoreText, useMediaCard } from './media-card'
 
 /** Открыто ли окно правки записи. */
 const sheetOpen = ref(false)
+
+/**
+ * Какой знак сервиса ставить ярлычку оценки. Ключи приходят из media-card.ts,
+ * а имена знаков — из BrandMark: словарь держит их вместе, чтобы разметка
+ * не знала ни о тех, ни о других.
+ */
+const MARK_BRAND: Record<string, 'anilist' | 'shikimori' | 'myanimelist'> = {
+  al: 'anilist',
+  shiki: 'shikimori',
+  mal: 'myanimelist',
+}
 
 /** Граница «широкого окна»: та же, что у раскладки шапки в CSS. */
 const WIDE_AT = '(min-width: 1400px)'
@@ -176,6 +192,9 @@ watch(mediaId, () => {
               />
               <span v-else class="am-hero__cover am-hero__cover--empty" aria-hidden="true">?</span>
 
+              <!-- Площадка названа знаком, а не словом: так ярлычок вдвое
+                   короче и три штуки встают в ряд под постером. Название
+                   осталось в подсказке — там ему и место. -->
               <ul v-if="ratings.length > 0" class="am-hero__marks">
                 <li
                   v-for="rate in ratings"
@@ -183,7 +202,11 @@ watch(mediaId, () => {
                   v-tip="`Средняя оценка на ${rate.label}`"
                   class="am-hero__mark"
                 >
-                  <span class="am-hero__marksrc">{{ rate.label }}</span>
+                  <BrandMark
+                    v-if="MARK_BRAND[rate.key]"
+                    class="am-hero__markicon"
+                    :name="MARK_BRAND[rate.key]!"
+                  />
                   <span class="am-hero__markval">{{ rate.value }}</span>
                 </li>
               </ul>
@@ -492,29 +515,33 @@ watch(mediaId, () => {
 }
 
 /* Оценки площадок — ярлычки под постером: четыре цифры не стоили целой
-   плитки на доске. Растут в две колонки равной ширины: из потока
-   разной длины строки выходили рваными, а сетка держит их столбиками. */
+   плитки на доске. Ряд не растягивается и стоит по центру: когда третий
+   знак в ширину постера не влезает, он переносится под два первых
+   и остаётся посередине, а не прижимается к левому краю. */
 .am-hero__marks {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 6px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  justify-content: center;
   margin: 0;
   padding: 0;
   list-style: none;
 }
 
 /* Стекло той же выделки, что пилюли у названия: плотная заливка
-   на светлом кадре читалась заплатками. Название площадки сверху
-   мелким, цифра под ним крупно: в строку длинные имена площадок
-   не влезали в ширину постера. */
+   на светлом кадре читалась заплатками. Знак и цифра в одну строку:
+   имена площадок словами занимали всю ширину постера и разгоняли
+   ярлычки на два этажа по две штуки. */
 .am-hero__mark {
   display: flex;
-  flex-direction: column;
-  gap: 1px;
-  padding: 5px 9px 6px;
+  flex: 0 1 auto;
+  gap: 5px;
+  align-items: center;
+  min-width: 0;
+  padding: 4px 7px;
   background: color-mix(in srgb, var(--am-veil) 44%, transparent);
   border: 1px solid color-mix(in srgb, var(--am-on-art) 14%, transparent);
-  border-radius: var(--am-r-m);
+  border-radius: var(--am-r-cap);
   backdrop-filter: blur(10px) saturate(1.2);
   transition: border-color var(--am-fast) var(--am-ease);
 }
@@ -523,33 +550,19 @@ watch(mediaId, () => {
   border-color: color-mix(in srgb, var(--am-warn) 52%, transparent);
 }
 
-.am-hero__marksrc {
-  overflow: hidden;
-  font-size: 10px;
-  font-weight: 600;
-  line-height: 1.2;
-  color: color-mix(in srgb, var(--am-on-art) 54%, transparent);
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
+/* Знак мелкий, но не мельче: ниже 14 пикселей буквы плит перестают
+   различаться и все три ярлычка выглядят одинаковыми. */
+.am-hero__markicon {
+  width: 15px;
+  height: 15px;
 }
 
-/* Звёздочка рисуется оформлением, а не разметкой: её не нужно
-   произносить скринридером — в подсказке строки и так есть слова. */
 .am-hero__markval {
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 700;
   line-height: 1.15;
   color: var(--am-on-art);
   font-variant-numeric: tabular-nums;
-}
-
-.am-hero__markval::before {
-  margin-right: 4px;
-  font-size: 11px;
-  color: var(--am-warn);
-  content: '★';
 }
 
 /* Проба вида: описание стоит по горизонтальной оси баннера, как постер
@@ -592,6 +605,11 @@ watch(mediaId, () => {
    перекладки на каждом доезжающем блоке и лесенка на стыках.
    Строка сетки сама равняет плитки по высоте — углы сошлись сами. */
 .am-board {
+  /* Высота строки хронологии: миниатюра 32 пикселя при пропорции 2/3
+     плюс поля строки. Потолок плитки считается строками, а не долей
+     экрана: доля давала то три с половиной строки, то шесть. */
+  --am-fran-row: 58px;
+
   grid-auto-flow: row;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   align-items: stretch;
@@ -614,20 +632,23 @@ watch(mediaId, () => {
 }
 
 /* Хронология в плитке-одиночке идёт двумя столбцами: строки с миниатюрой
-   и годом во всю ширину доски превращались в полосы пустоты справа. */
+   и годом во всю ширину доски превращались в полосы пустоты справа.
+   Четыре наименования при двух столбцах — это две строки сетки. */
 .am-board:not(:has(.am-tune)) .am-fran .am-rail {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 2px 14px;
   align-content: start;
+  max-height: calc(2 * var(--am-fran-row) + 2px);
 }
 
-/* Список берёт всю высоту, которую дала строка, но не выше своего
-   потолка: иначе франшиза на три десятка частей задала бы высоту
-   всему ряду и растянула рядом пустую плитку музыки. */
+/* Список берёт высоту, которую дала строка, но не выше четырёх
+   наименований: дальше прокрутка. Прежний потолок долей экрана резал
+   последнюю строку посередине и разнился от окна к окну. */
 .am-board .am-fran .am-rail {
   flex: 1 1 auto;
   min-height: 0;
+  max-height: calc(4 * var(--am-fran-row) + 6px);
 }
 
 /* Узкое окно — одна колонка: плеер и строки франшизы в половине
@@ -639,6 +660,7 @@ watch(mediaId, () => {
 
   .am-board:not(:has(.am-tune)) .am-fran .am-rail {
     display: flex;
+    max-height: calc(4 * var(--am-fran-row) + 6px);
   }
 }
 </style>
