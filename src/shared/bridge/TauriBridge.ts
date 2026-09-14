@@ -156,9 +156,10 @@ const tauriFiles: IFiles = {
 // ==== выгрузка ====
 
 /**
- * Выгрузка списка в папку, выбранную человеком (пункт 3.3). Окно выбора
- * открывает сам Rust: разрешений на диалог разметке не выдано, и проверка
- * имени с папкой живёт там же, в export.rs.
+ * Выгрузка списка в папку, выбранную человеком (пункт 3.3), и сохранение
+ * трека темы из плитки карточки. Окно выбора открывает сам Rust: разрешений
+ * на диалог разметке не выдано, и проверка имени с папкой живёт там же,
+ * в export.rs.
  *
  * Отказы НЕ глотаются, в отличие от tauriFiles выше: там дубль снимка,
  * который вправе не получиться молча, а выгрузку человек затеял руками
@@ -176,6 +177,19 @@ const tauriExport: IExport = {
   async write(dir: string, name: string, text: string): Promise<string> {
     // Ответ команды — полный путь записанного файла, его и отдаём.
     return await invoke<string>('animori_export_write', { dir, name, text })
+  },
+
+  async pickTrackDir(): Promise<string | null> {
+    // Своя команда, а не animori_export_pick_dir: разница в заголовке окна выбора.
+    // Выбранная папка никуда не записывается: спрашиваем каждый раз.
+    const picked = await invoke<string | null>('animori_track_pick_dir')
+    return picked ?? null
+  },
+
+  async writeTrack(dir: string, name: string, bytesBase64: string): Promise<string> {
+    // Ключ именно bytes: в export.rs параметр назван одним словом, иначе
+    // пришлось бы помнить про перевод camelCase в snake_case на стороне Tauri.
+    return await invoke<string>('animori_track_write', { dir, name, bytes: bytesBase64 })
   },
 }
 
