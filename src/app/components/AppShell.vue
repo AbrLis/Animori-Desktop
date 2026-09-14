@@ -103,8 +103,15 @@ function onReload(): void {
 
     <div class="am-body">
       <header class="am-top">
+        <!-- Стрелка нарисована, а не набрана знаком ←: текстовая стрелка
+             в каждом шрифте своей толщины и длины и к остальным знакам
+             интерфейса не подходит. -->
         <button v-if="canGoBack" class="am-top__back" type="button" @click="goBack">
-          <span class="am-top__sign" aria-hidden="true">←</span>
+          <span class="am-top__sign" aria-hidden="true">
+            <svg class="am-top__arrow" viewBox="0 0 16 16">
+              <path d="M9.9 3.3 5.2 8l4.7 4.7" />
+            </svg>
+          </span>
           <span class="am-top__word">Назад</span>
         </button>
         <h1 class="am-top__title">{{ title }}</h1>
@@ -378,14 +385,18 @@ function onReload(): void {
   z-index: 1;
 }
 
+/* «Назад» — капсула со знаком в кружке слева. Отступ слева меньше
+   правого: у кружка есть своя подложка, и равные отступы читались бы
+   дырой перед ним. */
 .am-top__back {
   display: inline-flex;
-  gap: 7px;
+  gap: 8px;
   align-items: center;
   min-height: 34px;
-  padding: 0 14px;
+  padding: 0 15px 0 5px;
   font: inherit;
   font-size: 13px;
+  font-weight: 600;
   color: var(--am-dim);
   cursor: pointer;
   background: var(--am-fill-1);
@@ -394,26 +405,50 @@ function onReload(): void {
   transition:
     color var(--am-fast) var(--am-ease),
     background-color var(--am-fast) var(--am-ease),
-    transform var(--am-fast) var(--am-ease);
+    border-color var(--am-fast) var(--am-ease),
+    box-shadow var(--am-mid) var(--am-ease);
 }
 
+/* Едет одна стрелка, а не вся кнопка: сдвиг капсулы тащил за собой
+   рамку и кольцо фокуса, а они должны стоять на месте. */
 .am-top__back:hover,
 .am-top__back:focus-visible {
   color: var(--am-text);
   background: var(--am-fill-2);
-  transform: translateX(-2px);
+  border-color: rgb(var(--am-accent-rgb) / 0.45);
+  box-shadow: 0 8px 20px rgb(var(--am-accent-rgb) / 0.16);
 }
 
-/* Стрелка «Назад» в своём квадрате: без него она тянула строку вниз
-   и слово рядом стояло на пиксель выше знака. */
+/* Кружок со стрелкой: акцентная подложка держит знак как отдельное
+   действие, а не как букву перед словом. */
 .am-top__sign {
   display: grid;
   flex: none;
   place-items: center;
+  width: 24px;
+  height: 24px;
+  color: var(--am-accent);
+  background: var(--am-accent-soft);
+  border-radius: var(--am-r-cap);
+  transition:
+    background-color var(--am-fast) var(--am-ease),
+    transform var(--am-fast) var(--am-ease);
+}
+
+.am-top__back:hover .am-top__sign,
+.am-top__back:focus-visible .am-top__sign {
+  background: rgb(var(--am-accent-rgb) / 0.22);
+  transform: translateX(-2px);
+}
+
+.am-top__arrow {
   width: 14px;
   height: 14px;
-  font-size: 14px;
-  line-height: 1;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
 }
 
 .am-top__title {
@@ -550,10 +585,16 @@ function onReload(): void {
   }
 }
 
-/* Узкое окно: рельс и так сложен, остаётся убрать слово у «Назад». */
+/* Узкое окно: рельс и так сложен, остаётся убрать слово у «Назад».
+   Без слова капсула становится ровным кружком вокруг знака: правый
+   отступ под текст там лишний. */
 @media (max-width: 1080px) {
   .am-top__word {
     display: none;
+  }
+
+  .am-top__back {
+    padding: 0 5px;
   }
 }
 
@@ -567,8 +608,8 @@ function onReload(): void {
   .am-side__name,
   .am-side__text,
   .am-side__foot,
-  .am-top__back:hover,
-  .am-top__back:focus-visible,
+  .am-top__back:hover .am-top__sign,
+  .am-top__back:focus-visible .am-top__sign,
   .am-skin__btn:hover > span,
   .am-skin__btn:focus-visible > span,
   .am-top__icon:hover > span,
