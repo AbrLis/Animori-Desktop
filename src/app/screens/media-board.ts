@@ -88,7 +88,14 @@ function tiles(board: HTMLElement): HTMLElement[] {
  *  не перекладывает, но лишняя запись в стиль стоит пересчёта макета. */
 function keep(
   el: HTMLElement,
-  name: 'gridColumn' | 'gridRowEnd' | 'gridTemplateColumns' | 'alignSelf' | 'height' | 'maxHeight',
+  name:
+    | 'gridColumn'
+    | 'gridRowEnd'
+    | 'gridTemplateColumns'
+    | 'alignSelf'
+    | 'height'
+    | 'minHeight'
+    | 'maxHeight',
   value: string,
 ): void {
   if (el.style[name] === value) return
@@ -134,6 +141,12 @@ function lay(board: HTMLElement): void {
   board.classList.add('am-board--flow')
   keep(board, 'gridTemplateColumns', `repeat(${cols}, minmax(0, 1fr))`)
 
+  // Доска держит свою высоту на время измерения. Без этого сброс строк
+  // коротит страницу внутри одного кадра, а браузер прижимает прокрутку
+  // к нулю — именно так карточку отбрасывало наверх при играющей теме.
+  const held = board.getBoundingClientRect().height
+  if (held > 0) keep(board, 'minHeight', `${Math.ceil(held)}px`)
+
   // Заход первый. Ширина идёт впереди высоты: число строк текста зависит
   // от того, во сколько колонок плитка встала. Заодно снимаем растяжку
   // и возвращаем потолок списку хронологии: измерять надо именно
@@ -164,7 +177,7 @@ function lay(board: HTMLElement): void {
   }
 
   // Заход третий. Проверка переполнения: если содержимое доехало уже
-  // после измерения, плитка стоит в строках под пустой верстке и текст
+  // после измерения, плитка стоит в строках под пустой версткой и текст
   // вылезает за панель. Растянутая плитка больше не меняет внешний
   // размер, и наблюдатель размеров такой рост просто не видит — поэтому
   // спрашиваем сами. Плитки со своей прокруткой внутри сюда не попадают:
@@ -192,7 +205,10 @@ function lay(board: HTMLElement): void {
     }
   })
 
-  if (spots.length === 0) return
+  if (spots.length === 0) {
+    keep(board, 'minHeight', '')
+    return
+  }
 
   // Заход четвёртый. Низ доски — самый глубокий край среди плиток; всё,
   // что кончается выше и ничего под собой не держит, добирает строки
@@ -214,6 +230,9 @@ function lay(board: HTMLElement): void {
     const rail = railOf(spot.el)
     if (rail) keep(rail, 'maxHeight', 'none')
   }
+
+  // Подпорка больше не нужна: строки выданы, и доска снова высокая сама.
+  keep(board, 'minHeight', '')
 }
 
 /**
@@ -304,11 +323,27 @@ export function useBoardFlow(board: Ref<HTMLElement | null>): void {
     })
   }
 
-  /** Наблюдение за составом разметки. Следим только за появлением и уходом
-   *  узлов: свои же записи в style и классы тогда не будят перекладку. */
+  /** Стоит ли перекладываться из-за этих правок разметки. Интересует
+   *  только появление и уход узлов — так доезжают виджеты и списки.
+   *  Правка текста на месте — это таймкод играющей темы, который меняется
+   *  каждую секунду и никогда не меняет раскладку. */
+  function worth(list: MutationRecord[]): boolean {
+    return list.some((one) => {
+      const moved = [...Array.from(one.addedNodes), ...Array.from(one.removedNodes)]
+      return moved.some((node) => node instanceof HTMLElement)
+    })
+  }
+
+  /** Наблюдение за составом разметки. Свои же записи в style и классы
+   *  перекладку не будят: атрибуты здесь вообще не отслеживаются. */
   function listen(box: HTMLElement): void {
     ear?.disconnect()
-    ear = new MutationObserver(plan)
+
+    ear = new MutationObserver((list) => {
+      if (!worth(list)) return
+      plan()
+    })
+
     ear.observe(box, { childList: true, subtree: true })
   }
 
