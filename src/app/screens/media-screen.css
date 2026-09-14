@@ -123,43 +123,70 @@
 
 /* Описание в шапке (только широкое окно, блок рисуется разметкой).
    Правая половина баннера пустовала, пока самый читаемый текст
-   карточки сидел панелью ниже. Стекло, а не плотная заливка:
-   под блоком должна угадываться картинка. */
+   карточки сидел панелью ниже.
+
+   Это не панель поверх картинки, а правая полоса самого баннера:
+   отрицательные поля съедают отступы шапки, и блок идёт от верхнего
+   края до нижнего и до правого края. Рамки и скругления сняты
+   намеренно — с ними текст читался наклейкой поверх кадра. */
 .am-hero__note {
   display: flex;
   flex: 1;
   flex-direction: column;
-  gap: 10px;
-  align-self: flex-end;
+  gap: 8px;
+  align-self: stretch;
   min-width: 0;
-  max-width: 78ch;
-  padding: 14px 8px 14px 16px;
-  background: var(--am-glass-2);
-  border: 1px solid color-mix(in srgb, var(--am-on-art) 13%, transparent);
-  border-radius: var(--am-r-l);
-  backdrop-filter: blur(var(--am-blur-strong)) saturate(1.2);
+  margin:
+    calc(-1 * clamp(64px, 9vw, 116px))
+    calc(-1 * clamp(20px, 2vw, 34px))
+    calc(-1 * clamp(20px, 1.6vw, 28px))
+    0;
+  padding: 16px clamp(20px, 2vw, 34px) 16px clamp(30px, 3.2vw, 56px);
 }
 
-/* Высота блока задана жёстко и совпадает с постером (ширина постера
-   на полтора: у него пропорция 2/3). Болтливый источник иначе растягивал
-   баннер на два экрана, поэтому лишнее уходит в прокрутку, а не под
-   кнопку «читать полностью»: та ломала бы шапку в момент нажатия. */
+/* Размытие своим слоем, а не на самом блоке: маска гасит его влево,
+   и стекло растворяется в картинке без видимого края. Блок при этом
+   остаётся обычным потоком, и текст маска не трогает.
+   Лёгкая подложка нужна только под буквы: на светлом кадре белый
+   текст по голому размытию не читался. */
+.am-hero__note::before {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  content: '';
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    color-mix(in srgb, var(--am-veil) 26%, transparent) 40%,
+    color-mix(in srgb, var(--am-veil) 44%, transparent) 100%
+  );
+  backdrop-filter: blur(var(--am-blur)) saturate(1.1);
+  -webkit-mask-image: linear-gradient(90deg, transparent 0%, #000 34%);
+  mask-image: linear-gradient(90deg, transparent 0%, #000 34%);
+}
+
+/* Слой размытия лежит за содержимым блока, а не за всей шапкой. */
 .am-hero__note {
-  max-height: calc(clamp(150px, 13vw, 226px) * 1.5);
+  position: relative;
+  isolation: isolate;
 }
 
 .am-hero__noteh {
   flex: none;
   margin: 0;
-  color: color-mix(in srgb, var(--am-on-art) 74%, transparent);
+  color: color-mix(in srgb, var(--am-on-art) 70%, transparent);
 }
 
 /* Прокручивается только текст: ссылки на источники лежат ниже
-   самой прокрутки и видны всегда. overscroll-behavior держит колесо
-   внутри: иначе после последней строки страница улетала вниз. */
+   самой прокрутки и видны всегда. Высоту задаёт сама шапка, поэтому
+   болтливый источник её не растягивает: лишнее уходит в прокрутку,
+   а не под кнопку «читать полностью», которая ломала бы баннер
+   в момент нажатия. overscroll-behavior держит колесо внутри:
+   иначе после последней строки страница улетала вниз. */
 .am-hero__scroll {
+  flex: 1;
   min-height: 0;
-  padding-right: 8px;
+  padding-right: 6px;
   overflow-y: auto;
   overscroll-behavior: contain;
   scrollbar-width: thin;
@@ -171,14 +198,14 @@
 .am-about--art {
   max-width: none;
   font-size: 13.5px;
-  color: color-mix(in srgb, var(--am-on-art) 84%, transparent);
+  color: color-mix(in srgb, var(--am-on-art) 86%, transparent);
 }
 
 .am-about__tail--art {
   flex: none;
   margin: 0;
-  padding-top: 10px;
-  padding-right: 8px;
+  padding-top: 9px;
+  padding-right: 6px;
   color: color-mix(in srgb, var(--am-on-art) 58%, transparent);
   border-top: 1px solid color-mix(in srgb, var(--am-on-art) 12%, transparent);
 }
