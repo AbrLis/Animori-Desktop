@@ -543,10 +543,14 @@
 
 .am-fran .am-rail {
   grid-auto-columns: 108px;
+  align-items: stretch;
 }
 
+/* Плитки полки равной высоты: без этого каждая кончалась там, где
+   кончилось её название, и нижний ряд меток шёл лесенкой. */
 .am-part {
   display: flex;
+  height: 100%;
   flex: none;
   flex-direction: column;
   width: 108px;
@@ -554,6 +558,7 @@
 
 .am-part__hit {
   display: flex;
+  height: 100%;
   flex-direction: column;
   gap: 4px;
   width: 100%;
@@ -618,10 +623,35 @@
   font-variant-numeric: tabular-nums;
 }
 
+/* Имя ровно в две строки: одной не хватало почти ни одному сиквелу,
+   а плавающая высота уводила знак доступности и метку просмотра
+   у соседних плиток на разную глубину. Полное название остаётся
+   в подсказке плитки. */
 .am-part__name {
+  display: -webkit-box;
+  min-height: 2.6em;
+  overflow: hidden;
   font-size: 12.5px;
   font-weight: 600;
   line-height: 1.3;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+
+/* Низ плитки: знак доступности и метка состояния прижаты к нижнему
+   краю и стоят по левому краю, как год и название над ними.
+   Первый из них забирает весь просвет, остальные идут за ним вплотную:
+   иначе пустота делилась бы между ними и разводила их по высоте. */
+.am-fran .am-part__hit > .am-part__play,
+.am-fran .am-part__hit > .am-part__status,
+.am-fran .am-part__hit > .am-part__here {
+  align-self: flex-start;
+  margin-top: auto;
+}
+
+.am-fran .am-part__hit > .am-part__play ~ .am-part__status,
+.am-fran .am-part__hit > .am-part__play ~ .am-part__here {
+  margin-top: 0;
 }
 
 .am-part__status {
@@ -695,6 +725,7 @@
 
   .am-part {
     width: auto;
+    height: auto;
   }
 
   /* Строка несёт радиус панели, а не капсулы: при 999px скругление равно
@@ -702,6 +733,7 @@
      14 снаружи минус 5 отступа дают ровно 10 внутри — радиус постера,
      и кривые сходятся. */
   .am-part__hit {
+    height: auto;
     flex-direction: row;
     gap: 10px;
     align-items: center;
@@ -761,9 +793,13 @@
     font-size: 12px;
   }
 
+  /* В строке имя снова однострочное: две строки раздули бы каждую строку
+     хронологии вдвое. */
   .am-part__name {
+    display: block;
     flex: 1;
     min-width: 0;
+    min-height: 0;
     overflow: hidden;
     font-size: 13px;
     text-overflow: ellipsis;
@@ -774,6 +810,14 @@
   .am-part__here {
     flex: none;
     margin-left: auto;
+  }
+
+  /* Низ плитки здесь ни при чём: всё стоит одной строкой по центру. */
+  .am-fran .am-part__hit > .am-part__play,
+  .am-fran .am-part__hit > .am-part__status,
+  .am-fran .am-part__hit > .am-part__here {
+    align-self: center;
+    margin-top: 0;
   }
 
   /* Метка справа — пилюля: голый акцентный текст сливался с названием
