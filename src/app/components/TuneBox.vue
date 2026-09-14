@@ -733,7 +733,7 @@ onBeforeUnmount(stop)
   position: relative;
   display: flex;
   align-items: center;
-  height: 18px;
+  height: 22px;
   cursor: pointer;
   touch-action: none;
 }
@@ -743,15 +743,17 @@ onBeforeUnmount(stop)
   min-width: 0;
 }
 
+/* Громкость короче таймлайна, но не огрызок: на шестидесяти пикселях
+   одно деление шло шесть процентов, и уровень выставлялся наугад. */
 .am-tune__vol {
   flex: none;
-  width: 62px;
+  width: 96px;
 }
 
 .am-tune__track {
   display: block;
   width: 100%;
-  height: 4px;
+  height: 6px;
   overflow: hidden;
   background: var(--am-fill-3);
   border-radius: var(--am-r-cap);
@@ -768,8 +770,8 @@ onBeforeUnmount(stop)
 .am-tune__knob {
   position: absolute;
   top: 50%;
-  width: 10px;
-  height: 10px;
+  width: 13px;
+  height: 13px;
   background: var(--am-sakura);
   border-radius: var(--am-r-blob);
   box-shadow: 0 0 0 3px rgb(var(--am-sakura-rgb) / 0.2);
@@ -789,18 +791,20 @@ onBeforeUnmount(stop)
 .am-tune__tools {
   display: flex;
   grid-column: 1 / -1;
-  gap: 4px;
+  gap: 6px;
   align-items: center;
   min-width: 0;
   padding-top: 2px;
 }
 
+/* Органы пульта размером под палец, а не под прицел: рядом
+   с цветком в 46px кнопки в 28 читались мелочью. */
 .am-tune__tool {
   display: grid;
   flex: none;
   place-items: center;
-  width: 28px;
-  height: 28px;
+  width: 34px;
+  height: 34px;
   padding: 0;
   color: var(--am-faint);
   cursor: pointer;
@@ -826,8 +830,8 @@ onBeforeUnmount(stop)
 }
 
 .am-tune__glyph {
-  width: 16px;
-  height: 16px;
+  width: 19px;
+  height: 19px;
   fill: none;
   stroke: currentcolor;
   stroke-width: 1.4;
