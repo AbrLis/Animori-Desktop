@@ -521,7 +521,7 @@ watch(mediaId, () => {
 .am-hero__marks {
   display: flex;
   flex-wrap: wrap;
-  gap: 5px;
+  gap: 6px;
   justify-content: center;
   margin: 0;
   padding: 0;
@@ -535,10 +535,10 @@ watch(mediaId, () => {
 .am-hero__mark {
   display: flex;
   flex: 0 1 auto;
-  gap: 5px;
+  gap: 6px;
   align-items: center;
   min-width: 0;
-  padding: 4px 7px;
+  padding: 5px 8px;
   background: color-mix(in srgb, var(--am-veil) 44%, transparent);
   border: 1px solid color-mix(in srgb, var(--am-on-art) 14%, transparent);
   border-radius: var(--am-r-cap);
@@ -553,12 +553,12 @@ watch(mediaId, () => {
 /* Знак мелкий, но не мельче: ниже 14 пикселей буквы плит перестают
    различаться и все три ярлычка выглядят одинаковыми. */
 .am-hero__markicon {
-  width: 15px;
-  height: 15px;
+  width: 18px;
+  height: 18px;
 }
 
 .am-hero__markval {
-  font-size: 13px;
+  font-size: 15.5px;
   font-weight: 700;
   line-height: 1.15;
   color: var(--am-on-art);
