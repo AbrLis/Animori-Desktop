@@ -374,15 +374,6 @@ onBeforeUnmount(() => {
     <div class="am-sheet__box">
       <!-- Шапка стоит на месте: прокручивается только тело ниже. -->
       <header class="am-sheet__head">
-        <button
-          v-if="depth > 0"
-          class="am-btn am-btn--ghost am-ps-back"
-          type="button"
-          @click="goBackPerson"
-        >
-          ← Назад
-        </button>
-
         <div class="am-ps-top">
           <div class="am-ps-portrait">
             <img
@@ -435,10 +426,36 @@ onBeforeUnmount(() => {
             </template>
           </div>
 
-          <button class="am-sheet__close" type="button" aria-label="Закрыть" @click="emit('close')">
-            <SakuraBloom />
-            <span aria-hidden="true">×</span>
-          </button>
+          <!-- Управление окном одной группой в правом углу: шаг назад по цепочке
+               стоит рядом с закрытием, а не отдельной строкой над шапкой. -->
+          <div class="am-ps-acts">
+            <button
+              v-if="depth > 0"
+              v-tip="'Шаг назад'"
+              class="am-ps-back"
+              type="button"
+              @click="goBackPerson"
+            >
+              <!-- Стрелка нарисована, а не набрана знаком ← из шрифта:
+                   глиф шёл тоньше остального интерфейса. -->
+              <span class="am-ps-back__sign" aria-hidden="true">
+                <svg class="am-ps-back__chev" viewBox="0 0 16 16">
+                  <path d="M9.9 3.3 5.2 8l4.7 4.7" />
+                </svg>
+              </span>
+              <span class="am-ps-back__word">Назад</span>
+            </button>
+
+            <button
+              class="am-sheet__close"
+              type="button"
+              aria-label="Закрыть"
+              @click="emit('close')"
+            >
+              <SakuraBloom />
+              <span aria-hidden="true">×</span>
+            </button>
+          </div>
         </div>
       </header>
 
@@ -603,6 +620,17 @@ onBeforeUnmount(() => {
   overflow-y: auto;
 }
 
+/* Управление окном: шаг назад и закрытие стоят одной группой в правом углу
+   шапки. Отдельной строкой над шапкой «Назад» ел высоту и уводил взгляд
+   от имени. */
+.am-ps-acts {
+  display: flex;
+  flex: none;
+  gap: 8px;
+  align-items: center;
+  margin-left: auto;
+}
+
 /* Цель нажатия в 44 пикселя. Своей одежды у кнопки нет: круг и распускающуюся
    под курсором сакуру рисует вложенный слой, а сама кнопка остаётся
    прямоугольной — при ней остаются и попадание курсора по всей цели,
@@ -623,7 +651,6 @@ onBeforeUnmount(() => {
   place-items: center;
   width: var(--am-touch);
   height: var(--am-touch);
-  margin-left: auto;
   padding: 0;
   font: inherit;
   font-size: 22px;
@@ -657,9 +684,56 @@ onBeforeUnmount(() => {
   transform: translateY(-1px);
 }
 
-/* Шаг назад по цепочке «персонаж → сэйю»: сидит над шапкой слева. */
+/* Шаг назад по цепочке «персонаж → сэйю»: капсула со знаком в кружке,
+   как у кнопки возврата в шапке приложения. */
 .am-ps-back {
-  align-self: flex-start;
+  display: flex;
+  flex: none;
+  gap: 8px;
+  align-items: center;
+  height: var(--am-ctl);
+  padding: 0 14px 0 6px;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--am-dim);
+  cursor: pointer;
+  background: var(--am-fill-1);
+  border: 1px solid var(--am-line-soft);
+  border-radius: var(--am-r-cap);
+  transition:
+    color var(--am-fast) var(--am-ease),
+    background-color var(--am-fast) var(--am-ease),
+    border-color var(--am-fast) var(--am-ease);
+}
+
+.am-ps-back:hover,
+.am-ps-back:focus-visible {
+  color: var(--am-text);
+  background: var(--am-hover);
+  border-color: rgb(var(--am-accent-rgb) / 0.45);
+}
+
+/* Кружок знака: без него стрелка проваливалась в подложку капсулы. */
+.am-ps-back__sign {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  color: var(--am-accent);
+  background: var(--am-accent-soft);
+  border-radius: var(--am-r-cap);
+  transition: transform var(--am-fast) var(--am-ease);
+}
+
+.am-ps-back:hover .am-ps-back__sign,
+.am-ps-back:focus-visible .am-ps-back__sign {
+  transform: translateX(-2px);
+}
+
+.am-ps-back__word {
+  white-space: nowrap;
 }
 
 /* Шапка */
@@ -943,6 +1017,7 @@ onBeforeUnmount(() => {
 }
 
 /* Шеврон линиями: толщина и скругление концов не зависят от шрифта. */
+.am-ps-back__chev,
 .am-ps-va__chev {
   width: 13px;
   height: 13px;
@@ -974,6 +1049,16 @@ onBeforeUnmount(() => {
     width: 84px;
   }
 
+  /* Слово у кнопки назад уходит: в углу с закрытием на узком окне хватает
+     только знака. */
+  .am-ps-back {
+    padding: 0 6px;
+  }
+
+  .am-ps-back__word {
+    display: none;
+  }
+
   /* На узком окне постер работы чуть мельче: четырёх колонок по 104
      в тело окна уже не влезало, и полка открывалась полупостером. */
   .am-ps-works {
@@ -989,6 +1074,8 @@ onBeforeUnmount(() => {
 
   .am-sheet__close:hover > span,
   .am-sheet__close:focus-visible > span,
+  .am-ps-back:hover .am-ps-back__sign,
+  .am-ps-back:focus-visible .am-ps-back__sign,
   .am-ps-work:hover .am-ps-work__art,
   .am-ps-work:focus-visible .am-ps-work__art,
   .am-ps-va:hover,
