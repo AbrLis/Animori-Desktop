@@ -332,9 +332,16 @@ function safePart(text: string): string {
     .trim()
 }
 
-/** Расширение из адреса без запроса и якоря. Незнакомое — считаем ogg. */
+/**
+ * Расширение из адреса без запроса и якоря. Незнакомое — считаем ogg.
+ *
+ * Обрезка идёт поиском разделителя, а не split с обращением по индексу:
+ * при noUncheckedIndexedAccess элемент массива считается возможно пустым,
+ * и проверять то, чего не бывает, пришлось бы на каждой строке.
+ */
 function extOf(url: string): string {
-  const path = url.split('?')[0].split('#')[0]
+  const cut = url.search(/[?#]/)
+  const path = cut < 0 ? url : url.slice(0, cut)
   const dot = path.lastIndexOf('.')
   const ext = dot >= 0 ? path.slice(dot).toLowerCase() : ''
   return TRACK_EXTS.includes(ext) ? ext : '.ogg'
@@ -1044,7 +1051,7 @@ onBeforeUnmount(stop)
 }
 
 /* Вся строка — цель нажатия: выбор темы мышью не должен требовать
-   попадания в кругляш. */
+   попадания в круглыш. */
 .am-tune__row {
   display: flex;
   flex: 1;
