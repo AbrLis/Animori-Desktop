@@ -14,15 +14,41 @@
 // тянется только по выбору темы и в базу не кладётся — тема весит
 // мегабайты, а кэш заведён под мелкие ответы служб, не под музыку.
 //
-// СКАЧАТЬ И СКОПИРОВАТЬ — ПО СТРОКАМ, А НЕ В ПУЛЬТЕ
+// ПУЛЬТ СИММЕТРИЧЕН СЕТКОЙ, А НЕ РАСПОРАМИ
+//
+// Цветок пуска стоит по центру над полосой, подпись звучащего — по
+// центру под ней, а повтор с громкостью — справа от цветка. Ряд органов
+// собран сеткой 1fr | auto | 1fr с пустой левой клеткой: так цветок
+// стоит ровно в середине панели независимо от того, сколько места
+// заняли правые органы. Подбирать ширину левого распора руками нельзя:
+// на другом языке или масштабе окна центр тут же уехал бы в сторону.
+//
+// СКАЧАТЬ, СКОПИРОВАТЬ И СТРИМИНГИ — ПО СТРОКАМ, А НЕ В ПУЛЬТЕ
 //
 // Это действия над конкретной темой, а не над воспроизведением: в пульте
 // они требовали бы сперва зарядить тему в плеер. Строка осталась кнопкой
-// выбора, а две мелкие кнопки стоят СНАРУЖИ неё, рядом: кнопка внутри
+// выбора, а мелкие кнопки стоят СНАРУЖИ неё, рядом: кнопка внутри
 // кнопки — неверная вёрстка, браузер вправе выбросить вложенную из дерева.
 //
 // Папка спрашивается КАЖДЫЙ раз и нигде не запоминается: один трек кладут
 // в музыку, другой на флешку, и папка из настроек выгрузок тут помешала бы.
+//
+// СТРИМИНГОВ ТРИ, И ОНИ СТОЯТ ВСЕГДА
+//
+// AnimeThemes знает ссылки далеко не у каждой песни, а Яндекс Музыки
+// не знает вовсе: каталог западный и держит spotify, apple и youtube.
+// Если показывать только готовые ссылки, ряд кнопок мигал бы от строки
+// к строке, а Яндекса не было бы никогда. Поэтому кнопок ровно три
+// всегда: есть готовый адрес — ведём на него, нет — на поиск службы
+// по «Название — Исполнитель», той же строкой, что кладёт в буфер соседняя
+// кнопка. Подсказка различает случаи словами «Открыть» и «Искать».
+//
+// У youtube готовая ссылка берётся только с пометкой Music в названии
+// ресурса: под тем же ключом служба отдаёт и обычный Ютуб с клипом,
+// а кнопка со знаком Музыки обещает именно Музыку.
+//
+// Адреса поиска собраны здесь, а не в animethemes.ts: тот модуль описывает
+// ответ службы, а выбор стримингов и их порядок — решение оболочки.
 //
 // ВИЗУАЛИЗАТОР НЕ В ТАКТ, И ЭТО НАРОЧНО
 //
@@ -40,6 +66,7 @@ import { fetchMalThemes, type ThemeLink } from '@/api/animethemes'
 import { Bridge } from '@/bridge'
 import { Logger } from '@/utils/logger'
 
+import BrandMark from './BrandMark.vue'
 import SakuraBloom from './SakuraBloom.vue'
 
 const props = defineProps<{ malId: number | null }>()
@@ -71,6 +98,16 @@ interface TuneRow {
   artist: string
   audio: string | null
   links: ThemeLink[]
+}
+
+/** Кнопка стриминга в строке темы. */
+interface TuneStream {
+  brand: 'spotify' | 'youtube-music' | 'yandex-music'
+  label: string
+  url: string
+  /** Адрес из ответа службы, а не поиск по подписи. */
+  exact: boolean
+  hint: string
 }
 
 /**
@@ -324,6 +361,62 @@ function rowLabel(row: TuneRow): string {
   return row.artist ? `${row.title} — ${row.artist}` : row.title
 }
 
+/**
+ * Готовая ссылка темы на службу или null.
+ *
+ * onlyMusic нужен Ютубу: под ключом youtube служба держит и обычные
+ * ролики, а кнопка со знаком YouTube Music обещает именно Музыку.
+ */
+function readyLink(row: TuneRow, site: string, onlyMusic: boolean): string | null {
+  const hit = row.links.find(
+    (link) => link.site === site && (!onlyMusic || /music/i.test(link.label)),
+  )
+  return hit?.url ?? null
+}
+
+/** Собирает кнопку: готовый адрес или поиск службы. */
+function stream(
+  brand: TuneStream['brand'],
+  label: string,
+  ready: string | null,
+  search: string,
+): TuneStream {
+  const exact = ready !== null
+  return {
+    brand,
+    label,
+    url: ready ?? search,
+    exact,
+    hint: `${exact ? 'Открыть в' : 'Искать в'} ${label}`,
+  }
+}
+
+/** Три стриминга строки в постоянном порядке — почему так, см. шапку. */
+function streamsFor(row: TuneRow): TuneStream[] {
+  const query = encodeURIComponent(rowLabel(row))
+
+  return [
+    stream(
+      'spotify',
+      'Spotify',
+      readyLink(row, 'spotify', false),
+      `https://open.spotify.com/search/${query}`,
+    ),
+    stream(
+      'youtube-music',
+      'YouTube Music',
+      readyLink(row, 'youtube', true),
+      `https://music.youtube.com/search?q=${query}`,
+    ),
+    stream(
+      'yandex-music',
+      'Яндекс Музыке',
+      null,
+      `https://music.yandex.ru/search?text=${query}`,
+    ),
+  ]
+}
+
 /** Запрещённые в именах Windows символы — пробелом: иначе запись откажет. */
 function safePart(text: string): string {
   return text
@@ -363,7 +456,7 @@ function markFor(box: typeof saved, key: string): void {
 
 /**
  * Название с автором в буфер: готовая строка для поиска на стриминге,
- * когда готовой ссылки у темы нет (а её нет чаще, чем есть).
+ * когда поиска кнопкой не достаточно и его несут куда-то ещё.
  */
 function onCopy(row: TuneRow): void {
   void Bridge.clipboard
@@ -504,32 +597,86 @@ onBeforeUnmount(stop)
       <span class="am-tune__count">{{ rows.length }}</span>
     </div>
 
-    <!-- Пульт: цветок пуска, подпись звучащего, таймлайн, повтор и громкость. -->
+    <!-- Пульт: цветок пуска по центру с органами справа, под ним таймлайн,
+         под таймлайном подпись звучащего. -->
     <div class="am-tune__deck">
-      <button
-        v-tip="playHint"
-        class="am-tune__hit"
-        :class="{ 'am-tune__hit--live': playing }"
-        type="button"
-        :aria-label="playHint"
-        @click="onPlay"
-      >
-        <SakuraBloom />
-        <span class="am-tune__mark" aria-hidden="true">
-          <svg v-if="playing" class="am-tune__sign" viewBox="0 0 16 16">
-            <rect x="4" y="3.2" width="2.9" height="9.6" rx="1.2" />
-            <rect x="9.1" y="3.2" width="2.9" height="9.6" rx="1.2" />
-          </svg>
-          <svg v-else class="am-tune__sign" viewBox="0 0 16 16">
-            <path d="M5.2 3.4 12.4 8l-7.2 4.6z" />
-          </svg>
-        </span>
-      </button>
+      <div class="am-tune__organs">
+        <!-- Пустая клетка-близнец правой: держит цветок ровно в центре. -->
+        <span class="am-tune__void" aria-hidden="true" />
 
-      <div class="am-tune__now">
-        <span v-if="nowRow" class="am-tune__nowtag">{{ nowRow.tag }}</span>
-        <span class="am-tune__nowname">{{ nowRow ? nowRow.title : 'Выберите тему' }}</span>
-        <span v-if="nowRow && nowRow.artist" class="am-tune__nowartist">{{ nowRow.artist }}</span>
+        <button
+          v-tip="playHint"
+          class="am-tune__hit"
+          :class="{ 'am-tune__hit--live': playing }"
+          type="button"
+          :aria-label="playHint"
+          @click="onPlay"
+        >
+          <SakuraBloom />
+          <span class="am-tune__mark" aria-hidden="true">
+            <svg v-if="playing" class="am-tune__sign" viewBox="0 0 16 16">
+              <rect x="4" y="3.2" width="2.9" height="9.6" rx="1.2" />
+              <rect x="9.1" y="3.2" width="2.9" height="9.6" rx="1.2" />
+            </svg>
+            <svg v-else class="am-tune__sign" viewBox="0 0 16 16">
+              <path d="M5.2 3.4 12.4 8l-7.2 4.6z" />
+            </svg>
+          </span>
+        </button>
+
+        <div class="am-tune__tools">
+          <button
+            v-tip="loop ? 'Повтор включён' : 'Повторять тему'"
+            class="am-tune__tool"
+            :class="{ 'am-tune__tool--on': loop }"
+            type="button"
+            aria-label="Повторять тему"
+            @click="onLoop"
+          >
+            <svg class="am-tune__glyph" viewBox="0 0 16 16">
+              <path d="M4.4 5.2h5.2a2.8 2.8 0 0 1 2.8 2.8v.4" />
+              <path d="M11.6 10.8H6.4a2.8 2.8 0 0 1-2.8-2.8V7.6" />
+              <path d="M6.2 3.2 4.1 5.2l2.1 2" />
+              <path d="M9.8 12.8l2.1-2-2.1-2" />
+            </svg>
+          </button>
+
+          <button
+            v-tip="mute ? 'Включить звук' : 'Без звука'"
+            class="am-tune__tool"
+            type="button"
+            aria-label="Громкость"
+            @click="onMute"
+          >
+            <svg class="am-tune__glyph" viewBox="0 0 16 16">
+              <path d="M3 6.2h2.1L8.4 3.4v9.2L5.1 9.8H3z" />
+              <template v-if="!mute">
+                <path d="M10.6 6.1a2.6 2.6 0 0 1 0 3.8" />
+                <path d="M12.4 4.4a5 5 0 0 1 0 7.2" />
+              </template>
+              <template v-else>
+                <path d="M10.8 6.4l3.2 3.2" />
+                <path d="M14 6.4l-3.2 3.2" />
+              </template>
+            </svg>
+          </button>
+
+          <!-- Громкость тем же органом, что таймлайн, только короче: две разные
+               полосы в одном пульте читались бы деталями от разных приборов. -->
+          <div
+            class="am-tune__vol"
+            role="slider"
+            aria-label="Уровень громкости"
+            :aria-valuetext="volPart"
+            @pointerdown="onVolDown"
+            @pointermove="onVolMove"
+          >
+            <span class="am-tune__track">
+              <span class="am-tune__done" :style="{ width: volPart }" />
+            </span>
+            <span class="am-tune__knob" :style="{ left: volPart }" />
+          </div>
+        </div>
       </div>
 
       <!-- Полоса своя: у родного ползунка ни формы темы, ни нужной толщины.
@@ -555,95 +702,15 @@ onBeforeUnmount(stop)
         <span class="am-tune__clock">{{ lenText }}</span>
       </div>
 
-      <div class="am-tune__tools">
-        <button
-          v-tip="loop ? 'Повтор включён' : 'Повторять тему'"
-          class="am-tune__tool"
-          :class="{ 'am-tune__tool--on': loop }"
-          type="button"
-          aria-label="Повторять тему"
-          @click="onLoop"
-        >
-          <svg class="am-tune__glyph" viewBox="0 0 16 16">
-            <path d="M4.4 5.2h5.2a2.8 2.8 0 0 1 2.8 2.8v.4" />
-            <path d="M11.6 10.8H6.4a2.8 2.8 0 0 1-2.8-2.8V7.6" />
-            <path d="M6.2 3.2 4.1 5.2l2.1 2" />
-            <path d="M9.8 12.8l2.1-2-2.1-2" />
-          </svg>
-        </button>
-
-        <button
-          v-tip="mute ? 'Включить звук' : 'Без звука'"
-          class="am-tune__tool"
-          type="button"
-          aria-label="Громкость"
-          @click="onMute"
-        >
-          <svg class="am-tune__glyph" viewBox="0 0 16 16">
-            <path d="M3 6.2h2.1L8.4 3.4v9.2L5.1 9.8H3z" />
-            <template v-if="!mute">
-              <path d="M10.6 6.1a2.6 2.6 0 0 1 0 3.8" />
-              <path d="M12.4 4.4a5 5 0 0 1 0 7.2" />
-            </template>
-            <template v-else>
-              <path d="M10.8 6.4l3.2 3.2" />
-              <path d="M14 6.4l-3.2 3.2" />
-            </template>
-          </svg>
-        </button>
-
-        <!-- Громкость тем же органом, что таймлайн, только короче: две разные
-             полосы в одном пульте читались бы деталями от разных приборов. -->
-        <div
-          class="am-tune__vol"
-          role="slider"
-          aria-label="Уровень громкости"
-          :aria-valuetext="volPart"
-          @pointerdown="onVolDown"
-          @pointermove="onVolMove"
-        >
-          <span class="am-tune__track">
-            <span class="am-tune__done" :style="{ width: volPart }" />
-          </span>
-          <span class="am-tune__knob" :style="{ left: volPart }" />
-        </div>
-
-        <span v-if="nowRow && nowRow.links.length > 0" class="am-tune__links">
-          <button
-            v-for="link in nowRow.links"
-            :key="link.site"
-            v-tip="`Открыть в ${link.label}`"
-            class="am-tune__tool"
-            type="button"
-            :aria-label="link.label"
-            @click="openLink(link.url)"
-          >
-            <svg v-if="link.site === 'spotify'" class="am-tune__glyph" viewBox="0 0 16 16">
-              <circle cx="8" cy="8" r="6.4" />
-              <path d="M4.6 6.1c2.2-.7 4.8-.4 6.8.8" />
-              <path d="M5.2 8.4c1.8-.5 3.8-.3 5.4.7" />
-              <path d="M5.8 10.5c1.4-.4 2.9-.2 4 .5" />
-            </svg>
-            <svg v-else-if="link.site === 'apple'" class="am-tune__glyph" viewBox="0 0 16 16">
-              <path d="M6.4 11V4.4l5-1.1V10" />
-              <circle cx="4.8" cy="11.2" r="1.7" />
-              <circle cx="9.8" cy="10.1" r="1.7" />
-            </svg>
-            <svg v-else-if="link.site === 'youtube'" class="am-tune__glyph" viewBox="0 0 16 16">
-              <rect x="1.6" y="3.6" width="12.8" height="8.8" rx="3" />
-              <path d="M6.8 6.3 10.3 8l-3.5 1.7z" fill="currentColor" stroke="none" />
-            </svg>
-            <svg v-else class="am-tune__glyph" viewBox="0 0 16 16">
-              <path d="M6.2 10.4V5.6l4.4-.9v4.6" />
-              <path d="M2.6 12.1c3.2 1.6 7.6 1.6 10.8-.1" />
-            </svg>
-          </button>
-        </span>
+      <div class="am-tune__now">
+        <span v-if="nowRow" class="am-tune__nowtag">{{ nowRow.tag }}</span>
+        <span class="am-tune__nowname">{{ nowRow ? nowRow.title : 'Выберите тему' }}</span>
+        <span v-if="nowRow && nowRow.artist" class="am-tune__nowartist">{{ nowRow.artist }}</span>
       </div>
     </div>
 
     <ul class="am-tune__list">
-      <!-- Строка и две мелкие кнопки — соседи в одном пункте: вложить кнопку
+      <!-- Строка и мелкие кнопки — соседи в одном пункте: вложить кнопку
            в кнопку вёрстка не позволяет. -->
       <li v-for="row in shownRows" :key="row.key" class="am-tune__item">
         <button
@@ -673,6 +740,22 @@ onBeforeUnmount(stop)
             <span v-if="row.artist" class="am-tune__artist">{{ row.artist }}</span>
           </span>
         </button>
+
+        <!-- Три стриминга круглыми знаками, как ярлычки под постером. -->
+        <span class="am-tune__tunes">
+          <button
+            v-for="place in streamsFor(row)"
+            :key="place.brand"
+            v-tip="place.hint"
+            class="am-tune__jump"
+            :class="{ 'am-tune__jump--far': !place.exact }"
+            type="button"
+            :aria-label="place.hint"
+            @click="openLink(place.url)"
+          >
+            <BrandMark class="am-tune__brand" :name="place.brand" />
+          </button>
+        </span>
 
         <span class="am-tune__acts">
           <button
@@ -765,518 +848,30 @@ onBeforeUnmount(stop)
   font-variant-numeric: tabular-nums;
 }
 
-/* Пульт: цветок слева на два ряда, подпись и таймлайн справа от него,
-   мелкие органы строкой во всю ширину под ними. */
+/* Пульт тремя рядами по центру: органы, таймлайн, подпись. */
 .am-tune__deck {
-  display: grid;
-  grid-template-columns: 46px minmax(0, 1fr);
-  gap: 8px 12px;
-  align-items: center;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
   padding: 12px 13px 11px;
   background: var(--am-fill-1);
   border: 1px solid var(--am-line-soft);
   border-radius: var(--am-r-l);
 }
 
-/* Кнопка остаётся прямоугольной и без своей одежды: круг и распускающуюся
-   сакуру рисует вложенный слой, а кнопке остаются попадание курсора
-   по всей цели и кольцо фокуса. Оттенки цветка — как у окна правки. */
-.am-tune__hit {
-  --am-bloom-deep: var(--am-hover);
-  --am-bloom-petal: color-mix(in srgb, var(--am-sakura) 30%, var(--am-hover));
-  --am-bloom-shade: var(--am-sh-1);
-  --am-bloom-out: 3px;
-
-  position: relative;
+/* Центр держит сетка, а не подобранные отступы: крайние колонки
+   равные, и цветок в средней стоит по середине панели при любой
+   ширине правой группы. */
+.am-tune__organs {
   display: grid;
-  grid-row: 1 / 3;
-  place-items: center;
-  width: 46px;
-  height: 46px;
-  padding: 0;
-  color: var(--am-dim);
-  cursor: pointer;
-  background: none;
-  border: 0;
-  border-radius: var(--am-r-cap);
-  transition: color var(--am-fast) var(--am-ease);
+  grid-template-columns: 1fr auto 1fr;
+  gap: 10px;
+  align-items: center;
 }
 
-.am-tune__hit:hover,
-.am-tune__hit:focus-visible {
-  color: var(--am-text);
-}
-
-/* Знак поднят над цветком: тот лежит своим слоем и накрыл бы содержимое. */
-.am-tune__mark {
-  position: relative;
+.am-tune__void {
   display: block;
 }
 
-.am-tune__sign {
-  display: block;
-  width: 18px;
-  height: 18px;
-  fill: currentcolor;
-}
-
-/* Играет — цветок остаётся распущенным сам, без курсора, и живёт:
-   лепестки медленно крутятся, сердцевина дышит. Ровным ходом, а не
-   по громкости: почему — в шапке файла. */
-.am-tune__hit--live {
-  color: var(--am-text);
-}
-
-.am-tune__hit--live :deep(.am-bloom__petals) {
-  opacity: 1;
-  animation: am-tune-turn 9s linear infinite;
-}
-
-.am-tune__hit--live :deep(.am-bloom__bud) {
-  animation: am-tune-beat 2.4s var(--am-ease-soft) infinite;
-}
-
-.am-tune__hit--live :deep(.am-bloom) {
-  filter: drop-shadow(var(--am-sh-1)) drop-shadow(0 0 10px rgb(var(--am-sakura-rgb) / 0.45));
-}
-
-@keyframes am-tune-turn {
-  from {
-    transform: rotate(0deg);
-  }
-  to {
-    transform: rotate(360deg);
-  }
-}
-
-@keyframes am-tune-beat {
-  0%,
-  100% {
-    transform: scale(0.9);
-  }
-  50% {
-    transform: scale(1);
-  }
-}
-
-.am-tune__now {
-  display: flex;
-  gap: 7px;
-  align-items: baseline;
-  min-width: 0;
-}
-
-.am-tune__nowtag {
-  flex: none;
-  padding: 2px 7px;
-  font-size: 10.5px;
-  font-weight: 700;
-  color: var(--am-accent);
-  background: rgb(var(--am-accent-rgb) / 0.14);
-  border-radius: var(--am-r-cap);
-}
-
-.am-tune__nowname {
-  overflow: hidden;
-  font-size: 13.5px;
-  font-weight: 650;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.am-tune__nowartist {
-  overflow: hidden;
-  font-size: 12px;
-  color: var(--am-faint);
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.am-tune__nowartist::before {
-  margin-right: 5px;
-  content: '·';
-}
-
-.am-tune__wave {
-  display: flex;
-  gap: 9px;
-  align-items: center;
-  min-width: 0;
-}
-
-.am-tune__clock {
-  flex: none;
-  font-size: 11px;
-  color: var(--am-faint);
-  font-variant-numeric: tabular-nums;
-}
-
-/* Цель тяги высокая, а сама полоса тонкая: ручку в четыре пикселя
-   мышью не поймать, поэтому под ней прозрачный запас по высоте. */
-.am-tune__seek,
-.am-tune__vol {
-  position: relative;
-  display: flex;
-  align-items: center;
-  height: 22px;
-  cursor: pointer;
-  touch-action: none;
-}
-
-.am-tune__seek {
-  flex: 1;
-  min-width: 0;
-}
-
-/* Громкость короче таймлайна, но не огрызок: на шестидесяти пикселях
-   одно деление шло шесть процентов, и уровень выставлялся наугад. */
-.am-tune__vol {
-  flex: none;
-  width: 96px;
-}
-
-.am-tune__track {
-  display: block;
-  width: 100%;
-  height: 6px;
-  overflow: hidden;
-  background: var(--am-fill-3);
-  border-radius: var(--am-r-cap);
-}
-
-.am-tune__done {
-  display: block;
-  height: 100%;
-  background: linear-gradient(90deg, var(--am-accent), var(--am-accent-2));
-  border-radius: inherit;
-}
-
-/* Ручка — лепесток, а не серый шарик системы: тот же розовый, что у цветка. */
-.am-tune__knob {
-  position: absolute;
-  top: 50%;
-  width: 13px;
-  height: 13px;
-  background: var(--am-sakura);
-  border-radius: var(--am-r-blob);
-  box-shadow: 0 0 0 3px rgb(var(--am-sakura-rgb) / 0.2);
-  transform: translate(-50%, -50%);
-  transition:
-    box-shadow var(--am-fast) var(--am-ease),
-    transform var(--am-fast) var(--am-ease);
-}
-
-.am-tune__seek:hover .am-tune__knob,
-.am-tune__vol:hover .am-tune__knob,
-.am-tune__seek--hold .am-tune__knob {
-  box-shadow: 0 0 0 5px rgb(var(--am-sakura-rgb) / 0.26);
-  transform: translate(-50%, -50%) rotate(38deg) scale(1.1);
-}
-
-.am-tune__tools {
-  display: flex;
-  grid-column: 1 / -1;
-  gap: 6px;
-  align-items: center;
-  min-width: 0;
-  padding-top: 2px;
-}
-
-/* Органы пульта размером под палец, а не под прицел: рядом
-   с цветком в 46px кнопки в 28 читались мелочью. */
-.am-tune__tool {
-  display: grid;
-  flex: none;
-  place-items: center;
-  width: 34px;
-  height: 34px;
-  padding: 0;
-  color: var(--am-faint);
-  cursor: pointer;
-  background: none;
-  border: 0;
-  border-radius: var(--am-r-cap);
-  transition:
-    color var(--am-fast) var(--am-ease),
-    background-color var(--am-fast) var(--am-ease);
-}
-
-.am-tune__tool:hover,
-.am-tune__tool:focus-visible {
-  color: var(--am-text);
-  background: var(--am-fill-2);
-}
-
-/* Включённый повтор светится акцентом: без этого состояние кнопки
-   приходилось бы проверять на слух. */
-.am-tune__tool--on {
-  color: var(--am-accent);
-  background: var(--am-accent-soft);
-}
-
-.am-tune__glyph {
-  width: 19px;
-  height: 19px;
-  fill: none;
-  stroke: currentcolor;
-  stroke-width: 1.4;
-  stroke-linecap: round;
-  stroke-linejoin: round;
-}
-
-/* Стриминги той же песни уходят к правому краю пульта. */
-.am-tune__links {
-  display: flex;
-  flex: none;
-  gap: 2px;
-  align-items: center;
-  margin-left: auto;
-}
-
-.am-tune__list {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-
-/* Пункт списка держит строку и две кнопки в одном ряду. */
-.am-tune__item {
-  display: flex;
-  gap: 2px;
-  align-items: center;
-  min-width: 0;
-}
-
-/* Вся строка — цель нажатия: выбор темы мышью не должен требовать
-   попадания в круглыш. */
-.am-tune__row {
-  display: flex;
-  flex: 1;
-  gap: 9px;
-  align-items: center;
-  min-width: 0;
-  min-height: 34px;
-  padding: 4px 8px;
-  font: inherit;
-  color: inherit;
-  text-align: left;
-  cursor: pointer;
-  background: none;
-  border: 0;
-  border-radius: var(--am-r-m);
-  transition: background-color var(--am-fast) var(--am-ease);
-}
-
-.am-tune__row:hover:not(:disabled) {
-  background: var(--am-fill-1);
-}
-
-.am-tune__row--on {
-  background: rgb(var(--am-accent-rgb) / 0.1);
-  box-shadow: inset 0 0 0 1px rgb(var(--am-accent-rgb) / 0.3);
-}
-
-/* Темы без записи встречаются: строка остаётся в списке со ссылками
-   и подписью, но не зовёт нажать. */
-.am-tune__row--mute {
-  cursor: default;
-  opacity: 0.55;
-}
-
-/* Две мелкие кнопки строки: скопировать подпись и скачать трек. Меньше
-   органов пульта: это спутники строки, а не её главное действие. */
-.am-tune__acts {
-  display: flex;
-  flex: none;
-  gap: 2px;
-  align-items: center;
-}
-
-.am-tune__act {
-  display: grid;
-  flex: none;
-  place-items: center;
-  width: 28px;
-  height: 28px;
-  padding: 0;
-  color: var(--am-faint);
-  cursor: pointer;
-  background: none;
-  border: 0;
-  border-radius: var(--am-r-cap);
-  transition:
-    color var(--am-fast) var(--am-ease),
-    background-color var(--am-fast) var(--am-ease);
-}
-
-.am-tune__act:hover:not(:disabled),
-.am-tune__act:focus-visible {
-  color: var(--am-text);
-  background: var(--am-fill-2);
-}
-
-.am-tune__act:disabled {
-  cursor: default;
-  opacity: 0.45;
-}
-
-/* Отметка о сделанном акцентом и на пару секунд: уведомление на полэкрана
-   ради одной строки в буфере было бы перебором. */
-.am-tune__act--done {
-  color: var(--am-accent);
-  background: var(--am-accent-soft);
-}
-
-/* Ожидание крутит дугу: трек весит мегабайты, и без знака жизни нажатие
-   казалось бы провалившимся. */
-.am-tune__act--wait {
-  color: var(--am-accent);
-}
-
-.am-tune__act--wait .am-tune__glyph {
-  animation: am-tune-turn 0.9s linear infinite;
-}
-
-.am-tune__beat {
-  display: grid;
-  flex: none;
-  place-items: center;
-  width: 14px;
-  height: 14px;
-}
-
-.am-tune__dot {
-  width: 5px;
-  height: 5px;
-  background: var(--am-faint);
-  border-radius: var(--am-r-cap);
-}
-
-.am-tune__row--on .am-tune__dot {
-  background: var(--am-accent);
-}
-
-/* Три палочки эквалайзера у звучащей строки: нарисованы полосками,
-   а не картинкой, и качаются со своим сдвигом каждая. */
-.am-tune__beats {
-  display: flex;
-  gap: 2px;
-  align-items: flex-end;
-  height: 12px;
-}
-
-.am-tune__beats i {
-  width: 2px;
-  height: 100%;
-  background: var(--am-accent);
-  border-radius: var(--am-r-cap);
-  animation: am-tune-wag 1.1s var(--am-ease-soft) infinite;
-}
-
-.am-tune__beats i:nth-child(2) {
-  animation-delay: 0.22s;
-}
-
-.am-tune__beats i:nth-child(3) {
-  animation-delay: 0.44s;
-}
-
-@keyframes am-tune-wag {
-  0%,
-  100% {
-    transform: scaleY(0.4);
-  }
-  50% {
-    transform: scaleY(1);
-  }
-}
-
-/* Номер темы пилюлей акцентом: OP1 и ED2 ищут глазом первыми. */
-.am-tune__tag {
-  flex: none;
-  min-width: 34px;
-  padding: 3px 7px;
-  font-size: 11px;
-  font-weight: 700;
-  line-height: 1.2;
-  color: var(--am-accent);
-  text-align: center;
-  background: rgb(var(--am-accent-rgb) / 0.14);
-  border-radius: var(--am-r-cap);
-}
-
-.am-tune__text {
-  display: flex;
-  flex: 1;
-  gap: 4px;
-  align-items: baseline;
-  min-width: 0;
-}
-
-.am-tune__name {
-  overflow: hidden;
-  font-size: 13px;
-  font-weight: 600;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-/* Исполнитель через точку и бледнее: это подпись к названию, а не вторая
-   строка — иначе блок из восьми тем вырастал вдвое. */
-.am-tune__artist {
-  overflow: hidden;
-  font-size: 12px;
-  color: var(--am-faint);
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.am-tune__artist::before {
-  margin-right: 4px;
-  content: '·';
-}
-
-.am-tune__more {
-  align-self: flex-start;
-  min-height: 30px;
-  padding: 0 13px;
-  font: inherit;
-  font-size: 12.5px;
-  font-weight: 600;
-  color: var(--am-dim);
-  cursor: pointer;
-  background: var(--am-fill-1);
-  border: 1px solid var(--am-line-soft);
-  border-radius: var(--am-r-cap);
-  transition:
-    color var(--am-fast) var(--am-ease),
-    background-color var(--am-fast) var(--am-ease),
-    border-color var(--am-fast) var(--am-ease);
-}
-
-.am-tune__more:hover {
-  color: var(--am-accent);
-  background: var(--am-fill-2);
-  border-color: rgb(var(--am-accent-rgb) / 0.5);
-}
-
-/* Просьба о покое сильнее красот: цветок просто остаётся распущенным,
-   палочки — поднятыми. */
-@media (prefers-reduced-motion: reduce) {
-  .am-tune__hit--live :deep(.am-bloom__petals),
-  .am-tune__hit--live :deep(.am-bloom__bud),
-  .am-tune__beats i,
-  .am-tune__act--wait .am-tune__glyph {
-    animation: none;
-  }
-
-  .am-tune__seek:hover .am-tune__knob,
-  .am-tune__vol:hover .am-tune__knob,
-  .am-tune__seek--hold .am-tune__knob {
-    transform: translate(-50%, -50%);
-  }
-}
-</style>
+/* Органы прижаты к цветку, а не растянуты по клетке: иначе повтор
+   с громкостью уех
