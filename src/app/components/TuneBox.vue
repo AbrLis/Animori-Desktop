@@ -16,15 +16,13 @@
 //
 // СКАЧАТЬ И СКОПИРОВАТЬ — ПО СТРОКАМ, А НЕ В ПУЛЬТЕ
 //
-// Загрузка и копирование имени — действия над конкретной темой, а не над
-// воспроизведением, и в пульте они требовали бы сначала зарядить тему
-// в плеер. Строка осталась кнопкой выбора, а две мелкие кнопки стоят
-// СНАРУЖИ неё, рядом: кнопка внутри кнопки — неверная вёрстка, и браузер
-// вправе выбросить вложенную из дерева.
+// Это действия над конкретной темой, а не над воспроизведением: в пульте
+// они требовали бы сперва зарядить тему в плеер. Строка осталась кнопкой
+// выбора, а две мелкие кнопки стоят СНАРУЖИ неё, рядом: кнопка внутри
+// кнопки — неверная вёрстка, браузер вправе выбросить вложенную из дерева.
 //
-// Папка спрашивается КАЖДЫЙ раз и нигде не запоминается: один трек
-// человек кладёт в музыку, другой на флешку, и папка из настроек
-// выгрузок здесь скорее помешала бы.
+// Папка спрашивается КАЖДЫЙ раз и нигде не запоминается: один трек кладут
+// в музыку, другой на флешку, и папка из настроек выгрузок тут помешала бы.
 //
 // ВИЗУАЛИЗАТОР НЕ В ТАКТ, И ЭТО НАРОЧНО
 //
@@ -59,9 +57,9 @@ const SAVE_TIMEOUT_MS = 120000
 const MARK_MS = 2200
 
 /**
- * Расширения, которые примет оболочка (список живёт в export.rs).
- * Незнакомое расширение превращаем в .ogg: AnimeThemes раздаёт именно
- * ogg, и проверка в Rust иначе отклонила бы уже скачанный файл.
+ * Расширения, которые примет оболочка (тот же список в export.rs).
+ * Незнакомое считаем ogg: AnimeThemes раздаёт именно ogg, а проверка
+ * в Rust иначе отклонила бы уже скачанный файл.
  */
 const TRACK_EXTS = ['.ogg', '.oga', '.opus', '.mp3', '.m4a', '.webm']
 
@@ -97,7 +95,7 @@ const mute = ref(false)
 /** Тянут ручку таймлайна: показания времени в это время наши, не плеера. */
 const drag = ref(false)
 
-/** Ключи строк в работе и с отметками: отметка именно у своей кнопки. */
+/** Ключи строк в работе и с отметками: отметка горит у своей кнопки, не у всех. */
 const saving = ref<string | null>(null)
 const saved = ref<string | null>(null)
 const copied = ref<string | null>(null)
@@ -326,7 +324,7 @@ function rowLabel(row: TuneRow): string {
   return row.artist ? `${row.title} — ${row.artist}` : row.title
 }
 
-/** Запрещённые в именах Windows символы пробелом: иначе запись откажет. */
+/** Запрещённые в именах Windows символы — пробелом: иначе запись откажет. */
 function safePart(text: string): string {
   return text
     .replace(/[\\/:*?"<>|]/g, ' ')
@@ -348,7 +346,7 @@ function fileName(row: TuneRow): string {
   return `${head || row.tag}${extOf(row.audio ?? '')}`
 }
 
-/** Отметка на кнопке гаснет сама и только если с тех пор не сменилась строка. */
+/** Отметка гаснет сама и только если с тех пор не сменилась строка. */
 function markFor(box: typeof saved, key: string): void {
   box.value = key
   setTimeout(() => {
@@ -376,14 +374,14 @@ function onCopy(row: TuneRow): void {
  * потом сеть. Скачать мегабайты и только потом узнать, что человек закрыл
  * окно выбора, значило бы тратить его канал впустую.
  *
- * Папка спрашивается на каждое нажатие и никуда не записывается.
- * Отмена — не ошибка: тихо выходим.
- *
  * Запрос идёт через мост, а не через fetch окна: байты нужны оболочке,
- * а не странице. Ограничитель AnimeThemes сюда не замешан нарочно:
- * он стережёт само АПИ с его 429, а звук раздаёт отдельная раздача,
- * и держать его многоминутное качание в очереди АПИ значило бы заморозить
- * обычные запросы карточки.
+ * а не странице. Ограничитель AnimeThemes сюда не замешан нарочно: он
+ * стережёт само АПИ с его 429, а звук раздаёт отдельная раздача, и держать
+ * его многоминутное качание в очереди АПИ значило бы заморозить обычные
+ * запросы карточки.
+ *
+ * Ошибки тихие: блок музыки не место для красных надписей, причина уходит
+ * в журнал.
  */
 async function onSave(row: TuneRow): Promise<void> {
   if (row.audio === null || saving.value !== null) return
@@ -391,6 +389,7 @@ async function onSave(row: TuneRow): Promise<void> {
   const url = row.audio
 
   try {
+    // Папка спрашивается на КАЖДОЕ нажатие. null — человек закрыл окно, это не сбой.
     const dir = await Bridge.exportFile.pickTrackDir()
     if (dir === null) return
 
@@ -406,7 +405,6 @@ async function onSave(row: TuneRow): Promise<void> {
     Logger('INFO', `Музыка: трек сохранён (${path})`)
     markFor(saved, row.key)
   } catch (e) {
-    // Тихо в журнал: блок музыки не место для красных надписей.
     Logger('WARN', `Музыка: трек не сохранён (${row.tag})`, e)
   } finally {
     if (saving.value === row.key) saving.value = null
@@ -687,7 +685,7 @@ onBeforeUnmount(stop)
             </svg>
           </button>
 
-          <!-- Загрузка без звуковой записи невозможна: у темы есть только подпись. -->
+          <!-- Без звуковой записи скачивать нечего: у темы есть только подпись. -->
           <button
             v-tip="
               row.audio === null
@@ -1081,7 +1079,8 @@ onBeforeUnmount(stop)
   opacity: 0.55;
 }
 
-/* Две мелкие кнопки строки: скопировать подпись и скачать трек. */
+/* Две мелкие кнопки строки: скопировать подпись и скачать трек. Меньше
+   органов пульта: это спутники строки, а не её главное действие. */
 .am-tune__acts {
   display: flex;
   flex: none;
@@ -1124,6 +1123,153 @@ onBeforeUnmount(stop)
   background: var(--am-accent-soft);
 }
 
-/* Ожидание крутит дугу: трек весит мегабайты, и без знака жизни
-   нажатие казалось бы провалившимся. */
-.am-tune__act--
+/* Ожидание крутит дугу: трек весит мегабайты, и без знака жизни нажатие
+   казалось бы провалившимся. */
+.am-tune__act--wait {
+  color: var(--am-accent);
+}
+
+.am-tune__act--wait .am-tune__glyph {
+  animation: am-tune-turn 0.9s linear infinite;
+}
+
+.am-tune__beat {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 14px;
+  height: 14px;
+}
+
+.am-tune__dot {
+  width: 5px;
+  height: 5px;
+  background: var(--am-faint);
+  border-radius: var(--am-r-cap);
+}
+
+.am-tune__row--on .am-tune__dot {
+  background: var(--am-accent);
+}
+
+/* Три палочки эквалайзера у звучащей строки: нарисованы полосками,
+   а не картинкой, и качаются со своим сдвигом каждая. */
+.am-tune__beats {
+  display: flex;
+  gap: 2px;
+  align-items: flex-end;
+  height: 12px;
+}
+
+.am-tune__beats i {
+  width: 2px;
+  height: 100%;
+  background: var(--am-accent);
+  border-radius: var(--am-r-cap);
+  animation: am-tune-wag 1.1s var(--am-ease-soft) infinite;
+}
+
+.am-tune__beats i:nth-child(2) {
+  animation-delay: 0.22s;
+}
+
+.am-tune__beats i:nth-child(3) {
+  animation-delay: 0.44s;
+}
+
+@keyframes am-tune-wag {
+  0%,
+  100% {
+    transform: scaleY(0.4);
+  }
+  50% {
+    transform: scaleY(1);
+  }
+}
+
+/* Номер темы пилюлей акцентом: OP1 и ED2 ищут глазом первыми. */
+.am-tune__tag {
+  flex: none;
+  min-width: 34px;
+  padding: 3px 7px;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1.2;
+  color: var(--am-accent);
+  text-align: center;
+  background: rgb(var(--am-accent-rgb) / 0.14);
+  border-radius: var(--am-r-cap);
+}
+
+.am-tune__text {
+  display: flex;
+  flex: 1;
+  gap: 4px;
+  align-items: baseline;
+  min-width: 0;
+}
+
+.am-tune__name {
+  overflow: hidden;
+  font-size: 13px;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Исполнитель через точку и бледнее: это подпись к названию, а не вторая
+   строка — иначе блок из восьми тем вырастал вдвое. */
+.am-tune__artist {
+  overflow: hidden;
+  font-size: 12px;
+  color: var(--am-faint);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.am-tune__artist::before {
+  margin-right: 4px;
+  content: '·';
+}
+
+.am-tune__more {
+  align-self: flex-start;
+  min-height: 30px;
+  padding: 0 13px;
+  font: inherit;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--am-dim);
+  cursor: pointer;
+  background: var(--am-fill-1);
+  border: 1px solid var(--am-line-soft);
+  border-radius: var(--am-r-cap);
+  transition:
+    color var(--am-fast) var(--am-ease),
+    background-color var(--am-fast) var(--am-ease),
+    border-color var(--am-fast) var(--am-ease);
+}
+
+.am-tune__more:hover {
+  color: var(--am-accent);
+  background: var(--am-fill-2);
+  border-color: rgb(var(--am-accent-rgb) / 0.5);
+}
+
+/* Просьба о покое сильнее красот: цветок просто остаётся распущенным,
+   палочки — поднятыми. */
+@media (prefers-reduced-motion: reduce) {
+  .am-tune__hit--live :deep(.am-bloom__petals),
+  .am-tune__hit--live :deep(.am-bloom__bud),
+  .am-tune__beats i,
+  .am-tune__act--wait .am-tune__glyph {
+    animation: none;
+  }
+
+  .am-tune__seek:hover .am-tune__knob,
+  .am-tune__vol:hover .am-tune__knob,
+  .am-tune__seek--hold .am-tune__knob {
+    transform: translate(-50%, -50%);
+  }
+}
+</style>
