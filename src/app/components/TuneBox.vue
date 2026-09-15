@@ -17,18 +17,32 @@
 // ЦЕНТР ДЕРЖИТ СЕТКА, А НЕ ПОДОБРАННЫЕ ОТСТУПЫ
 //
 // Цветок пуска стоит по центру над полосой, подпись звучащего — по центру
-// под ней, повтор с громкостью — справа от цветка. Ряд органов собран
-// сеткой 1fr | auto | 1fr с пустой левой клеткой: так цветок остаётся
-// ровно в середине панели независимо от того, сколько места заняли правые
-// органы. Левый распор фиксированной ширины приходилось бы подгонять
-// заново при каждой правке правой группы и на каждом масштабе окна.
+// под ней, а органы разведены по сторонам: слева перемешивание и звёздочка,
+// справа повтор с громкостью. Ряд собран сеткой 1fr | auto | 1fr, крайние
+// клетки равны по ширине, а боковые группы прижаты к середине: так цветок
+// стоит ровно в центре панели, чем бы ни наполнились бока. Распоры
+// фиксированной ширины приходилось бы подгонять заново после каждой правки
+// боковых групп и на каждом масштабе окна.
 //
-// СКАЧАТЬ, СКОПИРОВАТЬ И СТРИМИНГИ — ПО СТРОКАМ, А НЕ В ПУЛЬТЕ
+// Звёздочка «избранное» пока ни к чему не привязана: она заведена на рост,
+// и нажатие живёт только в памяти открытой карточки — хранилища избранных
+// тем в приложении нет. Кнопка стоит в ряду уже сейчас, чтобы потом не
+// перекраивать пульт заново.
+//
+// СКАЧАТЬ, СКОПИРОВАТЬ И СТРИМИНГИ — ЧАСТЬ СТРОКИ И ТОЛЬКО ПОД КУРСОРОМ
 //
 // Это действия над конкретной темой, а не над воспроизведением: в пульте
-// они требовали бы сперва зарядить тему в плеер. Строка осталась кнопкой
-// выбора, а мелкие кнопки стоят СНАРУЖИ неё, рядом: кнопка внутри
-// кнопки — неверная вёрстка, браузер вправе выбросить вложенную из дерева.
+// они требовали бы сперва зарядить тему в плеер. В разметке кнопки стоят
+// СНАРУЖИ кнопки выбора — кнопка внутри кнопки неверна, браузер вправе
+// выбросить вложенную из дерева, — но одежда у строки общая: отступы,
+// подсветка наведения и рамка выбора висят на пункте списка, поэтому пять
+// кнопок читаются частью строки, а не приставкой справа.
+//
+// Видны они только под курсором и при фокусе с клавиатуры: восемь тем по
+// пять значков превращали список в витрину иконок. Прячется прозрачность,
+// а не сама кнопка: место под значки занято всегда, иначе названия прыгали
+// бы при каждом наведении, а фокус с клавиатуры не мог бы дойти до скрытой
+// кнопки и показать её.
 //
 // Папка спрашивается КАЖДЫЙ раз и нигде не запоминается: один трек кладут
 // в музыку, другой на флешку, и папка из настроек выгрузок тут помешала бы.
@@ -134,6 +148,15 @@ const loop = ref(false)
 const vol = ref(keepVol)
 const mute = ref(false)
 
+/** Перемешивание: следующая тема берётся случайно, а не по порядку. */
+const shuffle = ref(false)
+
+/**
+ * Звёздочка «избранное» на рост: состояние живёт только в памяти карточки
+ * и никуда не уходит — хранилища избранных тем пока нет.
+ */
+const fav = ref(false)
+
 /** Тянут ручку таймлайна: показания времени в это время наши, не плеера. */
 const drag = ref(false)
 
@@ -226,10 +249,21 @@ function gear(): HTMLAudioElement {
   return next
 }
 
-/** Следующая тема со звуком после заряженной. На последней — тишина. */
+/**
+ * Следующая тема со звуком. По порядку — ближайшая ниже заряженной,
+ * с перемешиванием — случайная из остальных: иначе список ходил бы
+ * одним и тем же кругом.
+ */
 function nextRow(): TuneRow | null {
   const now = rows.value.findIndex((row) => row.key === pick.value)
   if (now < 0) return null
+
+  if (shuffle.value) {
+    const pool = rows.value.filter((row) => row.audio !== null && row.key !== pick.value)
+    if (pool.length === 0) return null
+    return pool[Math.floor(Math.random() * pool.length)] ?? null
+  }
+
   return rows.value.slice(now + 1).find((row) => row.audio !== null) ?? null
 }
 
@@ -283,6 +317,16 @@ function onPlay(): void {
 function onLoop(): void {
   loop.value = !loop.value
   if (sound !== null) sound.loop = loop.value
+}
+
+/** Перемешивание меняет только выбор следующей темы: звук не трогаем. */
+function onShuffle(): void {
+  shuffle.value = !shuffle.value
+}
+
+/** Звёздочка на рост: нажатие пока никуда не сохраняется — см. шапку. */
+function onFav(): void {
+  fav.value = !fav.value
 }
 
 /** Перемотка на месте: и стрелками, и прыжком по полосе. */
@@ -536,6 +580,7 @@ async function load(): Promise<void> {
   saving.value = null
   saved.value = null
   copied.value = null
+  fav.value = false
 
   const id = props.malId
   if (id === null) return
@@ -592,12 +637,44 @@ onBeforeUnmount(stop)
       <span class="am-tune__count">{{ rows.length }}</span>
     </div>
 
-    <!-- Пульт: цветок пуска по центру с органами справа, под ним таймлайн,
-         под таймлайном подпись звучащего. -->
+    <!-- Пульт: цветок пуска по центру с органами по сторонам, под ним
+         таймлайн, под таймлайном подпись звучащего. -->
     <div class="am-tune__deck">
       <div class="am-tune__organs">
-        <!-- Пустая клетка-близнец правой: держит цветок ровно в центре. -->
-        <span class="am-tune__void" aria-hidden="true" />
+        <!-- Левая сторона: перемешивание и звёздочка на рост. -->
+        <div class="am-tune__tools am-tune__tools--left">
+          <button
+            v-tip="shuffle ? 'Перемешивание включено' : 'Перемешать темы'"
+            class="am-tune__tool"
+            :class="{ 'am-tune__tool--on': shuffle }"
+            type="button"
+            aria-label="Перемешать темы"
+            :aria-pressed="shuffle"
+            @click="onShuffle"
+          >
+            <svg class="am-tune__glyph" viewBox="0 0 16 16">
+              <path d="M2.6 4.4h2.2l6 7.2h2.4" />
+              <path d="M2.6 11.6h2.2l2.1-2.6" />
+              <path d="M9.5 6.3l1.3-1.9h2.4" />
+              <path d="M11.3 2.6l2 1.8-2 1.8" />
+              <path d="M11.3 9.8l2 1.8-2 1.8" />
+            </svg>
+          </button>
+
+          <button
+            v-tip="fav ? 'В избранном' : 'В избранное'"
+            class="am-tune__tool"
+            :class="{ 'am-tune__tool--on': fav }"
+            type="button"
+            aria-label="В избранное"
+            :aria-pressed="fav"
+            @click="onFav"
+          >
+            <svg class="am-tune__glyph" :class="{ 'am-tune__glyph--full': fav }" viewBox="0 0 16 16">
+              <path d="M8 2.4l1.8 3.6 4 .6-2.9 2.8.7 4L8 11.5l-3.6 1.9.7-4L2.2 6.6l4-.6z" />
+            </svg>
+          </button>
+        </div>
 
         <button
           v-tip="playHint"
@@ -619,7 +696,7 @@ onBeforeUnmount(stop)
           </span>
         </button>
 
-        <div class="am-tune__tools">
+        <div class="am-tune__tools am-tune__tools--right">
           <button
             v-tip="loop ? 'Повтор включён' : 'Повторять тему'"
             class="am-tune__tool"
@@ -705,16 +782,19 @@ onBeforeUnmount(stop)
     </div>
 
     <ul class="am-tune__list">
-      <!-- Строка и мелкие кнопки — соседи в одном пункте: вложить кнопку
+      <!-- Пункт списка и есть строка: одежда, подсветка и рамка выбора на нём,
+           а кнопка выбора со спутниками — соседи внутри. Вложить кнопку
            в кнопку вёрстка не позволяет. -->
-      <li v-for="row in shownRows" :key="row.key" class="am-tune__item">
+      <li
+        v-for="row in shownRows"
+        :key="row.key"
+        class="am-tune__item"
+        :class="{ 'am-tune__item--on': row.key === pick }"
+      >
         <button
           v-tip="row.audio === null ? 'Записи нет' : `Слушать ${row.tag}`"
           class="am-tune__row"
-          :class="{
-            'am-tune__row--on': row.key === pick,
-            'am-tune__row--mute': row.audio === null,
-          }"
+          :class="{ 'am-tune__row--mute': row.audio === null }"
           type="button"
           :disabled="row.audio === null"
           @click="onRow(row)"
@@ -854,17 +934,14 @@ onBeforeUnmount(stop)
 }
 
 /* Центр держит сетка, а не подобранные отступы: крайние колонки равные,
-   и цветок в средней стоит по середине панели при любой ширине правой
-   группы. */
+   и цветок в средней стоит по середине панели при любой ширине боковых
+   групп. Просвет колонок широкий нарочно — мелкие органы не должны
+   липнуть к цветку. */
 .am-tune__organs {
   display: grid;
   grid-template-columns: 1fr auto 1fr;
-  gap: 10px;
+  gap: 18px;
   align-items: center;
-}
-
-.am-tune__void {
-  display: block;
 }
 
 /* Кнопка остаётся прямоугольной и без своей одежды: круг и распускающуюся
@@ -1064,14 +1141,21 @@ onBeforeUnmount(stop)
   transform: translate(-50%, -50%) rotate(38deg) scale(1.1);
 }
 
-/* Органы прижаты к цветку, а не растянуты по клетке: иначе повтор
-   с громкостью уехали бы к правому краю панели. */
+/* Боковые группы прижаты к цветку, а не растянуты по клетке: иначе органы
+   уехали бы к краям панели, а центр держался бы только на честном слове. */
 .am-tune__tools {
   display: flex;
   gap: 6px;
   align-items: center;
-  justify-self: start;
   min-width: 0;
+}
+
+.am-tune__tools--left {
+  justify-self: end;
+}
+
+.am-tune__tools--right {
+  justify-self: start;
 }
 
 /* Органы пульта размером под палец, а не под прицел: рядом
@@ -1099,7 +1183,7 @@ onBeforeUnmount(stop)
   background: var(--am-fill-2);
 }
 
-/* Включённый повтор светится акцентом: без этого состояние кнопки
+/* Включённый орган светится акцентом: без этого состояние кнопки
    приходилось бы проверять на слух. */
 .am-tune__tool--on {
   color: var(--am-accent);
@@ -1116,6 +1200,12 @@ onBeforeUnmount(stop)
   stroke-linejoin: round;
 }
 
+/* Залитый знак у звёздочки: обвод и заливка различают «в избранном»
+   и «добавить» надёжнее, чем один цвет. */
+.am-tune__glyph--full {
+  fill: currentcolor;
+}
+
 .am-tune__list {
   display: flex;
   flex-direction: column;
@@ -1125,24 +1215,38 @@ onBeforeUnmount(stop)
   list-style: none;
 }
 
-/* Пункт списка держит строку, стриминги и две кнопки в одном ряду. */
+/* Пункт списка и есть строка: отступы, подсветка наведения и рамка выбора
+   висят здесь, поэтому кнопки стримингов и действий читаются её частью,
+   а не приставкой справа. */
 .am-tune__item {
   display: flex;
-  gap: 2px;
+  gap: 3px;
   align-items: center;
   min-width: 0;
+  padding: 2px 8px;
+  border-radius: var(--am-r-m);
+  transition: background-color var(--am-fast) var(--am-ease);
+}
+
+.am-tune__item:hover {
+  background: var(--am-fill-1);
+}
+
+.am-tune__item--on {
+  background: rgb(var(--am-accent-rgb) / 0.1);
+  box-shadow: inset 0 0 0 1px rgb(var(--am-accent-rgb) / 0.3);
 }
 
 /* Вся строка — цель нажатия: выбор темы мышью не должен требовать
-   попадания в круглыш. */
+   попадания в круглыш. Своей одежды у кнопки нет, она на пункте. */
 .am-tune__row {
   display: flex;
   flex: 1;
   gap: 9px;
   align-items: center;
   min-width: 0;
-  min-height: 34px;
-  padding: 4px 8px;
+  min-height: 32px;
+  padding: 3px 0;
   font: inherit;
   color: inherit;
   text-align: left;
@@ -1150,16 +1254,6 @@ onBeforeUnmount(stop)
   background: none;
   border: 0;
   border-radius: var(--am-r-m);
-  transition: background-color var(--am-fast) var(--am-ease);
-}
-
-.am-tune__row:hover:not(:disabled) {
-  background: var(--am-fill-1);
-}
-
-.am-tune__row--on {
-  background: rgb(var(--am-accent-rgb) / 0.1);
-  box-shadow: inset 0 0 0 1px rgb(var(--am-accent-rgb) / 0.3);
 }
 
 /* Темы без записи встречаются: строка остаётся в списке со ссылками
@@ -1169,16 +1263,30 @@ onBeforeUnmount(stop)
   opacity: 0.55;
 }
 
-/* Стриминги строки: три круглых знака перед кнопками копирования
-   и загрузки. Знак цветной и своего цвета, поэтому кнопка под ним
-   прозрачная, а подсветка наведения — бледное кольцо. */
-.am-tune__tunes {
+/* Кнопки строки показываются под курсором и при фокусе с клавиатуры.
+   Прячется прозрачность, а не сама кнопка: место под значки занято
+   всегда, иначе названия прыгали бы при каждом наведении, а скрытая
+   кнопка не могла бы поймать фокус и проявиться. */
+.am-tune__tunes,
+.am-tune__acts {
   display: flex;
   flex: none;
   gap: 2px;
   align-items: center;
+  opacity: 0;
+  transition: opacity var(--am-fast) var(--am-ease);
 }
 
+.am-tune__item:hover .am-tune__tunes,
+.am-tune__item:hover .am-tune__acts,
+.am-tune__item:focus-within .am-tune__tunes,
+.am-tune__item:focus-within .am-tune__acts {
+  opacity: 1;
+}
+
+/* Стриминги строки: три круглых знака перед кнопками копирования
+   и загрузки. Знак цветной и своего цвета, поэтому кнопка под ним
+   прозрачная, а подсветка наведения — бледное кольцо. */
 .am-tune__jump {
   display: grid;
   flex: none;
@@ -1205,15 +1313,6 @@ onBeforeUnmount(stop)
 .am-tune__brand {
   width: 18px;
   height: 18px;
-}
-
-/* Две мелкие кнопки строки: скопировать подпись и скачать трек. Меньше
-   органов пульта: это спутники строки, а не её главное действие. */
-.am-tune__acts {
-  display: flex;
-  flex: none;
-  gap: 2px;
-  align-items: center;
 }
 
 .am-tune__act {
@@ -1261,6 +1360,13 @@ onBeforeUnmount(stop)
   animation: am-tune-turn 0.9s linear infinite;
 }
 
+/* Скачивание идёт и без курсора над строкой: отметка о работе не должна
+   исчезать вместе с наведением. */
+.am-tune__item .am-tune__act--wait,
+.am-tune__item .am-tune__act--done {
+  opacity: 1;
+}
+
 .am-tune__beat {
   display: grid;
   flex: none;
@@ -1276,7 +1382,7 @@ onBeforeUnmount(stop)
   border-radius: var(--am-r-cap);
 }
 
-.am-tune__row--on .am-tune__dot {
+.am-tune__item--on .am-tune__dot {
   background: var(--am-accent);
 }
 
