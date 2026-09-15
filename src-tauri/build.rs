@@ -18,6 +18,8 @@
 //   animori_file_write        -> allow-animori-file-write
 //   animori_export_pick_dir   -> allow-animori-export-pick-dir
 //   animori_export_write      -> allow-animori-export-write
+//   animori_track_pick_dir    -> allow-animori-track-pick-dir
+//   animori_track_write       -> allow-animori-track-write
 //   animori_proxy_status      -> allow-animori-proxy-status
 //   animori_proxy_probe       -> allow-animori-proxy-probe
 //
@@ -68,6 +70,12 @@ const COMMANDS: &[&str] = &[
     // Запись принимает папку из настроек и имя файла, и проверяет оба в export.rs.
     "animori_export_pick_dir",
     "animori_export_write",
+    // Загрузка темы с AnimeThemes отдельным файлом. Пара своя, а не переиспользованная:
+    // выгрузка списка спрашивает папку однажды и пишет текст, а трек спрашивает папку
+    // на каждое нажатие и пишет байты со своим списком расширений и своим пределом
+    // размера. Разделение оставляет проверки в export.rs строгими для обоих случаев.
+    "animori_track_pick_dir",
+    "animori_track_write",
     // Пункт 5.3.6: диагностика прокси для карточки настроек. Обе только читают:
     // status отдаёт снимок состояния, probe открывает TCP-соединение на адрес из
     // файла настроек. Ни та, ни другая не принимают адрес параметром — иначе код
