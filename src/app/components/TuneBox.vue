@@ -14,6 +14,18 @@
 // тянется только по выбору темы и в базу не кладётся — тема весит
 // мегабайты, а кэш заведён под мелкие ответы служб, не под музыку.
 //
+// СКАЧАТЬ И СКОПИРОВАТЬ — ПО СТРОКАМ, А НЕ В ПУЛЬТЕ
+//
+// Загрузка и копирование имени — действия над конкретной темой, а не над
+// воспроизведением, и в пульте они требовали бы сначала зарядить тему
+// в плеер. Строка осталась кнопкой выбора, а две мелкие кнопки стоят
+// СНАРУЖИ неё, рядом: кнопка внутри кнопки — неверная вёрстка, и браузер
+// вправе выбросить вложенную из дерева.
+//
+// Папка спрашивается КАЖДЫЙ раз и нигде не запоминается: один трек
+// человек кладёт в музыку, другой на флешку, и папка из настроек
+// выгрузок здесь скорее помешала бы.
+//
 // ВИЗУАЛИЗАТОР НЕ В ТАКТ, И ЭТО НАРОЧНО
 //
 // Пульс и вращение цветка идут ровным ходом, а не по громкости трека.
@@ -39,6 +51,19 @@ const FOLD_AT = 4
 
 /** Шаг перемотки стрелками, секунды. */
 const STEP_SEC = 5
+
+/** Таймаут загрузки трека: файл весит мегабайты, десяти секунд ему мало. */
+const SAVE_TIMEOUT_MS = 120000
+
+/** Сколько держится отметка «готово» на кнопке, миллисекунды. */
+const MARK_MS = 2200
+
+/**
+ * Расширения, которые примет оболочка (список живёт в export.rs).
+ * Незнакомое расширение превращаем в .ogg: AnimeThemes раздаёт именно
+ * ogg, и проверка в Rust иначе отклонила бы уже скачанный файл.
+ */
+const TRACK_EXTS = ['.ogg', '.oga', '.opus', '.mp3', '.m4a', '.webm']
 
 /** Строка блока: тема с подписью, звуком и ссылками. */
 interface TuneRow {
@@ -71,6 +96,11 @@ const mute = ref(false)
 
 /** Тянут ручку таймлайна: показания времени в это время наши, не плеера. */
 const drag = ref(false)
+
+/** Ключи строк в работе и с отметками: отметка именно у своей кнопки. */
+const saving = ref<string | null>(null)
+const saved = ref<string | null>(null)
+const copied = ref<string | null>(null)
 
 let sound: HTMLAudioElement | null = null
 
@@ -291,6 +321,98 @@ function onKey(event: KeyboardEvent): void {
   }
 }
 
+/** Подпись темы одной строкой: её несут в поиск на стримингах. */
+function rowLabel(row: TuneRow): string {
+  return row.artist ? `${row.title} — ${row.artist}` : row.title
+}
+
+/** Запрещённые в именах Windows символы пробелом: иначе запись откажет. */
+function safePart(text: string): string {
+  return text
+    .replace(/[\\/:*?"<>|]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+}
+
+/** Расширение из адреса без запроса и якоря. Незнакомое — считаем ogg. */
+function extOf(url: string): string {
+  const path = url.split('?')[0].split('#')[0]
+  const dot = path.lastIndexOf('.')
+  const ext = dot >= 0 ? path.slice(dot).toLowerCase() : ''
+  return TRACK_EXTS.includes(ext) ? ext : '.ogg'
+}
+
+/** Имя файла вида «OP1 · Название — Исполнитель.ogg». */
+function fileName(row: TuneRow): string {
+  const head = safePart(`${row.tag} · ${rowLabel(row)}`)
+  return `${head || row.tag}${extOf(row.audio ?? '')}`
+}
+
+/** Отметка на кнопке гаснет сама и только если с тех пор не сменилась строка. */
+function markFor(box: typeof saved, key: string): void {
+  box.value = key
+  setTimeout(() => {
+    if (box.value === key) box.value = null
+  }, MARK_MS)
+}
+
+/**
+ * Название с автором в буфер: готовая строка для поиска на стриминге,
+ * когда готовой ссылки у темы нет (а её нет чаще, чем есть).
+ */
+function onCopy(row: TuneRow): void {
+  void Bridge.clipboard
+    .writeText(rowLabel(row))
+    .then(() => {
+      markFor(copied, row.key)
+    })
+    .catch((e) => {
+      Logger('WARN', `Музыка: подпись не скопировалась (${row.tag})`, e)
+    })
+}
+
+/**
+ * Загрузка одной темы файлом. Порядок намеренно такой: сперва папка,
+ * потом сеть. Скачать мегабайты и только потом узнать, что человек закрыл
+ * окно выбора, значило бы тратить его канал впустую.
+ *
+ * Папка спрашивается на каждое нажатие и никуда не записывается.
+ * Отмена — не ошибка: тихо выходим.
+ *
+ * Запрос идёт через мост, а не через fetch окна: байты нужны оболочке,
+ * а не странице. Ограничитель AnimeThemes сюда не замешан нарочно:
+ * он стережёт само АПИ с его 429, а звук раздаёт отдельная раздача,
+ * и держать его многоминутное качание в очереди АПИ значило бы заморозить
+ * обычные запросы карточки.
+ */
+async function onSave(row: TuneRow): Promise<void> {
+  if (row.audio === null || saving.value !== null) return
+
+  const url = row.audio
+
+  try {
+    const dir = await Bridge.exportFile.pickTrackDir()
+    if (dir === null) return
+
+    saving.value = row.key
+
+    const res = await Bridge.http.requestBytes({ url, timeoutMs: SAVE_TIMEOUT_MS })
+    if (!res.ok) {
+      Logger('WARN', `Музыка: трек не отдался (${row.tag}, код ${res.status})`)
+      return
+    }
+
+    const path = await Bridge.exportFile.writeTrack(dir, fileName(row), res.bytesBase64)
+    Logger('INFO', `Музыка: трек сохранён (${path})`)
+    markFor(saved, row.key)
+  } catch (e) {
+    // Тихо в журнал: блок музыки не место для красных надписей.
+    Logger('WARN', `Музыка: трек не сохранён (${row.tag})`, e)
+  } finally {
+    if (saving.value === row.key) saving.value = null
+  }
+}
+
 /** Стриминг — наружу через оболочку: в WebView2 обычный переход уносит окно. */
 function openLink(url: string): void {
   void Bridge.shell.openExternal(url).catch((e) => {
@@ -318,6 +440,9 @@ async function load(): Promise<void> {
   stop()
   open.value = false
   rows.value = []
+  saving.value = null
+  saved.value = null
+  copied.value = null
 
   const id = props.malId
   if (id === null) return
@@ -513,7 +638,9 @@ onBeforeUnmount(stop)
     </div>
 
     <ul class="am-tune__list">
-      <li v-for="row in shownRows" :key="row.key">
+      <!-- Строка и две мелкие кнопки — соседи в одном пункте: вложить кнопку
+           в кнопку вёрстка не позволяет. -->
+      <li v-for="row in shownRows" :key="row.key" class="am-tune__item">
         <button
           v-tip="row.audio === null ? 'Записи нет' : `Слушать ${row.tag}`"
           class="am-tune__row"
@@ -541,6 +668,59 @@ onBeforeUnmount(stop)
             <span v-if="row.artist" class="am-tune__artist">{{ row.artist }}</span>
           </span>
         </button>
+
+        <span class="am-tune__acts">
+          <button
+            v-tip="copied === row.key ? 'Скопировано' : 'Скопировать название и автора'"
+            class="am-tune__act"
+            :class="{ 'am-tune__act--done': copied === row.key }"
+            type="button"
+            aria-label="Скопировать название и автора"
+            @click="onCopy(row)"
+          >
+            <svg v-if="copied === row.key" class="am-tune__glyph" viewBox="0 0 16 16">
+              <path d="M3.6 8.4 6.4 11.2 12.4 5" />
+            </svg>
+            <svg v-else class="am-tune__glyph" viewBox="0 0 16 16">
+              <rect x="5.6" y="2.6" width="7.8" height="9.4" rx="1.6" />
+              <path d="M10.4 13.4H4.2a1.6 1.6 0 0 1-1.6-1.6V5.2" />
+            </svg>
+          </button>
+
+          <!-- Загрузка без звуковой записи невозможна: у темы есть только подпись. -->
+          <button
+            v-tip="
+              row.audio === null
+                ? 'Записи нет'
+                : saving === row.key
+                  ? 'Скачивается…'
+                  : saved === row.key
+                    ? 'Сохранено'
+                    : 'Скачать трек'
+            "
+            class="am-tune__act"
+            :class="{
+              'am-tune__act--done': saved === row.key,
+              'am-tune__act--wait': saving === row.key,
+            }"
+            type="button"
+            :disabled="row.audio === null || saving !== null"
+            aria-label="Скачать трек"
+            @click="onSave(row)"
+          >
+            <svg v-if="saving === row.key" class="am-tune__glyph" viewBox="0 0 16 16">
+              <path d="M8 2.2a5.8 5.8 0 1 1-5.8 5.8" />
+            </svg>
+            <svg v-else-if="saved === row.key" class="am-tune__glyph" viewBox="0 0 16 16">
+              <path d="M3.6 8.4 6.4 11.2 12.4 5" />
+            </svg>
+            <svg v-else class="am-tune__glyph" viewBox="0 0 16 16">
+              <path d="M8 2.8v6.8" />
+              <path d="M5.2 7.2 8 10l2.8-2.8" />
+              <path d="M3.2 12.4h9.6" />
+            </svg>
+          </button>
+        </span>
       </li>
     </ul>
 
@@ -857,13 +1037,22 @@ onBeforeUnmount(stop)
   list-style: none;
 }
 
+/* Пункт списка держит строку и две кнопки в одном ряду. */
+.am-tune__item {
+  display: flex;
+  gap: 2px;
+  align-items: center;
+  min-width: 0;
+}
+
 /* Вся строка — цель нажатия: выбор темы мышью не должен требовать
    попадания в кругляш. */
 .am-tune__row {
   display: flex;
+  flex: 1;
   gap: 9px;
   align-items: center;
-  width: 100%;
+  min-width: 0;
   min-height: 34px;
   padding: 4px 8px;
   font: inherit;
@@ -892,142 +1081,49 @@ onBeforeUnmount(stop)
   opacity: 0.55;
 }
 
-.am-tune__beat {
+/* Две мелкие кнопки строки: скопировать подпись и скачать трек. */
+.am-tune__acts {
+  display: flex;
+  flex: none;
+  gap: 2px;
+  align-items: center;
+}
+
+.am-tune__act {
   display: grid;
   flex: none;
   place-items: center;
-  width: 14px;
-  height: 14px;
-}
-
-.am-tune__dot {
-  width: 5px;
-  height: 5px;
-  background: var(--am-faint);
-  border-radius: var(--am-r-cap);
-}
-
-.am-tune__row--on .am-tune__dot {
-  background: var(--am-accent);
-}
-
-/* Три палочки эквалайзера у звучащей строки: нарисованы полосками,
-   а не картинкой, и качаются со своим сдвигом каждая. */
-.am-tune__beats {
-  display: flex;
-  gap: 2px;
-  align-items: flex-end;
-  height: 12px;
-}
-
-.am-tune__beats i {
-  width: 2px;
-  height: 100%;
-  background: var(--am-accent);
-  border-radius: var(--am-r-cap);
-  animation: am-tune-wag 1.1s var(--am-ease-soft) infinite;
-}
-
-.am-tune__beats i:nth-child(2) {
-  animation-delay: 0.22s;
-}
-
-.am-tune__beats i:nth-child(3) {
-  animation-delay: 0.44s;
-}
-
-@keyframes am-tune-wag {
-  0%,
-  100% {
-    transform: scaleY(0.4);
-  }
-  50% {
-    transform: scaleY(1);
-  }
-}
-
-/* Номер темы пилюлей акцентом: OP1 и ED2 ищут глазом первыми. */
-.am-tune__tag {
-  flex: none;
-  min-width: 34px;
-  padding: 3px 7px;
-  font-size: 11px;
-  font-weight: 700;
-  line-height: 1.2;
-  color: var(--am-accent);
-  text-align: center;
-  background: rgb(var(--am-accent-rgb) / 0.14);
-  border-radius: var(--am-r-cap);
-}
-
-.am-tune__text {
-  display: flex;
-  flex: 1;
-  gap: 4px;
-  align-items: baseline;
-  min-width: 0;
-}
-
-.am-tune__name {
-  overflow: hidden;
-  font-size: 13px;
-  font-weight: 600;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-/* Исполнитель через точку и бледнее: это подпись к названию, а не вторая
-   строка — иначе блок из восьми тем вырастал вдвое. */
-.am-tune__artist {
-  overflow: hidden;
-  font-size: 12px;
+  width: 28px;
+  height: 28px;
+  padding: 0;
   color: var(--am-faint);
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.am-tune__artist::before {
-  margin-right: 4px;
-  content: '·';
-}
-
-.am-tune__more {
-  align-self: flex-start;
-  min-height: 30px;
-  padding: 0 13px;
-  font: inherit;
-  font-size: 12.5px;
-  font-weight: 600;
-  color: var(--am-dim);
   cursor: pointer;
-  background: var(--am-fill-1);
-  border: 1px solid var(--am-line-soft);
+  background: none;
+  border: 0;
   border-radius: var(--am-r-cap);
   transition:
     color var(--am-fast) var(--am-ease),
-    background-color var(--am-fast) var(--am-ease),
-    border-color var(--am-fast) var(--am-ease);
+    background-color var(--am-fast) var(--am-ease);
 }
 
-.am-tune__more:hover {
-  color: var(--am-accent);
+.am-tune__act:hover:not(:disabled),
+.am-tune__act:focus-visible {
+  color: var(--am-text);
   background: var(--am-fill-2);
-  border-color: rgb(var(--am-accent-rgb) / 0.5);
 }
 
-/* Просьба о покое сильнее красот: цветок просто остаётся распущенным,
-   палочки — поднятыми. */
-@media (prefers-reduced-motion: reduce) {
-  .am-tune__hit--live :deep(.am-bloom__petals),
-  .am-tune__hit--live :deep(.am-bloom__bud),
-  .am-tune__beats i {
-    animation: none;
-  }
-
-  .am-tune__seek:hover .am-tune__knob,
-  .am-tune__vol:hover .am-tune__knob,
-  .am-tune__seek--hold .am-tune__knob {
-    transform: translate(-50%, -50%);
-  }
+.am-tune__act:disabled {
+  cursor: default;
+  opacity: 0.45;
 }
-</style>
+
+/* Отметка о сделанном акцентом и на пару секунд: уведомление на полэкрана
+   ради одной строки в буфере было бы перебором. */
+.am-tune__act--done {
+  color: var(--am-accent);
+  background: var(--am-accent-soft);
+}
+
+/* Ожидание крутит дугу: трек весит мегабайты, и без знака жизни
+   нажатие казалось бы провалившимся. */
+.am-tune__act--
