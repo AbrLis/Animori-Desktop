@@ -29,6 +29,24 @@
 // тем в приложении нет. Кнопка стоит в ряду уже сейчас, чтобы потом не
 // перекраивать пульт заново.
 //
+// СПИСОК ПРОКРУЧИВАЕТСЯ, А НЕ РАСКРЫВАЕТСЯ
+//
+// Видно ровно четыре строки, остальные достаются прокруткой внутри блока.
+// Раскрытие всего списка кнопкой растягивало карточку на восемь тем и
+// уводило вниз всё, что стоит под музыкой, а вернуть прежний рост можно
+// было только найдя ту же кнопку снова. Окно постоянной высоты держит
+// соседние блоки на месте при любом числе тем.
+//
+// Высота окна не подобрана числом: она считается из высоты строки и
+// просвета между строками — --am-tune-row и --am-tune-gap в стилях, — а
+// самой строке рост задан явно. Иначе правка отступов строки оставляла бы
+// снизу полоску пятой, и «видно четыре» превращалось бы в «видно четыре
+// с половиной».
+//
+// Звучащая строка доводится в окно сама: темы уезжают за нижний край без
+// участия человека — по концу трека и перемешиванием, — и без доводки
+// список стоял бы на первых четырёх строках, пока играет седьмая.
+//
 // СКАЧАТЬ, СКОПИРОВАТЬ И СТРИМИНГИ — ЧАСТЬ СТРОКИ И ТОЛЬКО ПОД КУРСОРОМ
 //
 // Это действия над конкретной темой, а не над воспроизведением: в пульте
@@ -85,9 +103,6 @@ import SakuraBloom from './SakuraBloom.vue'
 
 const props = defineProps<{ malId: number | null }>()
 
-/** Сколько строк видно до раскрытия: пятая и дальше уходят под кнопку. */
-const FOLD_AT = 4
-
 /** Шаг перемотки стрелками, секунды. */
 const STEP_SEC = 5
 
@@ -137,7 +152,9 @@ interface TuneStream {
 let keepVol = 0.8
 
 const rows = ref<TuneRow[]>([])
-const open = ref(false)
+
+/** Окно списка: через него звучащая строка доводится в видимую часть. */
+const listBox = ref<HTMLElement | null>(null)
 
 /** Ключ заряженной темы; null — плеер пуст. */
 const pick = ref<string | null>(null)
@@ -169,12 +186,6 @@ let sound: HTMLAudioElement | null = null
 
 /** Номер захода: ответ про прошлое аниме в блок не попадёт. */
 let run = 0
-
-const shownRows = computed<TuneRow[]>(() =>
-  open.value ? rows.value : rows.value.slice(0, FOLD_AT),
-)
-
-const hiddenCount = computed<number>(() => Math.max(0, rows.value.length - FOLD_AT))
 
 const nowRow = computed<TuneRow | null>(
   () => rows.value.find((row) => row.key === pick.value) ?? null,
@@ -282,6 +293,21 @@ function charge(row: TuneRow): void {
     Logger('WARN', `Музыка: воспроизведение не началось (${row.tag})`, e)
     playing.value = false
   })
+}
+
+/**
+ * Доводит звучащую строку в окно списка: видно четыре строки, а тема
+ * сменяется и сама — по концу трека и перемешиванием. Ближним краем,
+ * а не серединой: доводка обязана показать строку, а не перетряхивать
+ * окно на каждой смене темы.
+ */
+function showPick(): void {
+  const box = listBox.value
+  const key = pick.value
+  if (box === null || key === null) return
+
+  const item = box.querySelector(`[data-key="${key}"]`)
+  item?.scrollIntoView({ block: 'nearest', inline: 'nearest' })
 }
 
 /** Нажатие по строке: своя тема — пауза и пуск, чужая — смена. */
@@ -575,7 +601,6 @@ async function load(): Promise<void> {
   const mine = ++run
 
   stop()
-  open.value = false
   rows.value = []
   saving.value = null
   saved.value = null
@@ -626,6 +651,8 @@ watch(
   },
   { immediate: true },
 )
+
+watch(pick, showPick)
 
 onBeforeUnmount(stop)
 </script>
@@ -781,13 +808,17 @@ onBeforeUnmount(stop)
       </div>
     </div>
 
-    <ul class="am-tune__list">
+    <!-- Окно в четыре строки: остальные темы достаются прокруткой, и рост
+         блока от их числа не зависит. Ключ темы висит на пункте разметкой:
+         по нему звучащая строка доводится в видимую часть. -->
+    <ul ref="listBox" class="am-tune__list">
       <!-- Пункт списка и есть строка: одежда, подсветка и рамка выбора на нём,
            а кнопка выбора со спутниками — соседи внутри. Вложить кнопку
            в кнопку вёрстка не позволяет. -->
       <li
-        v-for="row in shownRows"
+        v-for="row in rows"
         :key="row.key"
+        :data-key="row.key"
         class="am-tune__item"
         :class="{ 'am-tune__item--on': row.key === pick }"
       >
@@ -885,15 +916,18 @@ onBeforeUnmount(stop)
         </span>
       </li>
     </ul>
-
-    <button v-if="hiddenCount > 0" class="am-tune__more" type="button" @click="open = !open">
-      {{ open ? 'Свернуть' : `Показать все · ещё ${hiddenCount}` }}
-    </button>
   </div>
 </template>
 
 <style scoped>
 .am-tune {
+  /* На этих числах стоит рост окна списка: строка в 36px — это 32px кнопки
+     строки и по 2px отступов пункта, просвет между строками 2px. Токенами,
+     а не числом в max-height: подобранная высота разъезжалась бы с первой
+     же правкой отступов строки, и снизу оставалась бы полоска пятой. */
+  --am-tune-row: 36px;
+  --am-tune-gap: 2px;
+
   display: flex;
   flex-direction: column;
   gap: 12px;
@@ -1206,23 +1240,38 @@ onBeforeUnmount(stop)
   fill: currentcolor;
 }
 
+/* Окно списка ростом ровно в четыре строки: пятая и дальше достаются
+   прокруткой. Просветы в счёте участвуют — без них снизу выглядывала бы
+   полоска пятой строки и обещала бы больше, чем видно. Прокрутка не уходит
+   на страницу: докрутив список до конца, человек продолжал бы листать
+   карточку и терял бы блок из вида. */
 .am-tune__list {
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: var(--am-tune-gap);
+  max-height: calc(var(--am-tune-row) * 4 + var(--am-tune-gap) * 3);
   margin: 0;
   padding: 0;
+  overflow-y: auto;
   list-style: none;
+  overscroll-behavior-y: contain;
 }
 
 /* Пункт списка и есть строка: отступы, подсветка наведения и рамка выбора
    висят здесь, поэтому кнопки стримингов и действий читаются её частью,
-   а не приставкой справа. */
+   а не приставкой справа.
+
+   Рост задан, а не набран содержимым: на нём стоит обещание «видно ровно
+   четыре», и строка, выросшая на пиксель, ломала бы его. Сжиматься строке
+   запрещено отдельно: в колонке с потолком высоты flex сдавил бы восемь
+   строк по окну вместо того, чтобы отдать их прокрутке. */
 .am-tune__item {
   display: flex;
+  flex: none;
   gap: 3px;
   align-items: center;
   min-width: 0;
+  height: var(--am-tune-row);
   padding: 2px 8px;
   border-radius: var(--am-r-m);
   transition: background-color var(--am-fast) var(--am-ease);
@@ -1464,30 +1513,6 @@ onBeforeUnmount(stop)
 .am-tune__artist::before {
   margin-right: 4px;
   content: '·';
-}
-
-.am-tune__more {
-  align-self: flex-start;
-  min-height: 30px;
-  padding: 0 13px;
-  font: inherit;
-  font-size: 12.5px;
-  font-weight: 600;
-  color: var(--am-dim);
-  cursor: pointer;
-  background: var(--am-fill-1);
-  border: 1px solid var(--am-line-soft);
-  border-radius: var(--am-r-cap);
-  transition:
-    color var(--am-fast) var(--am-ease),
-    background-color var(--am-fast) var(--am-ease),
-    border-color var(--am-fast) var(--am-ease);
-}
-
-.am-tune__more:hover {
-  color: var(--am-accent);
-  background: var(--am-fill-2);
-  border-color: rgb(var(--am-accent-rgb) / 0.5);
 }
 
 /* Просьба о покое сильнее красот: цветок просто остаётся распущенным,
