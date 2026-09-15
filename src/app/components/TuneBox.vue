@@ -14,14 +14,14 @@
 // тянется только по выбору темы и в базу не кладётся — тема весит
 // мегабайты, а кэш заведён под мелкие ответы служб, не под музыку.
 //
-// ПУЛЬТ СИММЕТРИЧЕН СЕТКОЙ, А НЕ РАСПОРАМИ
+// ЦЕНТР ДЕРЖИТ СЕТКА, А НЕ ПОДОБРАННЫЕ ОТСТУПЫ
 //
-// Цветок пуска стоит по центру над полосой, подпись звучащего — по
-// центру под ней, а повтор с громкостью — справа от цветка. Ряд органов
-// собран сеткой 1fr | auto | 1fr с пустой левой клеткой: так цветок
-// стоит ровно в середине панели независимо от того, сколько места
-// заняли правые органы. Подбирать ширину левого распора руками нельзя:
-// на другом языке или масштабе окна центр тут же уехал бы в сторону.
+// Цветок пуска стоит по центру над полосой, подпись звучащего — по центру
+// под ней, повтор с громкостью — справа от цветка. Ряд органов собран
+// сеткой 1fr | auto | 1fr с пустой левой клеткой: так цветок остаётся
+// ровно в середине панели независимо от того, сколько места заняли правые
+// органы. Левый распор фиксированной ширины приходилось бы подгонять
+// заново при каждой правке правой группы и на каждом масштабе окна.
 //
 // СКАЧАТЬ, СКОПИРОВАТЬ И СТРИМИНГИ — ПО СТРОКАМ, А НЕ В ПУЛЬТЕ
 //
@@ -35,12 +35,12 @@
 //
 // СТРИМИНГОВ ТРИ, И ОНИ СТОЯТ ВСЕГДА
 //
-// AnimeThemes знает ссылки далеко не у каждой песни, а Яндекс Музыки
-// не знает вовсе: каталог западный и держит spotify, apple и youtube.
-// Если показывать только готовые ссылки, ряд кнопок мигал бы от строки
-// к строке, а Яндекса не было бы никогда. Поэтому кнопок ровно три
-// всегда: есть готовый адрес — ведём на него, нет — на поиск службы
-// по «Название — Исполнитель», той же строкой, что кладёт в буфер соседняя
+// Готовые ссылки AnimeThemes знает далеко не у каждой песни, а про Яндекс
+// Музыку не знает вовсе: каталог западный и держит spotify, apple и
+// youtube. Показывай мы только готовые адреса — ряд кнопок мигал бы от
+// строки к строке, а Яндекса не было бы никогда. Поэтому кнопок ровно три
+// всегда: есть готовый адрес — ведём на него, нет — на поиск службы по
+// «Название — Исполнитель», той же строкой, что кладёт в буфер соседняя
 // кнопка. Подсказка различает случаи словами «Открыть» и «Искать».
 //
 // У youtube готовая ссылка берётся только с пометкой Music в названии
@@ -89,6 +89,11 @@ const MARK_MS = 2200
  * в Rust иначе отклонила бы уже скачанный файл.
  */
 const TRACK_EXTS = ['.ogg', '.oga', '.opus', '.mp3', '.m4a', '.webm']
+
+/** Поиск на стримингах: к адресу дописывается подпись темы. */
+const SEARCH_SPOTIFY = 'https://open.spotify.com/search/'
+const SEARCH_YTMUSIC = 'https://music.youtube.com/search?q='
+const SEARCH_YANDEX = 'https://music.yandex.ru/search?text='
 
 /** Строка блока: тема с подписью, звуком и ссылками. */
 interface TuneRow {
@@ -364,8 +369,8 @@ function rowLabel(row: TuneRow): string {
 /**
  * Готовая ссылка темы на службу или null.
  *
- * onlyMusic нужен Ютубу: под ключом youtube служба держит и обычные
- * ролики, а кнопка со знаком YouTube Music обещает именно Музыку.
+ * onlyMusic нужен Ютубу: под ключом youtube служба держит и обычные ролики,
+ * а кнопка со знаком YouTube Music обещает именно Музыку.
  */
 function readyLink(row: TuneRow, site: string, onlyMusic: boolean): string | null {
   const hit = row.links.find(
@@ -396,24 +401,14 @@ function streamsFor(row: TuneRow): TuneStream[] {
   const query = encodeURIComponent(rowLabel(row))
 
   return [
-    stream(
-      'spotify',
-      'Spotify',
-      readyLink(row, 'spotify', false),
-      `https://open.spotify.com/search/${query}`,
-    ),
+    stream('spotify', 'Spotify', readyLink(row, 'spotify', false), `${SEARCH_SPOTIFY}${query}`),
     stream(
       'youtube-music',
       'YouTube Music',
       readyLink(row, 'youtube', true),
-      `https://music.youtube.com/search?q=${query}`,
+      `${SEARCH_YTMUSIC}${query}`,
     ),
-    stream(
-      'yandex-music',
-      'Яндекс Музыке',
-      null,
-      `https://music.yandex.ru/search?text=${query}`,
-    ),
+    stream('yandex-music', 'Яндекс Музыке', null, `${SEARCH_YANDEX}${query}`),
   ]
 }
 
@@ -456,7 +451,7 @@ function markFor(box: typeof saved, key: string): void {
 
 /**
  * Название с автором в буфер: готовая строка для поиска на стриминге,
- * когда поиска кнопкой не достаточно и его несут куда-то ещё.
+ * когда кнопки поиска мало и подпись несут куда-то ещё.
  */
 function onCopy(row: TuneRow): void {
   void Bridge.clipboard
@@ -748,7 +743,6 @@ onBeforeUnmount(stop)
             :key="place.brand"
             v-tip="place.hint"
             class="am-tune__jump"
-            :class="{ 'am-tune__jump--far': !place.exact }"
             type="button"
             :aria-label="place.hint"
             @click="openLink(place.url)"
@@ -848,7 +842,7 @@ onBeforeUnmount(stop)
   font-variant-numeric: tabular-nums;
 }
 
-/* Пульт тремя рядами по центру: органы, таймлайн, подпись. */
+/* Пульт тремя рядами по центру: органы, таймлайн, подпись звучащего. */
 .am-tune__deck {
   display: flex;
   flex-direction: column;
@@ -859,9 +853,9 @@ onBeforeUnmount(stop)
   border-radius: var(--am-r-l);
 }
 
-/* Центр держит сетка, а не подобранные отступы: крайние колонки
-   равные, и цветок в средней стоит по середине панели при любой
-   ширине правой группы. */
+/* Центр держит сетка, а не подобранные отступы: крайние колонки равные,
+   и цветок в средней стоит по середине панели при любой ширине правой
+   группы. */
 .am-tune__organs {
   display: grid;
   grid-template-columns: 1fr auto 1fr;
@@ -873,5 +867,542 @@ onBeforeUnmount(stop)
   display: block;
 }
 
+/* Кнопка остаётся прямоугольной и без своей одежды: круг и распускающуюся
+   сакуру рисует вложенный слой, а кнопке остаются попадание курсора
+   по всей цели и кольцо фокуса. Оттенки цветка — как у окна правки. */
+.am-tune__hit {
+  --am-bloom-deep: var(--am-hover);
+  --am-bloom-petal: color-mix(in srgb, var(--am-sakura) 30%, var(--am-hover));
+  --am-bloom-shade: var(--am-sh-1);
+  --am-bloom-out: 3px;
+
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 46px;
+  height: 46px;
+  padding: 0;
+  color: var(--am-dim);
+  cursor: pointer;
+  background: none;
+  border: 0;
+  border-radius: var(--am-r-cap);
+  transition: color var(--am-fast) var(--am-ease);
+}
+
+.am-tune__hit:hover,
+.am-tune__hit:focus-visible {
+  color: var(--am-text);
+}
+
+/* Знак поднят над цветком: тот лежит своим слоем и накрыл бы содержимое. */
+.am-tune__mark {
+  position: relative;
+  display: block;
+}
+
+.am-tune__sign {
+  display: block;
+  width: 18px;
+  height: 18px;
+  fill: currentcolor;
+}
+
+/* Играет — цветок остаётся распущенным сам, без курсора, и живёт:
+   лепестки медленно крутятся, сердцевина дышит. Ровным ходом, а не
+   по громкости: почему — в шапке файла. */
+.am-tune__hit--live {
+  color: var(--am-text);
+}
+
+.am-tune__hit--live :deep(.am-bloom__petals) {
+  opacity: 1;
+  animation: am-tune-turn 9s linear infinite;
+}
+
+.am-tune__hit--live :deep(.am-bloom__bud) {
+  animation: am-tune-beat 2.4s var(--am-ease-soft) infinite;
+}
+
+.am-tune__hit--live :deep(.am-bloom) {
+  filter: drop-shadow(var(--am-sh-1)) drop-shadow(0 0 10px rgb(var(--am-sakura-rgb) / 0.45));
+}
+
+@keyframes am-tune-turn {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes am-tune-beat {
+  0%,
+  100% {
+    transform: scale(0.9);
+  }
+  50% {
+    transform: scale(1);
+  }
+}
+
+/* Подпись звучащего под полосой и по центру: заголовок пульта, а не
+   строка слева. */
+.am-tune__now {
+  display: flex;
+  gap: 7px;
+  align-items: baseline;
+  justify-content: center;
+  min-width: 0;
+}
+
+.am-tune__nowtag {
+  flex: none;
+  padding: 2px 7px;
+  font-size: 10.5px;
+  font-weight: 700;
+  color: var(--am-accent);
+  background: rgb(var(--am-accent-rgb) / 0.14);
+  border-radius: var(--am-r-cap);
+}
+
+.am-tune__nowname {
+  overflow: hidden;
+  font-size: 13.5px;
+  font-weight: 650;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.am-tune__nowartist {
+  overflow: hidden;
+  font-size: 12px;
+  color: var(--am-faint);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.am-tune__nowartist::before {
+  margin-right: 5px;
+  content: '·';
+}
+
+.am-tune__wave {
+  display: flex;
+  gap: 9px;
+  align-items: center;
+  min-width: 0;
+}
+
+.am-tune__clock {
+  flex: none;
+  font-size: 11px;
+  color: var(--am-faint);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Цель тяги высокая, а сама полоса тонкая: ручку в четыре пикселя
+   мышью не поймать, поэтому под ней прозрачный запас по высоте. */
+.am-tune__seek,
+.am-tune__vol {
+  position: relative;
+  display: flex;
+  align-items: center;
+  height: 22px;
+  cursor: pointer;
+  touch-action: none;
+}
+
+.am-tune__seek {
+  flex: 1;
+  min-width: 0;
+}
+
+/* Громкость короче таймлайна, но не огрызок: на шестидесяти пикселях
+   одно деление шло шесть процентов, и уровень выставлялся наугад. */
+.am-tune__vol {
+  flex: none;
+  width: 96px;
+}
+
+.am-tune__track {
+  display: block;
+  width: 100%;
+  height: 6px;
+  overflow: hidden;
+  background: var(--am-fill-3);
+  border-radius: var(--am-r-cap);
+}
+
+.am-tune__done {
+  display: block;
+  height: 100%;
+  background: linear-gradient(90deg, var(--am-accent), var(--am-accent-2));
+  border-radius: inherit;
+}
+
+/* Ручка — лепесток, а не серый шарик системы: тот же розовый, что у цветка. */
+.am-tune__knob {
+  position: absolute;
+  top: 50%;
+  width: 13px;
+  height: 13px;
+  background: var(--am-sakura);
+  border-radius: var(--am-r-blob);
+  box-shadow: 0 0 0 3px rgb(var(--am-sakura-rgb) / 0.2);
+  transform: translate(-50%, -50%);
+  transition:
+    box-shadow var(--am-fast) var(--am-ease),
+    transform var(--am-fast) var(--am-ease);
+}
+
+.am-tune__seek:hover .am-tune__knob,
+.am-tune__vol:hover .am-tune__knob,
+.am-tune__seek--hold .am-tune__knob {
+  box-shadow: 0 0 0 5px rgb(var(--am-sakura-rgb) / 0.26);
+  transform: translate(-50%, -50%) rotate(38deg) scale(1.1);
+}
+
 /* Органы прижаты к цветку, а не растянуты по клетке: иначе повтор
-   с громкостью уех
+   с громкостью уехали бы к правому краю панели. */
+.am-tune__tools {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  justify-self: start;
+  min-width: 0;
+}
+
+/* Органы пульта размером под палец, а не под прицел: рядом
+   с цветком в 46px кнопки в 28 читались мелочью. */
+.am-tune__tool {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  color: var(--am-faint);
+  cursor: pointer;
+  background: none;
+  border: 0;
+  border-radius: var(--am-r-cap);
+  transition:
+    color var(--am-fast) var(--am-ease),
+    background-color var(--am-fast) var(--am-ease);
+}
+
+.am-tune__tool:hover,
+.am-tune__tool:focus-visible {
+  color: var(--am-text);
+  background: var(--am-fill-2);
+}
+
+/* Включённый повтор светится акцентом: без этого состояние кнопки
+   приходилось бы проверять на слух. */
+.am-tune__tool--on {
+  color: var(--am-accent);
+  background: var(--am-accent-soft);
+}
+
+.am-tune__glyph {
+  width: 19px;
+  height: 19px;
+  fill: none;
+  stroke: currentcolor;
+  stroke-width: 1.4;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.am-tune__list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+/* Пункт списка держит строку, стриминги и две кнопки в одном ряду. */
+.am-tune__item {
+  display: flex;
+  gap: 2px;
+  align-items: center;
+  min-width: 0;
+}
+
+/* Вся строка — цель нажатия: выбор темы мышью не должен требовать
+   попадания в круглыш. */
+.am-tune__row {
+  display: flex;
+  flex: 1;
+  gap: 9px;
+  align-items: center;
+  min-width: 0;
+  min-height: 34px;
+  padding: 4px 8px;
+  font: inherit;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+  background: none;
+  border: 0;
+  border-radius: var(--am-r-m);
+  transition: background-color var(--am-fast) var(--am-ease);
+}
+
+.am-tune__row:hover:not(:disabled) {
+  background: var(--am-fill-1);
+}
+
+.am-tune__row--on {
+  background: rgb(var(--am-accent-rgb) / 0.1);
+  box-shadow: inset 0 0 0 1px rgb(var(--am-accent-rgb) / 0.3);
+}
+
+/* Темы без записи встречаются: строка остаётся в списке со ссылками
+   и подписью, но не зовёт нажать. */
+.am-tune__row--mute {
+  cursor: default;
+  opacity: 0.55;
+}
+
+/* Стриминги строки: три круглых знака перед кнопками копирования
+   и загрузки. Знак цветной и своего цвета, поэтому кнопка под ним
+   прозрачная, а подсветка наведения — бледное кольцо. */
+.am-tune__tunes {
+  display: flex;
+  flex: none;
+  gap: 2px;
+  align-items: center;
+}
+
+.am-tune__jump {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  cursor: pointer;
+  background: none;
+  border: 0;
+  border-radius: var(--am-r-cap);
+  transition:
+    background-color var(--am-fast) var(--am-ease),
+    transform var(--am-fast) var(--am-ease);
+}
+
+.am-tune__jump:hover,
+.am-tune__jump:focus-visible {
+  background: var(--am-fill-2);
+  transform: scale(1.08);
+}
+
+/* Знак того же размера, что ярлычки оценок под постером. */
+.am-tune__brand {
+  width: 18px;
+  height: 18px;
+}
+
+/* Две мелкие кнопки строки: скопировать подпись и скачать трек. Меньше
+   органов пульта: это спутники строки, а не её главное действие. */
+.am-tune__acts {
+  display: flex;
+  flex: none;
+  gap: 2px;
+  align-items: center;
+}
+
+.am-tune__act {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  color: var(--am-faint);
+  cursor: pointer;
+  background: none;
+  border: 0;
+  border-radius: var(--am-r-cap);
+  transition:
+    color var(--am-fast) var(--am-ease),
+    background-color var(--am-fast) var(--am-ease);
+}
+
+.am-tune__act:hover:not(:disabled),
+.am-tune__act:focus-visible {
+  color: var(--am-text);
+  background: var(--am-fill-2);
+}
+
+.am-tune__act:disabled {
+  cursor: default;
+  opacity: 0.45;
+}
+
+/* Отметка о сделанном акцентом и на пару секунд: уведомление на полэкрана
+   ради одной строки в буфере было бы перебором. */
+.am-tune__act--done {
+  color: var(--am-accent);
+  background: var(--am-accent-soft);
+}
+
+/* Ожидание крутит дугу: трек весит мегабайты, и без знака жизни нажатие
+   казалось бы провалившимся. */
+.am-tune__act--wait {
+  color: var(--am-accent);
+}
+
+.am-tune__act--wait .am-tune__glyph {
+  animation: am-tune-turn 0.9s linear infinite;
+}
+
+.am-tune__beat {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 14px;
+  height: 14px;
+}
+
+.am-tune__dot {
+  width: 5px;
+  height: 5px;
+  background: var(--am-faint);
+  border-radius: var(--am-r-cap);
+}
+
+.am-tune__row--on .am-tune__dot {
+  background: var(--am-accent);
+}
+
+/* Три палочки эквалайзера у звучащей строки: нарисованы полосками,
+   а не картинкой, и качаются со своим сдвигом каждая. */
+.am-tune__beats {
+  display: flex;
+  gap: 2px;
+  align-items: flex-end;
+  height: 12px;
+}
+
+.am-tune__beats i {
+  width: 2px;
+  height: 100%;
+  background: var(--am-accent);
+  border-radius: var(--am-r-cap);
+  animation: am-tune-wag 1.1s var(--am-ease-soft) infinite;
+}
+
+.am-tune__beats i:nth-child(2) {
+  animation-delay: 0.22s;
+}
+
+.am-tune__beats i:nth-child(3) {
+  animation-delay: 0.44s;
+}
+
+@keyframes am-tune-wag {
+  0%,
+  100% {
+    transform: scaleY(0.4);
+  }
+  50% {
+    transform: scaleY(1);
+  }
+}
+
+/* Номер темы пилюлей акцентом: OP1 и ED2 ищут глазом первыми. */
+.am-tune__tag {
+  flex: none;
+  min-width: 34px;
+  padding: 3px 7px;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1.2;
+  color: var(--am-accent);
+  text-align: center;
+  background: rgb(var(--am-accent-rgb) / 0.14);
+  border-radius: var(--am-r-cap);
+}
+
+.am-tune__text {
+  display: flex;
+  flex: 1;
+  gap: 4px;
+  align-items: baseline;
+  min-width: 0;
+}
+
+.am-tune__name {
+  overflow: hidden;
+  font-size: 13px;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Исполнитель через точку и бледнее: это подпись к названию, а не вторая
+   строка — иначе блок из восьми тем вырастал вдвое. */
+.am-tune__artist {
+  overflow: hidden;
+  font-size: 12px;
+  color: var(--am-faint);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.am-tune__artist::before {
+  margin-right: 4px;
+  content: '·';
+}
+
+.am-tune__more {
+  align-self: flex-start;
+  min-height: 30px;
+  padding: 0 13px;
+  font: inherit;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--am-dim);
+  cursor: pointer;
+  background: var(--am-fill-1);
+  border: 1px solid var(--am-line-soft);
+  border-radius: var(--am-r-cap);
+  transition:
+    color var(--am-fast) var(--am-ease),
+    background-color var(--am-fast) var(--am-ease),
+    border-color var(--am-fast) var(--am-ease);
+}
+
+.am-tune__more:hover {
+  color: var(--am-accent);
+  background: var(--am-fill-2);
+  border-color: rgb(var(--am-accent-rgb) / 0.5);
+}
+
+/* Просьба о покое сильнее красот: цветок просто остаётся распущенным,
+   палочки — поднятыми. */
+@media (prefers-reduced-motion: reduce) {
+  .am-tune__hit--live :deep(.am-bloom__petals),
+  .am-tune__hit--live :deep(.am-bloom__bud),
+  .am-tune__beats i,
+  .am-tune__act--wait .am-tune__glyph {
+    animation: none;
+  }
+
+  .am-tune__seek:hover .am-tune__knob,
+  .am-tune__vol:hover .am-tune__knob,
+  .am-tune__seek--hold .am-tune__knob {
+    transform: translate(-50%, -50%);
+  }
+
+  .am-tune__jump:hover,
+  .am-tune__jump:focus-visible {
+    transform: none;
+  }
+}
+</style>
