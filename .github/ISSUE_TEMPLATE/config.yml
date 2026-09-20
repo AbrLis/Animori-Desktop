@@ -3,9 +3,9 @@ contact_links:
   - name: Установка и обновление
     url: https://github.com/foulnike/Animori-Desktop/releases/latest
     about: Последний выпуск — установщик, подпись и требования к системе.
-  - name: Название, описание или видео не те
+  - name: Название или номер не те
     url: https://github.com/foulnike/animori-data
-    about: Русские названия и описания собирает отдельный репозиторий.
+    about: Русские названия и соответствия номеров собирает отдельный репозиторий.
   - name: Устройство приложения
     url: https://github.com/foulnike/Animori-Desktop/blob/main/docs/README.md
     about: Документация — интерфейс, данные, видео, хранение, сборка.
