@@ -13,7 +13,7 @@ import { fetchBriefsByMal } from '../api/anilist-lookup'
 import { searchMedia, type MediaBrief, type SearchPage } from '../api/anilist-media'
 import { hasCyrillic, searchShikimori } from '../api/shikimori-search'
 import { Logger } from '../utils/logger'
-import { hiddenCount, keepAllowed } from './adult'
+import { adultAllowed, hiddenCount, keepAllowed } from './adult'
 import { selectEntries } from './collection-view'
 import { peekRussianName, rememberRussianName, warmRussianNames } from './media-title'
 import type { SnapshotEntry } from './snapshot'
@@ -94,20 +94,38 @@ function sift(page: SearchPage, word: string): SearchPage {
   return { items, hasNext: page.hasNext, total: null }
 }
 
+/** Что дал поиск по своему списку: что нашлось и сколько спрятал тумблер. */
+export interface OwnSearch {
+  /** Находки без спрятанного взрослого — в том порядке, в каком их показывают. */
+  entries: SnapshotEntry[]
+  /**
+   * Сколько находок спрятано. Считается только по просмотренному до потолка
+   * выдачи, поэтому число честное снизу: «не меньше стольких».
+   */
+  hidden: number
+}
+
 /**
  * Поиск по своему списку. Слово сверяется с русским, ромадзи и английским
  * названием. Перед отбором поднимается склад имён: иначе на кириллице
  * нашлось бы только то, что успели показать в этом запуске.
  *
- * Взрослое здесь НЕ отсеивается: своя запись уже своя, и прятать её значит
- * терять свои же данные из вида. Метку 18+ рисует плитка.
+ * Взрослое отсеивается наравне с каталогом: тумблер показа один на всё
+ * приложение, и поиск по своим закладкам — не уголок, где он не действует.
+ * Прежде здесь стояло обратное («своя запись уже своя»); причина пересмотра
+ * записана в шапке core/adult.ts.
+ *
+ * Спрятанное не занимает места в выдаче: потолок отсчитывается по тому,
+ * что человек увидит, иначе десяток находок уходил бы в пустоту. Число
+ * спрятанного уходит наружу — экран говорит его словами, и молча съеденные
+ * строки не читаются потерей своих же данных.
  *
  * Отбора по виду больше нет: в коллекции только аниме, а лишнее условие
  * скрыло бы записи старых снимков до их первого обновления с сервера.
  */
-export async function searchOwnList(word: string, limit: number): Promise<SnapshotEntry[]> {
+export async function searchOwnList(word: string, limit: number): Promise<OwnSearch> {
   const needle = fold(word)
-  if (needle === '') return []
+  if (needle === '') return { entries: [], hidden: 0 }
 
   const all = selectEntries({}, { key: 'updated' }, { limit: OWN_SCAN_LIMIT })
 
@@ -116,7 +134,8 @@ export async function searchOwnList(word: string, limit: number): Promise<Snapsh
     await warmRussianNames(all.map((entry) => entry.mediaId))
   }
 
-  const found: SnapshotEntry[] = []
+  const entries: SnapshotEntry[] = []
+  let hidden = 0
 
   for (const entry of all) {
     const russian = peekRussianName(entry.mediaId)
@@ -124,11 +143,16 @@ export async function searchOwnList(word: string, limit: number): Promise<Snapsh
       continue
     }
 
-    found.push(entry)
-    if (found.length >= limit) break
+    if (!adultAllowed(entry.isAdult)) {
+      hidden += 1
+      continue
+    }
+
+    entries.push(entry)
+    if (entries.length >= limit) break
   }
 
-  return found
+  return { entries, hidden }
 }
 
 /**

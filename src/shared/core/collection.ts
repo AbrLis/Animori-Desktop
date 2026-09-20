@@ -102,6 +102,12 @@ export interface ShikiPullResult extends PullResult {
   lost: number
   /** Названия потерянного, несколько штук для разговора с человеком. */
   lostTitles: string[]
+  /**
+   * Сколько записей получило хоть одну дату просмотра. Даты берутся
+   * из журнала изменений Шикимори: в закладках их нет вовсе. Ноль здесь —
+   * не поломка: у запланированного тайтла просмотров и не было.
+   */
+  dated: number
 }
 
 /**
@@ -256,9 +262,17 @@ function mergeFromServer(raw: RawListEntry[]): PullResult {
       // Спор о полях записи наша правка выиграла, но пустоты дополнить можно:
       // номер MAL и латинские имена запись, добавленная здесь, о себе не знает,
       // а без номера MAL её потом нечем выгрузить в XML.
+      //
+      // Даты просмотра — та же пустота, и добираются по тому же праву: правка
+      // руками их не заполняет, а приезжают они только с Шикимори. Без этого
+      // повторный перенос оставлял бы без дат ровно те записи, которые человек
+      // трогал, — то есть выглядел бы как «даты не переносятся». Свою дату,
+      // поставленную руками, не затираем: заполняем только пустое место.
       if (mine.malId === null) mine.malId = fresh.malId
       if (mine.romaji === null) mine.romaji = fresh.romaji
       if (mine.english === null) mine.english = fresh.english
+      if (mine.startedAt === null) mine.startedAt = fresh.startedAt
+      if (mine.completedAt === null) mine.completedAt = fresh.completedAt
       kept++
       continue
     }
@@ -393,7 +407,7 @@ export async function pullFromShikimori(
       'DB',
       `Коллекция перенесена с Шикимори (${done.mode}, ${got.user.nick}): ` +
         `всего ${done.total}, новых ${done.added}, обновлено ${done.updated}, ` +
-        `оставлено своих ${done.kept}, без пары ${got.lost}`,
+        `оставлено своих ${done.kept}, без пары ${got.lost}, с датами ${got.dated}`,
     )
 
     return {
@@ -403,6 +417,7 @@ export async function pullFromShikimori(
       matched: got.matched,
       lost: got.lost,
       lostTitles: got.lostTitles,
+      dated: got.dated,
     }
   })()
 

@@ -75,6 +75,29 @@ export interface RussianTitle {
   rates: Array<{ name: string; value: number }> | null
 }
 
+/**
+ * Чем кончился вопрос о русской карточке. Три исхода, а не два, и третий
+ * нужен именно показу: `null` вместо карточки приходит и когда источник
+ * ответил «перевода нет», и когда сеть не доехала вовсе.
+ *
+ * Разница решает, можно ли показывать английский текст. Отказ — можно,
+ * сбой — нельзя: иначе любая моргнувшая сеть выдавала бы человеку
+ * английское описание, а через секунду подменяла его русским.
+ */
+export type RussianAskState =
+  /** Карточка есть. */
+  | 'ready'
+  /** Источник спрошен и ответил, что перевода нет. */
+  | 'none'
+  /** До источника не дошли: сбой, обрыв, отказ по темпу. */
+  | 'fail'
+
+/** Ответ источника о русской карточке вместе с самим исходом. */
+export interface RussianAsk {
+  state: RussianAskState
+  title: RussianTitle | null
+}
+
 /** Тайтл и его номер MAL: пачечным путям нужны оба сразу. */
 interface TitlePair {
   mediaId: number
@@ -116,7 +139,7 @@ const askedNames = new Set<number>()
 const askedNoname = new Set<number>()
 
 /** Незавершённые добычи: два виджета часто просят один тайтл в один миг. */
-const pending = new Map<number, Promise<RussianTitle | null>>()
+const pending = new Map<number, Promise<RussianAsk>>()
 
 function cacheKey(mediaId: number): string {
   return `${KEY_PREFIX}${mediaId}`
@@ -244,24 +267,41 @@ async function loadOne(mediaId: number): Promise<RussianTitle | null> {
 }
 
 /**
- * Русская карточка тайтла или `null`, если перевода нет.
+ * Русская карточка тайтла с исходом вопроса: `ready`, `none` или `fail`.
  * Повторные вызовы пока идёт добыча ждут тот же ответ, а не шлют свой запрос.
+ *
+ * Карточка отдельно от исхода затем, что `null` сам по себе ничего не значит:
+ * он бывает и отказом источника, и сбоем. Показ по исходу и решает, можно ли
+ * уже показывать английский текст английским, или подождать.
  *
  * Путь открытой карточки, и потому единственный, кто не спрашивает
  * отрицательные записи: ни отсутствие имени в датасете, ни прошлый отказ сети
  * не повод оставить открытую карточку без описания и ссылки.
  */
-export async function getRussianTitle(mediaId: number): Promise<RussianTitle | null> {
-  if (memory.has(mediaId)) return memory.get(mediaId) ?? null
+export async function getRussianTitle(mediaId: number): Promise<RussianAsk> {
+  if (memory.has(mediaId)) {
+    const title = memory.get(mediaId) ?? null
+    // Запомненное знание всегда исход, а не ожидание: в память ложится
+    // либо карточка, либо отказ источника. Сбой в память не пишется вовсе.
+    return { state: title === null ? 'none' : 'ready', title }
+  }
 
   const inFlight = pending.get(mediaId)
   if (inFlight) return await inFlight
 
-  const task = loadOne(mediaId).catch((e) => {
-    // Сбой не запоминается в памяти: сеть вернётся — спросим снова.
-    Logger('WARN', `Русское название: добыть не вышло (тайтл ${mediaId})`, e)
-    return null
-  })
+  const task = loadOne(mediaId)
+    .then<RussianAsk>((title) => ({
+      state: title === null ? 'none' : 'ready',
+      title,
+    }))
+    .catch<RussianAsk>((e) => {
+      // Сбой не запоминается в памяти: сеть вернётся — спросим снова.
+      // И наружу он уходит своим исходом, а не пустотой: вызывающий должен
+      // отличить «сети нет» от «перевода нет», иначе покажет английский
+      // текст там, где через секунду приехал бы русский.
+      Logger('WARN', `Русское название: добыть не вышло (тайтл ${mediaId})`, e)
+      return { state: 'fail', title: null }
+    })
 
   pending.set(mediaId, task)
 

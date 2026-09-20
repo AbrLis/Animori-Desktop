@@ -7,11 +7,19 @@
 // Дерево у Шикимори смешанное: в хронологии аниме лежит и первоисточник
 // манги. Показывать его негде: переход вёл бы на пустую карточку, так что
 // такие узлы отбрасываются прямо по адресу (/mangas/, /ranobe/).
+//
+// Обратное тоже бывает: узлу MAL отвечают несколько записей AniList. Служба
+// дробит часть франшизы на этапы и заводит каждому свою запись, а номер MAL
+// оставляет общий. Прежде из них выбиралась одна — и выбор был случаен, а
+// прочие записи пропадали из плитки вовсе. Теперь строк столько, сколько
+// записей: у «Карманов лета. Фильм» их четыре, и все четыре видны.
+// Порядок записей одной части — `orderParts` в `media-parts.ts`.
 
 import { anilistQuery } from '../api/anilist'
 import { fetchShiki } from '../api/shikimori'
 import { dbGet, dbSet } from './db'
 import { Logger } from '../utils/logger'
+import { startStamp } from './media-parts'
 import type { FranchiseCacheRecord } from './types'
 
 /** Узел дерева франшизы с Шикимори: номер тут — номер MAL. */
@@ -35,7 +43,16 @@ export interface FranchiseWork {
    * и старых записей, где манга ещё лежит.
    */
   type: string | null
+  /** Имя части с Шикимори: русское и общее для всех записей этого узла. */
   name: string
+  /** Название записи AniList. У раздробленной части только оно и различает строки. */
+  title: string | null
+  /**
+   * Что различает записи одной части: остаток названия после общего начала
+   * («1st STAGE», «Kushima Kamome-hen»). `null` — узел дал одну запись,
+   * различать нечего.
+   */
+  stage: string | null
   year: number | null
   /** Полная дата части, unix-секунды. */
   date: number | null
@@ -50,6 +67,11 @@ interface FranchiseMapEntry {
   type: string | null
   isAdult: boolean
   coverImage: { medium: string | null } | null
+  /** Состояние выпуска: по нему выбирается запись, когда их несколько. */
+  status: string | null
+  startDate: { year: number | null; month: number | null; day: number | null } | null
+  /** Название записи: единственное, чем различаются этапы одной части. */
+  title: { romaji: string | null } | null
 }
 
 const FRANCHISE_MAP_QUERY = `
@@ -60,6 +82,9 @@ query ($ids: [Int], $type: MediaType) {
       idMal
       type
       isAdult
+      status
+      startDate { year month day }
+      title { romaji }
       coverImage { medium }
     }
   }
@@ -67,6 +92,36 @@ query ($ids: [Int], $type: MediaType) {
 
 /** Знание этого запуска: дерево спрашивают карточка и полка одновременно. */
 const memory = new Map<number, FranchiseWork[] | null>()
+
+/**
+ * Что различает записи одной части: остаток названия после общего начала.
+ *
+ * У «Стального шара» названия этапов — «…Steel Ball Run - 1st STAGE» и
+ * «…Steel Ball Run - 2nd - 3rd STAGE», у «Карманов лета» — «Summer Pockets:
+ * Kushima Kamome-hen» и три соседних. Общее начало у них одно и то же, и
+ * в строке оно только мешает: различает именно хвост.
+ *
+ * Общее начало срезается, только если остаток начинается с разделителя.
+ * У «Foo» и «Foobar» общее начало «Foo», но остаток «bar» ничего не
+ * различает — такое название остаётся целым.
+ */
+function stageTail(title: string, others: readonly string[]): string | null {
+  let common = title
+  for (const other of others) {
+    let i = 0
+    while (i < common.length && i < other.length && common[i] === other[i]) i += 1
+    common = common.slice(0, i)
+  }
+
+  const cut = common.replace(/[\s\-–—:·,.]+$/, '')
+  if (cut.length === 0) return null
+
+  const rest = title.slice(cut.length)
+  if (!/^[\s\-–—:·,.]/.test(rest)) return null
+
+  const tail = rest.replace(/^[\s\-–—:·,.]+/, '').trim()
+  return tail === '' ? null : tail
+}
 
 /** Незавершённые добычи по номеру тайтла. */
 const pending = new Map<number, Promise<FranchiseWork[] | null>>()
@@ -79,18 +134,34 @@ function isForeignNode(url: string): boolean {
   return FOREIGN_PATHS.some((path) => url.startsWith(path))
 }
 
-/** Читает дерево со склада. Записи старой формы — без постеров, без полной
- *  даты, с частями без сопоставления или с мангой внутри — считаются
- *  промахом. Проверяется каждая часть, а не первая: иначе старый склад
- *  с клипом или с мангой в середине выживал, а склад у нас бессрочный. */
+/**
+ * Форма складской записи.
+ *
+ * 2 — выбор записи каталога перестал зависеть от порядка ответа службы.
+ * 3 — в строке появились название записи и её отличительный хвост, а на один
+ * узел Шикимори строк стало столько, сколько записей в каталоге. Склад
+ * у франшизы бессрочный, а правила сборки меняются: без метки записи прежней
+ * формы пережили бы правку, и потеря записей осталась бы у каждого, кто уже
+ * открывал эту карточку.
+ */
+const FRANCHISE_SHAPE = 3
+
+/** Читает дерево со склада. Записи старой формы — без метки, без постеров,
+ *  без полной даты, без названия записи, с частями без сопоставления или
+ *  с мангой внутри — считаются промахом. Проверяется каждая часть, а не
+ *  первая: иначе старый склад с клипом или с мангой в середине выживал,
+ *  а склад у нас бессрочный. */
 async function readCache(mediaId: number): Promise<FranchiseWork[] | null> {
   const record = await dbGet<FranchiseCacheRecord>('franchiseCache', mediaId)
-  const data = record?.data
+  if (record?.shape !== FRANCHISE_SHAPE) return null
+
+  const data = record.data
   if (!Array.isArray(data) || data.length === 0) return null
 
   for (const work of data as Array<Partial<FranchiseWork> | undefined>) {
     if (!work || typeof work.name !== 'string') return null
     if (!('cover' in work) || !('date' in work)) return null
+    if (!('title' in work) || !('stage' in work)) return null
     if (work.mediaId === undefined || work.mediaId === null) return null
     if (work.type === 'MANGA') return null
   }
@@ -100,7 +171,12 @@ async function readCache(mediaId: number): Promise<FranchiseWork[] | null> {
 
 /** Кладёт дерево на склад. Отсутствие дерева на склад не пишется. */
 async function writeCache(mediaId: number, works: FranchiseWork[]): Promise<void> {
-  await dbSet('franchiseCache', { id: mediaId, data: works, ts: Date.now() })
+  await dbSet('franchiseCache', {
+    id: mediaId,
+    data: works,
+    ts: Date.now(),
+    shape: FRANCHISE_SHAPE,
+  })
 }
 
 /**
@@ -125,7 +201,12 @@ async function load(mediaId: number, malId: number): Promise<FranchiseWork[] | n
     ...new Set(own.flatMap((n) => (typeof n.id === 'number' && n.id > 0 ? [n.id] : []))),
   ]
 
-  const mapped = new Map<number, FranchiseMapEntry>()
+  // Одному номеру MAL служба иногда отвечает несколькими записями: часть
+  // франшизы раздроблена на этапы, а номер у них общий. Отсюда список, а не
+  // одна запись. Прежде здесь стоял Map «номер → запись», и побеждала та,
+  // что пришла последней: порядок ответа службы решал, какая часть попадёт
+  // в плитку, а остальные пропадали из неё вовсе.
+  const mapped = new Map<number, FranchiseMapEntry[]>()
   if (malIds.length > 0) {
     const answer = await anilistQuery<{ Page?: { media?: FranchiseMapEntry[] } }>(
       FRANCHISE_MAP_QUERY,
@@ -133,40 +214,78 @@ async function load(mediaId: number, malId: number): Promise<FranchiseWork[] | n
     )
 
     for (const entry of answer?.data?.Page?.media ?? []) {
-      if (typeof entry.idMal === 'number') mapped.set(entry.idMal, entry)
+      if (typeof entry.idMal !== 'number') continue
+
+      const list = mapped.get(entry.idMal)
+      if (list) list.push(entry)
+      else mapped.set(entry.idMal, [entry])
     }
   }
 
-  const works: FranchiseWork[] = []
+  const rows: Array<{ work: FranchiseWork; stamp: number }> = []
+
   for (const node of own) {
     if (typeof node.id !== 'number' || node.id <= 0) continue
 
-    const found = mapped.get(node.id)
+    const list = mapped.get(node.id)
     // Части только на Шикимори выкидываются: это клипы и реклама,
     // которых в каталоге AniList нет нарочно.
-    if (found === undefined) continue
+    if (list === undefined) continue
 
-    works.push({
-      mediaId: found.id,
-      malId: node.id,
-      type: found.type,
-      name: node.name,
-      year: typeof node.year === 'number' ? node.year : null,
-      date: typeof node.date === 'number' && node.date > 0 ? node.date : null,
-      kind: node.kind ?? null,
-      cover: found.coverImage?.medium ?? null,
-      isAdult: found.isAdult === true,
-    })
+    // Порядок записей одной части берётся у начала выпуска, а не у порядка
+    // ответа службы: хронология и есть хронология.
+    const sorted = [...list].sort(
+      (a, b) => startStamp(a.startDate) - startStamp(b.startDate) || a.id - b.id,
+    )
+
+    // Хвост, различающий этапы, нужен только раздробленной части: у одиночной
+    // записи различать нечего, и полное название ей ни к чему.
+    const split = sorted.length > 1
+    const titles = sorted
+      .map((entry) => entry.title?.romaji ?? '')
+      .filter((title) => title !== '')
+
+    for (const entry of sorted) {
+      const title = entry.title?.romaji ?? null
+      const nodeYear = typeof node.year === 'number' ? node.year : null
+      const entryYear = entry.startDate?.year
+
+      rows.push({
+        work: {
+          mediaId: entry.id,
+          malId: node.id,
+          type: entry.type,
+          name: node.name,
+          title,
+          stage: split && title !== null ? stageTail(title, titles) : null,
+          // Год записи точнее года узла: у раздробленной части этапы
+          // расходятся по годам, а узел Шикимори у них один.
+          year: typeof entryYear === 'number' && entryYear > 0 ? entryYear : nodeYear,
+          date: typeof node.date === 'number' && node.date > 0 ? node.date : null,
+          kind: node.kind ?? null,
+          cover: entry.coverImage?.medium ?? null,
+          isAdult: entry.isAdult === true,
+        },
+        stamp: startStamp(entry.startDate),
+      })
+    }
   }
 
-  if (works.length <= 1) {
+  if (rows.length <= 1) {
     // Одна часть — это не франшиза, а сам тайтл: полке делать нечего.
     memory.set(mediaId, null)
     return null
   }
 
-  // Хронология по полной дате: сезоны одного года иначе ехали.
-  works.sort((a, b) => (a.date ?? Number.MAX_SAFE_INTEGER) - (b.date ?? Number.MAX_SAFE_INTEGER))
+  // Хронология по полной дате узла, а внутри узла — по началу выпуска записи:
+  // сезоны одного года иначе ехали, а этапы одной части и подавно.
+  rows.sort(
+    (a, b) =>
+      (a.work.date ?? Number.MAX_SAFE_INTEGER) - (b.work.date ?? Number.MAX_SAFE_INTEGER) ||
+      a.stamp - b.stamp,
+  )
+
+  const works = rows.map((row) => row.work)
 
   memory.set(mediaId, works)
   await writeCache(mediaId, works)

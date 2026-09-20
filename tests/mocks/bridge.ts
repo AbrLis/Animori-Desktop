@@ -115,6 +115,7 @@ export function createMockBridge(options: { filesAvailable?: boolean } = {}): Mo
       },
       shell: {
         reload: vi.fn(),
+        restart: vi.fn(),
         openExternal: vi.fn(),
         back: vi.fn(),
         forward: vi.fn(),

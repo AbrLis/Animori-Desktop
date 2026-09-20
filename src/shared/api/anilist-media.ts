@@ -31,7 +31,7 @@ import {
 } from '../core/cache-life'
 import { datasetMalId, initDatasetNames } from '../core/dataset-names'
 import { dbGet, dbSet } from '../core/db'
-import type { MalCacheRecord, MediaCacheRecord, MediaType } from '../core/types'
+import type { MalCacheRecord, MediaCacheRecord, MediaTrailer, MediaType } from '../core/types'
 import { Logger } from '../utils/logger'
 import { anilistQuery } from './anilist'
 import { once } from './rate-limit'
@@ -123,6 +123,7 @@ const MAL_QUERY = `query ($ids: [Int], $perPage: Int) {
 // коллекции, а без неё ответ одинаков для всех и годится на склад.
 // Баннер и цвет обложки — для крупного вида: без них карточка серая.
 // Ближайшая серия — для счёта вышедшего у идущего сезона и для срока хранения.
+// Трейлер — для плитки кадров: площадка и номер ролика, кадр берётся у площадки.
 // Глав, томов и прочитанных томов здесь нет: аниме их не имеет.
 const CARD_QUERY = `query ($id: Int!) {
   Media(id: $id) {
@@ -143,6 +144,11 @@ const CARD_QUERY = `query ($id: Int!) {
     nextAiringEpisode {
       episode
       airingAt
+    }
+    trailer {
+      id
+      site
+      thumbnail
     }
     title {
       romaji
@@ -295,6 +301,7 @@ interface CardReply {
     bannerImage?: string | null
     description?: string | null
     nextAiringEpisode?: AiringReply | null
+    trailer?: { id?: string | null; site?: string | null; thumbnail?: string | null } | null
     title?: { romaji?: string | null; english?: string | null; native?: string | null } | null
     coverImage?: {
       extraLarge?: string | null
@@ -380,6 +387,11 @@ export interface MediaCard {
   cover: string | null
   /** Широкая картинка для верха карточки. Есть далеко не у всех тайтлов. */
   banner: string | null
+  /**
+   * Трейлер тайтла. Есть у большинства, но не у всех: у половины старых
+   * тайтлов сервер его не знает. Пустота здесь — не поломка, а ответ.
+   */
+  trailer: MediaTrailer | null
   /** Основной цвет обложки: подложка и подсветка крупного вида. */
   color: string | null
   /** Номер серии, которая ещё только выйдет. У завершённого его нет. */
@@ -679,6 +691,53 @@ function textOrNull(value: string | null | undefined): string | null {
   return typeof value === 'string' && value.trim() !== '' ? value : null
 }
 
+/**
+ * Адреса ролика по площадке: страница встраивания и обычная ссылка.
+ *
+ * Таблица, а не склейка по общему шаблону: вид адреса у каждой площадки свой,
+ * и шаблон подошёл бы одной ютюбу. Незнакомая площадка даёт `null` — окно,
+ * которое не откроется, хуже честного отсутствия трейлера.
+ */
+const TRAILER_SITES: ReadonlyArray<readonly [string, (id: string) => string, (id: string) => string]> =
+  [
+    [
+      'youtube',
+      (id) => `https://www.youtube.com/embed/${id}`,
+      (id) => `https://www.youtube.com/watch?v=${id}`,
+    ],
+    [
+      'dailymotion',
+      (id) => `https://www.dailymotion.com/embed/video/${id}`,
+      (id) => `https://www.dailymotion.com/video/${id}`,
+    ],
+    ['vimeo', (id) => `https://player.vimeo.com/video/${id}`, (id) => `https://vimeo.com/${id}`],
+  ]
+
+/**
+ * Трейлер из ответа сервера или `null`.
+ *
+ * Площадка сверяется с таблицей целиком, а не по куску слова: «youtube» и
+ * «youtube.com» — разные строки, и угадывание по подстроке однажды уже
+ * приводило к ссылке, собранной из чужого имени.
+ */
+function readTrailer(
+  reply: { id?: string | null; site?: string | null; thumbnail?: string | null } | null | undefined,
+): MediaTrailer | null {
+  const id = textOrNull(reply?.id)
+  const site = textOrNull(reply?.site)?.toLowerCase() ?? null
+  if (id === null || site === null) return null
+
+  const known = TRAILER_SITES.find(([name]) => name === site)
+  if (!known) return null
+
+  return {
+    title: 'Трейлер',
+    thumb: textOrNull(reply?.thumbnail),
+    embed: known[1](id),
+    url: known[2](id),
+  }
+}
+
 /** Студии из ответа: безымянные и битые отброшены, основная едет первой. */
 function readStudios(edges: Array<StudioEdgeReply | null> | null | undefined): StudioRef[] {
   if (!Array.isArray(edges)) return []
@@ -785,6 +844,7 @@ async function loadCard(mediaId: number): Promise<MediaCard | null> {
     // Крупный размер первым: карточка показывает обложку большой.
     cover: textOrNull(media.coverImage?.extraLarge) ?? textOrNull(media.coverImage?.large),
     banner: textOrNull(media.bannerImage),
+    trailer: readTrailer(media.trailer),
     color: textOrNull(media.coverImage?.color),
     airingEpisode: countOrNull(media.nextAiringEpisode?.episode),
     airingAt: countOrNull(media.nextAiringEpisode?.airingAt),

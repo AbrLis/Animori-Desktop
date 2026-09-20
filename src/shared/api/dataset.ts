@@ -9,7 +9,7 @@ import { githubLimiter } from './rate-limit'
 /**
  * Постоянный адрес файлов последнего выпуска: тег в нём не участвует,
  * latest на него ведёт сам GitHub. Зеркала нет: jsDelivr файлы выпусков
- * не раздаёт (docs/DATA-PIPELINE.md).
+ * не раздаёт (docs/DATA.md).
  */
 const RELEASE_BASE = 'https://github.com/foulnike/animori-data/releases/latest/download'
 

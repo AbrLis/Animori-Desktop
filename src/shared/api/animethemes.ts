@@ -1,16 +1,54 @@
 // Клиент AnimeThemes.moe: опенинги и эндинги по MAL ID.
-// Единственный API без ключа и без зеркал, зато с обязательным кэшем mediaCache.
-// Пустой результат тоже кэшируется: иначе тайтлы без тем дёргали бы API каждый раз.
 //
-// Повторов после 429 здесь нет намеренно: ими распоряжается ограничитель темпа,
-// а темы второстепенны — карточка без них откроется. Прежде тут жила рекурсия
-// по attempt, но при MAX_RATE_RETRIES = 1 она была недостижима: условие выхода
-// срабатывало на первом же проходе. Мᄅртвый код хуже отсутствующего: он обещает
-// поведение, которого нет.
+// Спрашиваем GraphQL (graphql.animethemes.moe), а не прежний JSON:API
+// (api.animethemes.moe): тот помечен устаревшим прямо в документации сервиса —
+// «The JSON:API is deprecated and it will be removed». Сроков там не назвали,
+// но отключат его молча: виджет музыки просто опустеет, без ошибки и без записи
+// в журнале. Темы — единственное, что приходит с этого сервиса, и модуль один,
+// поэтому переезд сделан заранее.
+//
+// Запрос идёт POST с телом {"query", "variables"}: GraphQL иначе не умеет.
+// Ответ приходит с кодом 200 и тогда, когда запрос отвергнут, — причина лежит
+// в поле errors. Проверять один статус нельзя: отказ выглядел бы как «тем нет»,
+// и пустой ответ осел бы в кэше на CACHE_TIME.
+//
+// Три ловушки новой схемы, найденные при сверке со старым API:
+//
+// 1. Исполнители. Было готовое поле song.artists, стало performances, и на
+//    группу с участниками приходит по строке на каждого: у «Kessoku Band»
+//    их четыре. Без свёртывания по имени в карточке стояло бы «Kessoku Band,
+//    Kessoku Band, Kessoku Band, Kessoku Band». Свёртываем, порядок храним.
+//
+// 2. Номер темы. Поле sequence выглядит прямее слага, но врёт: у Hibike!
+//    Euphonium опенинг имеет slug OP1 и sequence null. Источник номера — слаг,
+//    как было и в JSON:API.
+//
+// 3. Площадки ссылок. Теперь это перечисление (SPOTIFY, YOUTUBE_MUSIC,
+//    APPLE_MUSIC, AMAZON_MUSIC, YOUTUBE), а не строка со свободным написанием.
+//    Сопоставление стало точным, и таблица ниже — исчерпывающая: неизвестную
+//    площадку пропускаем, а не угадываем по куску слова.
+//
+// 4. Версии заставки. У одной заставки бывает несколько записей: дубляж,
+//    выпуск для другого региона, версия без титров. У них свой слаг с
+//    суффиксом (OP1-EN, OP1-EN4Kids) при том же номере и той же песне,
+//    и без разбора они встают в список двумя строками. У One Piece так
+//    задваиваются двенадцать опенингов и двенадцать эндингов.
 //
 // Кроме метаданных спрашивается адрес звукового файла темы и ссылки на стриминги.
 // Звук берётся именно аудиодорожкой (videos.audio), а не видеофайлом: карточке
 // нужна песня, а видео тяжелее в несколько раз при том же звуке.
+//
+// Полных версий сервис не отдаёт и отдавать не будет: в хранилище попадает
+// только то, что звучало в самом аниме, — дорожка, вынутая из видео заставки.
+// На вопрос «где взять полную» у них один ответ: ссылка на внешнюю службу,
+// и она приезжает тем же полем resources.
+//
+// Побочно чинится строка ссылок. Прежний адрес JSON:API не отдавал
+// song.resources вовсе, когда тайтл искался по внешнему ресурсу: поле приходило
+// пустым у всех двенадцати проверенных тайтлов, у которых ссылки на самом деле
+// есть. Поэтому в карточке их и не было — не потому, что службы молчат.
+// GraphQL отдаёт их тем же запросом, так что строка ссылок у песен появится.
+// Это не новая возможность, а починка старой: людям покажется иначе.
 
 import { Bridge, type HttpResponse } from '@/bridge'
 import { CACHE_TIME } from '../core/constants'
@@ -20,8 +58,36 @@ import { Logger } from '../utils/logger'
 import type { MediaCacheRecord } from '../core/types'
 import { animeThemesLimiter } from './rate-limit'
 
-/** Базовый адрес собран конкатенацией: литерал схемы в шаблонной строке ломался при отправке. */
-const API_BASE = 'https://api.animethemes.moe/anime'
+/**
+ * Адрес запроса. Собран конкатенацией, как и прежний: литерал схемы
+ * в шаблонной строке ломался при отправке.
+ */
+const API_URL = 'https://graphql.animethemes.moe/'
+
+/**
+ * Тело запроса. Переменная одна: сервис принимает список идентификаторов,
+ * но нам всегда нужен один тайтл, и подстановка через переменную избавляет
+ * от склейки строк с чужой строкой внутри.
+ *
+ * site: MAL — площадка, по которой ищем. Имя перечисления, не подпись:
+ * в JSON:API та же площадка звалась MyAnimeList.
+ */
+const THEMES_QUERY = `query Themes($malId: [Int!]) {
+  findAnimeByExternalSite(site: MAL, id: $malId) {
+    animethemes {
+      type
+      slug
+      song {
+        title { romaji }
+        performances { artist { name { main } } }
+        resources { nodes { site link } }
+      }
+      animethemeentries {
+        videos { nodes { audio { link } } }
+      }
+    }
+  }
+}`
 
 /**
  * Имя источника для учёта доступности. Именно имя, а не адрес: net-health по замыслу
@@ -35,11 +101,21 @@ const RATE_PAUSE_MS = 1500
 const REQUEST_TIMEOUT_MS = 10000
 
 /**
- * Номер вида записи в кэше. Строение темы пополнилось звуком и ссылками,
- * а старые записи их не знают: под новый вид идёт свой ключ. Префикс
- * THEMES2_ при этом сохранён: по нему считает темы счётчик кэша в core/db.ts.
+ * Номер вида записи в кэше. Поднимается, когда прежняя запись перестаёт
+ * годиться: кэш тем вечный (CACHE_TIME — бесконечность), и старое содержимое
+ * само не выветрится никогда.
+ *
+ * Строение темы при переезде на GraphQL не изменилось — те же поля и те же
+ * значения, — поэтому ключ тогда оставлен прежним: поднимать номер значило бы
+ * выбросить весь накопленный кэш тем и заново собрать его под рейт-лимитом
+ * ради ничего.
+ *
+ * Поднимать при смене строения записи ИЛИ при правке её содержимого. Номер
+ * темы считался неверно (слаг OP1-EN4Kids давал 14), а дубляжи заставок не
+ * отсеивались, — в кэше лежат списки с повторами, и без подъёма номера они
+ * останутся в нём навсегда.
  */
-const SHAPE = 3
+const SHAPE = 4
 
 const pendingThemes = new Map<number, Promise<MalThemes | null>>()
 
@@ -68,16 +144,20 @@ export interface MalThemes {
 }
 
 /**
- * Службы, ссылки на которые имеют смысл в карточке. Среди resources песни
- * приезжают и каталоги вроде AniDB: слушать по ним нечего, и в строку они не идут.
+ * Службы, ссылки на которые имеют смысл в карточке. Слева — имя перечисления
+ * из ответа, справа — ключ и подпись для разметки. Среди ресурсов песни
+ * приезжают и каталоги вроде ANIDB: слушать по ним нечего, и в строку они не идут.
+ *
+ * Порядок значим: YouTube Music и YouTube дают один ключ разметки, и первая
+ * найденная площадка занимает его. Музыкальная служба стоит выше обычной —
+ * она и полезнее, а прежний разбор подстрокой приходил к тому же.
  */
-const MUSIC_SITES: ReadonlyArray<{ match: string; site: string; label: string }> = [
-  { match: 'spotify', site: 'spotify', label: 'Spotify' },
-  { match: 'apple music', site: 'apple', label: 'Apple Music' },
-  { match: 'youtube music', site: 'youtube', label: 'YouTube Music' },
-  { match: 'amazon music', site: 'amazon', label: 'Amazon Music' },
-  { match: 'amazon', site: 'amazon', label: 'Amazon Music' },
-  { match: 'youtube', site: 'youtube', label: 'YouTube' },
+const MUSIC_SITES: ReadonlyArray<{ key: string; site: string; label: string }> = [
+  { key: 'SPOTIFY', site: 'spotify', label: 'Spotify' },
+  { key: 'APPLE_MUSIC', site: 'apple', label: 'Apple Music' },
+  { key: 'YOUTUBE_MUSIC', site: 'youtube', label: 'YouTube Music' },
+  { key: 'AMAZON_MUSIC', site: 'amazon', label: 'Amazon Music' },
+  { key: 'YOUTUBE', site: 'youtube', label: 'YouTube' },
 ]
 
 interface AnimeThemesResource {
@@ -85,22 +165,26 @@ interface AnimeThemesResource {
   link?: string
 }
 
-interface AnimeThemesSong {
-  title?: string
-  artists?: Array<{ name?: string }>
-  resources?: AnimeThemesResource[]
+interface AnimeThemesName {
+  main?: string
 }
 
-interface AnimeThemesAudio {
-  link?: string
+interface AnimeThemesPerformance {
+  artist?: { name?: AnimeThemesName }
+}
+
+interface AnimeThemesSong {
+  title?: { romaji?: string }
+  performances?: AnimeThemesPerformance[]
+  resources?: { nodes?: AnimeThemesResource[] }
 }
 
 interface AnimeThemesVideo {
-  audio?: AnimeThemesAudio
+  audio?: { link?: string }
 }
 
 interface AnimeThemesThemeEntry {
-  videos?: AnimeThemesVideo[]
+  videos?: { nodes?: AnimeThemesVideo[] }
 }
 
 interface AnimeThemesEntry {
@@ -110,8 +194,14 @@ interface AnimeThemesEntry {
   animethemeentries?: AnimeThemesThemeEntry[]
 }
 
+interface AnimeThemesAnime {
+  animethemes?: AnimeThemesEntry[]
+}
+
 interface AnimeThemesResponse {
-  anime?: Array<{ animethemes?: AnimeThemesEntry[] }>
+  data?: { findAnimeByExternalSite?: AnimeThemesAnime[] }
+  /** Отказ приходит с кодом 200: разбирать его обязательно. */
+  errors?: Array<{ message?: string }>
 }
 
 /**
@@ -121,12 +211,32 @@ interface AnimeThemesResponse {
  */
 function pickAudio(entries: readonly AnimeThemesThemeEntry[]): string | null {
   for (const entry of entries) {
-    for (const video of entry.videos ?? []) {
+    for (const video of entry.videos?.nodes ?? []) {
       const link = video.audio?.link
       if (typeof link === 'string' && link !== '') return link
     }
   }
   return null
+}
+
+/**
+ * Исполнители песни строкой. Свёртываем по имени: на группу с участниками
+ * сервис присылает по строке на каждого участника, и без свёртывания имя
+ * группы повторилось бы столько раз, сколько в ней человек.
+ */
+function pickArtists(song: AnimeThemesSong): string {
+  const names: string[] = []
+  const seen = new Set<string>()
+
+  for (const perf of song.performances ?? []) {
+    const name = perf.artist?.name?.main
+    if (typeof name !== 'string' || name === '' || seen.has(name)) continue
+
+    seen.add(name)
+    names.push(name)
+  }
+
+  return names.join(', ')
 }
 
 /** Стриминги песни без повторов: одна служба — одна иконка в строке. */
@@ -136,14 +246,60 @@ function pickLinks(resources: readonly AnimeThemesResource[]): ThemeLink[] {
 
   for (const res of resources) {
     const url = res.link
-    const name = (res.site ?? '').trim().toLowerCase()
-    if (typeof url !== 'string' || url === '' || name === '') continue
+    const key = (res.site ?? '').trim().toUpperCase()
+    if (typeof url !== 'string' || url === '' || key === '') continue
 
-    const known = MUSIC_SITES.find((s) => name.includes(s.match))
+    const known = MUSIC_SITES.find((s) => s.key === key)
     if (!known || seen.has(known.site)) continue
 
     seen.add(known.site)
     out.push({ site: known.site, label: known.label, url })
+  }
+
+  return out
+}
+
+/**
+ * Номер темы из слага: первая группа цифр.
+ *
+ * Склеивать все цифры подряд нельзя. У версий заставки слаг с суффиксом,
+ * и OP1-EN4Kids давал бы 14 — тема вставала бы на место настоящей
+ * четырнадцатой заставки, а своей терялась. Суффикс после номера — признак
+ * версии, к номеру он не относится.
+ *
+ * Цифр в слагe может не быть вовсе (у Hibike! Euphonium опенинг имеет слаг
+ * просто OP): тогда это первая заставка.
+ */
+function seqOf(slug: string): string {
+  return slug.match(/\d+/)?.[0] ?? '1'
+}
+
+/**
+ * Убирает песни, пришедшие дважды.
+ *
+ * Одна заставка приходит двумя записями, когда у неё есть версия. Номер из
+ * слага выходит один и тот же, название песни тоже, и в списке она вставала
+ * двумя строками подряд: OP1 «We Are!» и OP1-EN «We Are!», ED1 «memories» и
+ * ED1-EN «memories». У One Piece таких пар двенадцать в каждую сторону.
+ *
+ * Сверяем по названию, а не по номеру: у слага без цифр номер совпадает
+ * с первой заставкой, а песня там другая, и отсеять её по номеру значило бы
+ * потерять её вовсе. Исполнитель в свёртку не входит: у версии на другом
+ * языке он может быть указан иначе, а песня от этого не меняется.
+ *
+ * Из повторов остаётся первая по порядку: сервис кладёт саму заставку
+ * раньше её переложений.
+ */
+function dropTwins(items: readonly ThemeItem[]): ThemeItem[] {
+  const seen = new Set<string>()
+  const out: ThemeItem[] = []
+
+  for (const item of items) {
+    const mark = item.title.trim().toLowerCase()
+    if (seen.has(mark)) continue
+
+    seen.add(mark)
+    out.push(item)
   }
 
   return out
@@ -156,18 +312,14 @@ function formatThemes(themes: AnimeThemesEntry[]): MalThemes {
   themes.forEach((t) => {
     const song = t.song ?? {}
     const slug = t.slug ?? ''
-    const title = song.title || slug
-    const artist = (song.artists ?? [])
-      .map((a) => a.name)
-      .filter(Boolean)
-      .join(', ')
-    const seq = slug.replace(/[^0-9]/g, '') || '1'
+    const title = song.title?.romaji || slug
+    const seq = seqOf(slug)
     const item: ThemeItem = {
       seq,
       title,
-      artist,
+      artist: pickArtists(song),
       audio: pickAudio(t.animethemeentries ?? []),
-      links: pickLinks(song.resources ?? []),
+      links: pickLinks(song.resources?.nodes ?? []),
     }
 
     if (t.type === 'OP') formattedData.openings.push(item)
@@ -175,11 +327,16 @@ function formatThemes(themes: AnimeThemesEntry[]): MalThemes {
   })
 
   // По номеру: API отдаёт темы в своём порядке, а в строке ждут OP1, OP2, OP3.
+  // Повторы отсеиваются после сортировки: из двух записей одной песни первой
+  // должна остаться та, что стоит раньше в списке, а порядок он и задаёт.
   const byNumber = (a: ThemeItem, b: ThemeItem): number => Number(a.seq) - Number(b.seq)
   formattedData.openings.sort(byNumber)
   formattedData.endings.sort(byNumber)
 
-  return formattedData
+  return {
+    openings: dropTwins(formattedData.openings),
+    endings: dropTwins(formattedData.endings),
+  }
 }
 
 /**
@@ -217,13 +374,10 @@ async function fetchMalThemesAttempt(malId: number): Promise<MalThemes | null> {
     await animeThemesLimiter.acquireSlot()
 
     res = await Bridge.http.request({
-      method: 'GET',
-      url:
-        API_BASE +
-        '?filter[has]=resources&filter[site]=MyAnimeList' +
-        `&filter[external_id]=${malId}` +
-        '&include=animethemes.song.artists,animethemes.song.resources' +
-        ',animethemes.animethemeentries.videos.audio',
+      method: 'POST',
+      url: API_URL,
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ query: THEMES_QUERY, variables: { malId: [malId] } }),
       timeoutMs: REQUEST_TIMEOUT_MS,
     })
   } catch (e) {
@@ -253,8 +407,16 @@ async function fetchMalThemesAttempt(malId: number): Promise<MalThemes | null> {
   }
 
   try {
-    const data = JSON.parse(res.text) as AnimeThemesResponse
-    const animeList = data.anime ?? []
+    const parsed = JSON.parse(res.text) as AnimeThemesResponse
+
+    // Отказ GraphQL приходит с кодом 200, и это не «тем нет»: кэшировать нельзя.
+    if (parsed.errors && parsed.errors.length > 0) {
+      const reason = parsed.errors[0]?.message ?? 'без пояснения'
+      Logger('ERROR', `AnimeThemes: запрос отвергнут — ${reason} (MAL ${malId})`)
+      return null
+    }
+
+    const animeList = parsed.data?.findAnimeByExternalSite ?? []
 
     // Не найдено — кэшируем пустой результат.
     if (animeList.length === 0) {
@@ -267,7 +429,7 @@ async function fetchMalThemesAttempt(malId: number): Promise<MalThemes | null> {
     void dbSet('mediaCache', { key: cacheKey, data: formattedData, ts: Date.now() })
     return formattedData
   } catch (e) {
-    Logger('ERROR', 'Ошибка парсинга AnimeThemes', e)
+    Logger('ERROR', 'Ошибка разбора ответа AnimeThemes', e)
     return null
   }
 }

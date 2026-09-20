@@ -206,13 +206,34 @@ type TauriProxyOption = TauriFetchOptions['proxy']
 /** Ответ плагина: тип выведен, чтобы не гадать с именем экспорта. */
 type TauriResponse = Awaited<ReturnType<typeof tauriFetch>>
 
-/** Читается один раз за сеанс: смена адреса вступает в силу только с перезапуском. */
-let proxyOption: TauriProxyOption
-let proxyReady = false
+/**
+ * Подпись последней настройки, о негодности которой уже сказано в журнал.
+ * Пароля в ней нет и быть не может: подпись живёт в памяти до конца сеанса,
+ * а нужна она ровно для того, чтобы не повторять одно и то же на каждый запрос.
+ */
+let warnedBadProxy = ''
 
-async function loadProxyOption(): Promise<TauriProxyOption> {
-  if (proxyReady) return proxyOption
+/** Один раз на настройку: включённый тумблер с пустым адресом — трафик напрямую. */
+function warnBadProxy(config: ProxyConfig): void {
+  const mark = `${config.kind}|${config.host}|${config.port}`
+  if (mark === warnedBadProxy) return
 
+  warnedBadProxy = mark
+  console.warn('[AniMori] Прокси включён, но адрес или порт заданы неверно — запросы идут напрямую')
+}
+
+/**
+ * Прокси для одного запроса. Читается КАЖДЫЙ раз, а не однажды за сеанс.
+ *
+ * Однажды прочитанное значение держалось весь сеанс, и смена адреса в панели
+ * до перезапуска не доходила. Хуже всего было выключение: снятый тумблер
+ * оставлял запросы в мёртвом прокси, и это читалось как поломка программы.
+ *
+ * Цены у чтения нет: значения берутся из снимка файла настроек в памяти,
+ * а не через IPC. Окна это не касается — ключи запуска WebView2 читаются
+ * один раз, при создании окна, и там перезапуск обязателен.
+ */
+async function readProxyOption(): Promise<TauriProxyOption> {
   try {
     const [enabled, kind, host, port, login, password, bypass] = await Promise.all([
       storageGet(PROXY_KEYS.enabled, DEFAULT_PROXY.enabled),
@@ -225,7 +246,9 @@ async function loadProxyOption(): Promise<TauriProxyOption> {
     ])
 
     const config: ProxyConfig = {
-      enabled,
+      // Строго true, как matches!(…, Bool(true)) в proxy.rs: «да» строкой
+      // движок за включение не считает, и мост обязан судить так же.
+      enabled: enabled === true,
       kind: normalizeProxyKind(kind),
       host: String(host ?? ''),
       port,
@@ -236,44 +259,37 @@ async function loadProxyOption(): Promise<TauriProxyOption> {
 
     const url = proxyUrl(config)
 
-    if (config.enabled && !url) {
+    if (!url) {
       // Инвариант 4: иначе включённый тумблер врёт, а трафик идёт напрямую.
-      console.warn(
-        '[AniMori] Прокси включён, но адрес или порт заданы неверно — запросы идут напрямую',
-      )
+      // Сказано будет один раз на настройку, а не на каждый запрос: с пустым
+      // адресом при включённом тумблере запросов много, и журнал бы утонул.
+      if (config.enabled) warnBadProxy(config)
+      return undefined
     }
 
-    if (url) {
-      const noProxy = proxyBypassList(config).join(',')
-      const trimmedLogin = config.login.trim()
+    const noProxy = proxyBypassList(config).join(',')
+    const trimmedLogin = config.login.trim()
 
-      proxyOption = {
-        all: {
-          url,
-          // Отдельно от адреса: пароль с ':' или '@' сломал бы склейку user:pass@host.
-          ...(trimmedLogin
-            ? { basicAuth: { username: trimmedLogin, password: config.password } }
-            : {}),
-          ...(noProxy ? { noProxy } : {}),
-        },
-      }
-    } else {
-      proxyOption = undefined
+    return {
+      all: {
+        url,
+        // Отдельно от адреса: пароль с ':' или '@' сломал бы склейку user:pass@host.
+        ...(trimmedLogin
+          ? { basicAuth: { username: trimmedLogin, password: config.password } }
+          : {}),
+        ...(noProxy ? { noProxy } : {}),
+      },
     }
   } catch (e) {
-    console.error('[AniMori] Не удалось прочитать настройки прокси, запросы идут напрямую', e)
-    proxyOption = undefined
-  } finally {
-    proxyReady = true
+    console.error('[AniMori] Не удалось прочитать настройки прокси, запрос идёт напрямую', e)
+    return undefined
   }
-
-  return proxyOption
 }
 
 // ==== http ====
 
 /** Без своего представления reqwest подписывается собой: 403 у AnimeThemes, 5.3.5. */
-const DEFAULT_USER_AGENT = `AniMori/${__ANIMORI_VERSION__} (+https://github.com/foulnike/AniMori-AniList-Toolkit)`
+const DEFAULT_USER_AGENT = `AniMori/${__ANIMORI_VERSION__} (+https://github.com/foulnike/Animori-Desktop)`
 
 /**
  * Общая часть обоих запросов: прокси, таймаут на весь запрос и разбор
@@ -283,7 +299,7 @@ async function sendRequest(options: HttpRequestOptions): Promise<TauriResponse> 
   const { url, method = 'GET', headers, body, timeoutMs, credentials = 'include' } = options
 
   // До таймера: первое чтение идёт в оболочку и съело бы таймаут запроса.
-  const proxy = await loadProxyOption()
+  const proxy = await readProxyOption()
 
   // connectTimeout покрывает только установку соединения, нужен таймаут на весь запрос.
   const controller = new AbortController()
@@ -400,6 +416,21 @@ const tauriClipboard: IClipboard = {
 const tauriShell: IShell = {
   async reload(): Promise<void> {
     await invoke('animori_reload')
+  },
+
+  restart(): Promise<void> {
+    // Ответа не будет: команда уводит процесс целиком, и обещание invoke
+    // не разрешится никогда. Ждать его здесь значило бы повесить вызывающего
+    // навсегда, поэтому отдаём управление сразу.
+    //
+    // Отказ при этом не глотается: он означает невыданное разрешение либо
+    // отсутствие команды, и о таком надо сказать в журнал — иначе кнопка
+    // просто молчит.
+    void invoke('animori_restart').catch((e) => {
+      console.error('[AniMori] Перезапуск не удался', e)
+    })
+
+    return Promise.resolve()
   },
 
   async openExternal(url: string): Promise<void> {

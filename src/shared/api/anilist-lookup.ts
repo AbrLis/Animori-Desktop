@@ -13,6 +13,7 @@
 
 import { Logger } from '../utils/logger'
 import { anilistQuery } from './anilist'
+import { pickEntry, type PartEntry } from '../core/media-parts'
 import type { MediaBrief } from './anilist-media'
 
 /** Потолок страницы у AniList — пятьдесят записей за запрос. */
@@ -164,6 +165,30 @@ function cleanIds(ids: number[]): number[] {
   return Array.from(new Set(ids.filter((id) => Number.isFinite(id) && id > 0)))
 }
 
+/** Выписка в том виде, в каком её видит порядок записей одной части. */
+interface PartBrief extends PartEntry {
+  brief: MediaBrief
+}
+
+/**
+ * Выписка для правила выбора.
+ *
+ * Даты начала выпуска в выписке нет: запрос нарочно лёгкий, и три поля
+ * на каждую из пятидесяти записей пачки ради редкого случая — дорого.
+ * Года хватает: у раздробленной части этапы расходятся по годам, а если
+ * и нет, ничью решит номер записи, который у AniList растёт вместе
+ * с порядком заведения.
+ */
+function toPart(brief: MediaBrief): PartBrief {
+  return {
+    id: brief.mediaId,
+    status: brief.status,
+    startDate:
+      brief.seasonYear === null ? null : { year: brief.seasonYear, month: null, day: null },
+    brief,
+  }
+}
+
 /**
  * Обход пачками по выбранному полю отбора. Запрос идёт без ключа: личного
  * в ответе ничего нет, а подписанный запрос тратит личный темп и не работает
@@ -202,6 +227,12 @@ async function lookupBriefs(field: LookupField, wanted: number[]): Promise<Media
  * Найденное раздаётся картой, а не списком: каждый ждущий спрашивал своё
  * и собирает порядок сам. Отказ тоже общий: один упавший запрос — отказ
  * всем, иначе полка ждала бы обещания вечно.
+ *
+ * Одному номеру MAL служба иногда отвечает несколькими записями: часть
+ * франшизы раздроблена на этапы, а номер у них общий. Прежде карта оставляла
+ * ту, что пришла последней, и поиск по такому номеру мог открыть анонс,
+ * у которого нет ни одной вышедшей серии. Выбирает `pickEntry` — то же
+ * правило, что и в плитке франшизы.
  */
 async function flushBatch(field: LookupField): Promise<void> {
   const batch = batches.get(field)
@@ -215,10 +246,21 @@ async function flushBatch(field: LookupField): Promise<void> {
   const wanted = Array.from(batch.ids)
 
   try {
-    const byKey = new Map<number, MediaBrief>()
+    const groups = new Map<number, PartBrief[]>()
     for (const brief of await lookupBriefs(field, wanted)) {
       const key = field === 'idMal_in' ? brief.malId : brief.mediaId
-      if (key !== null) byKey.set(key, brief)
+      if (key === null) continue
+
+      const part = toPart(brief)
+      const list = groups.get(key)
+      if (list) list.push(part)
+      else groups.set(key, [part])
+    }
+
+    const byKey = new Map<number, MediaBrief>()
+    for (const [key, list] of groups) {
+      const found = pickEntry(list, null)
+      if (found !== null) byKey.set(key, found.brief)
     }
 
     for (const waiter of batch.waiters) waiter.resolve(byKey)

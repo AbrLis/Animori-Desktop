@@ -40,8 +40,8 @@ export function rawHTML(value: unknown): RawHTML {
  * Бегущая строка для текста, не влезающего в контейнер: спан и CSS-анимация
  * туда-сюда при overflow, скорость пропорциональна длине.
  *
- * Риски №3 и №4 из docs/DECISIONS.md: функция сама меняет DOM — оборачивает детей
- * в span. В Vue-компонентах вызывать только через директиву или onMounted по ref,
+ * Функция сама меняет DOM — оборачивает детей в span. В Vue-компонентах
+ * вызывать только через директиву или onMounted по ref,
  * иначе ререндер потеряет вставленный span и флаг dataset.amMarqInit.
  */
 export function applyMarquee(el: HTMLElement | null): void {

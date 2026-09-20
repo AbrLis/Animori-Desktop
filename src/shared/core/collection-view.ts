@@ -2,6 +2,7 @@
 // Ни сети, ни хранилища здесь нет: перебирается то, что уже в памяти.
 // Менять записи через этот файл нельзя, для того есть хозяин в collection.ts.
 
+import { adultAllowed } from './adult'
 import { eachEntry, entryCount } from './collection'
 import type { SnapshotEntry } from './snapshot'
 
@@ -20,6 +21,19 @@ export interface EntryFilter {
   word?: string
   /** Только взрослое или только остальное. Без условия — всё подряд. */
   isAdult?: boolean
+  /**
+   * Прятать взрослое, пока тумблер показа выключен.
+   *
+   * Отдельное условие, а не следствие `isAdult`: то поле выбирает «только
+   * такое», а это — «никакого такого». Смешать их значило бы потерять
+   * возможность отобрать взрослое отдельно.
+   *
+   * Условие включают там, где список показывают: свои закладки и сбор номеров
+   * для календаря. По умолчанию его нет нарочно — на отборе стоят и внутренние
+   * вопросы вроде «есть ли запись у этого тайтла», где прятать значит соврать
+   * о своём же списке.
+   */
+  hideAdult?: boolean
 }
 
 /** По какому полю сортировать. Названий в памяти нет, по ним сортирует экран. */
@@ -67,6 +81,8 @@ export function matchesEntry(entry: SnapshotEntry, filter: EntryFilter = EMPTY_F
   if (typeof filter.updatedAfter === 'number' && entry.updatedAt < filter.updatedAfter) return false
 
   if (filter.isAdult !== undefined && entry.isAdult !== filter.isAdult) return false
+
+  if (filter.hideAdult === true && !adultAllowed(entry.isAdult)) return false
 
   if (typeof filter.word === 'string' && filter.word !== '') {
     const word = filter.word.toLowerCase()

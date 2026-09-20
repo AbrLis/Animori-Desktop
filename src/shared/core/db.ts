@@ -438,6 +438,7 @@ export async function getDbStats(): Promise<DbStats | DbStatsError> {
         ratings: 0,
         playable: 0,
         anilibertyLinks: 0,
+        screenshots: 0,
         malMappings: 0,
         franchises: 0,
         other: 0,
@@ -497,6 +498,7 @@ type PrefixField =
   | 'ratings'
   | 'playable'
   | 'anilibertyLinks'
+  | 'screenshots'
 
 /**
  * Что за запись лежит под префиксом ключа. Таблица, а не череда else if:
@@ -516,9 +518,8 @@ type PrefixField =
  * Порядок важен только внутри одного вида: сравнение идёт первым совпадением.
  */
 const KEY_PREFIXES: ReadonlyArray<readonly [string, PrefixField]> = [
-  // Писателя у этого префикса пока нет, и ноль в сводке честен: карточка
-  // тайтла на диск не ложится вовсе. Строка стоит заранее, чтобы появление
-  // записи не потребовало правки ещё и здесь.
+  // Карточки тайтлов: пишет api/anilist-media.ts после удачного ответа, срок —
+  // неделя у завершённого тайтла и сутки у идущего.
   ['MED3_', 'media'],
   ['CHR3_', 'characters'],
   ['STF4_', 'staff'],
@@ -539,4 +540,7 @@ const KEY_PREFIXES: ReadonlyArray<readonly [string, PrefixField]> = [
   // плитку, а соответствие Aniliberty — на каждый опрошенный тайтл.
   ['PLAY1_', 'playable'],
   ['ALIB1_', 'anilibertyLinks'],
+  // Кадры и ролики тайтла: одна запись на тайтл, около полусотни адресов.
+  // Спрашивается раз в месяц и только при открытии карточки.
+  ['SHOT1_', 'screenshots'],
 ]

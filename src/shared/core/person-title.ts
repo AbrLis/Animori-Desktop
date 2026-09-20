@@ -68,6 +68,25 @@ export interface KnownPerson {
   person: PersonRef
 }
 
+/**
+ * Исход вопроса к русскому источнику. `null` в ответе сам по себе ничего не
+ * значит: он бывает и отказом источника, и тем, что ответ не доехал. Показу
+ * это разница — отказ разрешает показать ромаджи, недоезд нет.
+ */
+export type PersonAskState =
+  /** Карточка есть. */
+  | 'ready'
+  /** Источник спрошен и ответил, что перевода нет. */
+  | 'none'
+  /** До источника не дошли: обрыв, отказ по темпу, чужая пятисотка. */
+  | 'fail'
+
+/** Ответ русского источника о человеке вместе с самим исходом. */
+export interface PersonAnswer {
+  state: PersonAskState
+  person: RussianPerson | null
+}
+
 /** Знание этого запуска. `null` значит «спрашивали, перевода нет». */
 const memory = new Map<string, RussianPerson | null>()
 
@@ -78,7 +97,7 @@ const memory = new Map<string, RussianPerson | null>()
 const byShiki = new Map<number, KnownPerson>()
 
 /** Незавершённые добычи: плитка и окошко часто просят одного человека в один миг. */
-const pending = new Map<string, Promise<RussianPerson | null>>()
+const pending = new Map<string, Promise<PersonAnswer>>()
 
 function memoryKey(kind: PersonKind, personId: number): string {
   return `${kind}:${personId}`
@@ -162,24 +181,30 @@ function textOrNull(text: string | null | undefined): string | null {
   return clean === '' ? null : clean
 }
 
-/** Полный путь для одного человека: склад, затем поиск Shikimori. */
+/**
+ * Полный путь для одного человека: склад, затем поиск Shikimori.
+ *
+ * Исход возвращается вместе с карточкой, а не вместо неё: `null` приходит
+ * и когда источник ответил «русского имени не знаю», и когда ответ не доехал.
+ * Показу это разница — отказ разрешает показать латиницу, сбой нет.
+ */
 async function loadOne(
   kind: PersonKind,
   person: PersonRef,
   targetMalIds: number[],
-): Promise<RussianPerson | null> {
+): Promise<PersonAnswer> {
   const key = memoryKey(kind, person.personId)
 
   const cached = await readCache(kind, person.personId)
   if (cached) {
     remember(kind, person, cached)
-    return cached
+    return { state: 'ready', person: cached }
   }
 
   // Отказ читается вторым: карточка старше отказа всегда важнее.
   if (await readMiss(kind, person.personId)) {
     memory.set(key, null)
-    return null
+    return { state: 'none', person: null }
   }
 
   const found = await fetchShikiPersonREST(
@@ -189,14 +214,17 @@ async function loadOne(
     targetMalIds,
   )
 
-  // Сбой транспорта и 429 не запоминаются: сеть вернётся — спросим снова.
-  if (found.status === 0 || found.status === 429) return null
+  // Обрыв, отказ по темпу и чужая пятисотка — это не ответ источника,
+  // а недоезд. В память не идёт: сеть вернётся — спросим снова.
+  if (found.status === 0 || found.status === 429 || found.status >= 500) {
+    return { state: 'fail', person: null }
+  }
 
   if (found.status !== 200 || !found.data?.russian) {
     // Источник ответил и русского имени не знает: это добытый ответ, и он хранится.
     memory.set(key, null)
     await writeMiss(kind, person.personId)
-    return null
+    return { state: 'none', person: null }
   }
 
   const card: RussianPerson = {
@@ -207,7 +235,7 @@ async function loadOne(
 
   remember(kind, person, card)
   await writeCache(kind, person.personId, card)
-  return card
+  return { state: 'ready', person: card }
 }
 
 /**
@@ -215,13 +243,18 @@ async function loadOne(
  * Повторные вызовы пока идёт добыча ждут тот же ответ, а не шлют свой запрос.
  * @param targetMalIds MAL id текущего тайтла — гард против тёзок.
  */
-export async function getRussianPerson(
+export async function askRussianPerson(
   kind: PersonKind,
   person: PersonRef,
   targetMalIds: number[] = [],
-): Promise<RussianPerson | null> {
+): Promise<PersonAnswer> {
   const key = memoryKey(kind, person.personId)
-  if (memory.has(key)) return memory.get(key) ?? null
+  if (memory.has(key)) {
+    const known = memory.get(key) ?? null
+    // Запомненное знание всегда исход: в память ложится либо карточка,
+    // либо добытый отказ. Недоезд в память не пишется вовсе.
+    return { state: known === null ? 'none' : 'ready', person: known }
+  }
 
   const inFlight = pending.get(key)
   if (inFlight) return await inFlight
@@ -229,7 +262,7 @@ export async function getRussianPerson(
   const task = loadOne(kind, person, targetMalIds).catch((e) => {
     // Сбой не запоминается в памяти: сеть вернётся — спросим снова.
     Logger('WARN', `Русское имя: добыть не вышло (${person.name})`, e)
-    return null
+    return { state: 'fail' as const, person: null }
   })
 
   pending.set(key, task)
@@ -239,6 +272,15 @@ export async function getRussianPerson(
   } finally {
     pending.delete(key)
   }
+}
+
+export async function getRussianPerson(
+  kind: PersonKind,
+  person: PersonRef,
+  targetMalIds: number[] = [],
+): Promise<RussianPerson | null> {
+  const answer = await askRussianPerson(kind, person, targetMalIds)
+  return answer.person
 }
 
 /**
@@ -321,22 +363,25 @@ export async function prefetchRussianPeople(
  * Полная русская карточка, с описанием. Карточка из списка ролей добирает
  * описание одним запросом деталей по уже известному номеру.
  */
-export async function getRussianPersonFull(
+export async function askRussianPersonFull(
   kind: PersonKind,
   person: PersonRef,
   targetMalIds: number[] = [],
-): Promise<RussianPerson | null> {
+): Promise<PersonAnswer> {
   const key = memoryKey(kind, person.personId)
   const known = memory.get(key)
 
-  if (known && !known.partial) return known
+  if (known && !known.partial) return { state: 'ready', person: known }
 
   if (known?.partial && known.shikiId) {
     const details = await fetchShikiPersonDetails(
       kind === 'character' ? 'characters' : 'people',
       known.shikiId,
     )
-    if (!details) return known
+
+    // Детали не доехали — а имя из списка ролей уже есть, его и отдаём.
+    // Исход всё равно недоезд: описание ещё можно добыть повтором.
+    if (!details) return { state: 'fail', person: known }
 
     const full: RussianPerson = {
       russian: details.russian ?? known.russian,
@@ -345,10 +390,10 @@ export async function getRussianPersonFull(
     }
     remember(kind, person, full)
     await writeCache(kind, person.personId, full)
-    return full
+    return { state: 'ready', person: full }
   }
 
-  return getRussianPerson(kind, person, targetMalIds)
+  return await askRussianPerson(kind, person, targetMalIds)
 }
 
 /**

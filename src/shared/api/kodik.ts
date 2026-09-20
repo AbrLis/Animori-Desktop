@@ -1,5 +1,5 @@
 // Клиент Kodik. Открытого API для ссылок у службы нет, поэтому цепочка из трёх
-// шагов, выверенная руками на живой серии (см. docs/ARCHITECTURE-VIDEO.md):
+// шагов, выверенная руками на живой серии (см. docs/ARCHITECTURE.md):
 //
 //   1. поиск по номеру Шикимори — озвучки и адреса страниц серий;
 //   2. страница серии — подписи d_sign / pd_sign / ref_sign и признаки видео;
@@ -34,10 +34,21 @@
 //
 // ПРО ОПТОВЫЙ ВОПРОС. Метке доступности нужен один бит: есть ли вход к тайтлу.
 // Поштучно это запрос на плитку, то есть минута на полсотни плиток при нашем
-// же ограничителе темпа. Поэтому askPresence кладёт в один вопрос два десятка
-// номеров и не просит ни сезонов, ни серий, ни сводки. Поддержку перечня
-// служба нигде не обещает, поэтому она не берётся на веру, а проверяется
-// на живом ответе (см. kodikPresence).
+// же ограничителе темпа. Обойти это нельзя: перечень номеров служба не
+// принимает ни в одной форме. Через запятую — 400, повторением довода — 200,
+// но читается последний номер, квадратные скобки и разделитель «|» — снова 400.
+// Без отбора и с широким отбором («types», «year», «genres») — тоже 400:
+// страницами каталог не выгружается, одним вопросом сотню тайтлов не проверить.
+//
+// Прежде здесь стояла догадка об обратном: askPresence отправлял два десятка
+// номеров одним вопросом и «проверял перечень на живом ответе». Проверка была
+// написана так, что сработать не могла: неуспех кода — это null, а ветка,
+// которая считала попытки и переходила на поштучный опрос, требовала ответа
+// не null. Догадка стоила дорого. Первые заходы (два десятка, потом пять)
+// уходили в 400, номера из пачки терялись молча, а слой показа считал пустой
+// ответ срывом службы и уводил её в отдых — на три секунды, потом на восемь.
+// Теперь вопрос задаётся по одному номеру, и это объявлено честно:
+// presenceCost — 'each', а не 'batch'.
 
 import { Bridge, type HttpResponse } from '@/bridge'
 import { LIFE_VOICES_AIRING, LIFE_VOICES_FINISHED, isFresh } from '../core/cache-life'
@@ -90,17 +101,14 @@ const CACHE_PREFIX = 'KODIK1_'
  */
 const CACHE_ROWS_MAX = 2000
 
-/** По скольку номеров уходит в один оптовый вопрос. */
-const PRESENCE_IDS = 20
-
-/** Сколько записей просим на странице оптового ответа: потолок службы. */
+/**
+ * Сколько записей просим в ответе о наличии. Потолок службы — сотня; берём
+ * его целиком, потому что ответ читается до конца и лишняя страница не нужна.
+ */
 const PRESENCE_LIMIT = 100
 
 /** Дальше этой страницы ответ не дочитываем: тогда «нет» просто не ставится. */
 const PRESENCE_PAGES = 3
-
-/** Сколько раз пробуем доказать перечень, прежде чем перейти на поштучный опрос. */
-const PRESENCE_TRIES = 3
 
 /** Перебор сдвига шифра: все варианты, кроме тождественного. */
 const SHIFTS: number[] = Array.from({ length: 25 }, (_, i) => i + 1)
@@ -231,12 +239,6 @@ const pendingFound = new Map<number, Promise<KodikFound>>()
 
 /** Удачный сдвиг прошлого разбора. Ноль — ещё ни разу не встречался. */
 let knownShift = 0
-
-/** Понимает ли служба перечень номеров. null — ещё не выяснено на живом ответе. */
-let manyIds: boolean | null = null
-
-/** Сколько раз перечень не подтвердился: после трёх переходим на поштучный опрос. */
-let manyTries = 0
 
 function describe(e: unknown): string {
   return e instanceof Error ? e.message : String(e)
@@ -495,9 +497,14 @@ interface PageFields {
   id: string
 }
 
-/** Что дал один оптовый вопрос: какие номера нашлись и дочитан ли ответ. */
+/**
+ * Что дал вопрос об одном номере: нашёлся ли он и дочитан ли ответ.
+ *
+ * `found` — не множество, а признак: спрашиваем всегда про один номер, и
+ * множество из одного элемента только прятало бы это от читателя.
+ */
 interface KodikSeen {
-  found: Set<number>
+  found: boolean
   /** Ответ дочитан до последней страницы. Нет — «нет» из него не следует. */
   complete: boolean
 }
@@ -752,16 +759,19 @@ async function loadVoices(shikimoriId: number): Promise<KodikVoiceRow[]> {
 }
 
 /**
- * Один оптовый вопрос: какие из этих номеров служба вообще знает. Ни сезонов,
- * ни серий, ни сводки — ответ короткий, и на сотню записей его хватает.
+ * Один вопрос об одном номере: знает ли служба такой тайтл. Ни сезонов,
+ * ни серий, ни сводки — ответ короткий, и сотни записей на страницу хватает.
+ *
+ * Номер уходит по одному нарочно: перечень служба не принимает ни в одной
+ * форме (разбор — в шапке файла). Спрашивать пачкой нельзя, а не «пока нельзя».
  *
  * null — служба не ответила вовсе: это молчание, а не «нет».
  */
-async function askIds(ids: readonly number[]): Promise<KodikSeen | null> {
-  const found = new Set<number>()
+async function askOne(id: number): Promise<KodikSeen | null> {
+  let found = false
   const query = [
     'token=' + TOKEN,
-    'shikimori_id=' + ids.join(','),
+    'shikimori_id=' + String(id),
     'limit=' + String(PRESENCE_LIMIT),
   ].join('&')
 
@@ -778,8 +788,7 @@ async function askIds(ids: readonly number[]): Promise<KodikSeen | null> {
     if (body === null) return { found, complete: false }
 
     for (const item of body.results ?? []) {
-      const id = Number(item.shikimori_id)
-      if (Number.isFinite(id) && id > 0) found.add(id)
+      if (Number(item.shikimori_id) === id) found = true
     }
 
     url = typeof body.next_page === 'string' ? body.next_page : ''
@@ -790,72 +799,27 @@ async function askIds(ids: readonly number[]): Promise<KodikSeen | null> {
 }
 
 /**
- * Наличие входа сразу про многих. Ключ ответа — номер Шикимори; номера,
- * про который служба не высказалась, в ответе просто нет.
+ * Наличие входа про нескольких. Ключ ответа — номер Шикимори; номера, про
+ * который служба не высказалась, в ответе просто нет.
  *
- * Перечень номеров в одном вопросе служба нигде не обещает, а ошибиться тут
- * дорого: если перечень не понят и ответ пуст, поспешный вывод перечеркнул бы
- * два десятка тайтлов разом. Поэтому «да» принимается всегда (запись с этим
- * номером и есть вход), а «нет» — только после того, как перечень доказан
- * живым ответом: пришло два разных номера или один, но не первый в списке.
- * Пока не доказан, непришедшие номера переспрашиваются поштучно.
+ * Вопрос задаётся по одному номеру, а не пачкой: перечень служба не понимает
+ * ни в одной форме, и «одним вопросом на два десятка тайтлов» здесь взять
+ * нечего. Отсюда и вид ответа: «нет» ставится только тогда, когда служба
+ * ответила про этот номер явно и ответ дочитан до конца. Молчание остаётся
+ * молчанием — на нём метка «нет видео» была бы прямой ложью.
+ *
+ * Цена честная и известная: запрос на тайтл. Ограничитель темпа растягивает
+ * полсотни плиток примерно на минуту, и это потолок службы, а не наш недочёт.
  */
 export async function kodikPresence(ids: readonly number[]): Promise<Map<number, boolean>> {
   const out = new Map<number, boolean>()
   const queue = [...new Set(ids.filter((id) => Number.isFinite(id) && id > 0))]
-  const singles: number[] = []
 
-  while (queue.length > 0) {
-    const chunk = queue.splice(0, manyIds === false ? 1 : PRESENCE_IDS)
-    const answer = await askIds(chunk)
+  for (const id of queue) {
+    const answer = await askOne(id)
     if (answer === null) continue
 
-    for (const id of chunk) {
-      if (answer.found.has(id)) out.set(id, true)
-    }
-
-    const only = chunk.length === 1 ? chunk[0] : undefined
-    if (only !== undefined) {
-      if (answer.complete && !answer.found.has(only)) out.set(only, false)
-      continue
-    }
-
-    if (manyIds === null) {
-      const hits = chunk.filter((id) => answer.found.has(id))
-      const proven = hits.length > 1 || (hits.length === 1 && hits[0] !== chunk[0])
-
-      if (proven) {
-        manyIds = true
-        Logger('API', `Kodik: перечень номеров принят, спрашиваю по ${PRESENCE_IDS} за раз`)
-      } else {
-        manyTries += 1
-        if (manyTries >= PRESENCE_TRIES) {
-          manyIds = false
-          Logger('WARN', 'Kodik: перечень номеров не подтвердился, перехожу на поштучный опрос')
-        }
-
-        for (const id of chunk) {
-          if (!answer.found.has(id)) singles.push(id)
-        }
-        continue
-      }
-    }
-
-    if (!answer.complete) continue
-
-    for (const id of chunk) {
-      if (!out.has(id)) out.set(id, false)
-    }
-  }
-
-  // Остаток недоказанных пачек: по одному номеру за вопрос, зато без догадок.
-  for (const id of singles) {
-    if (out.has(id)) continue
-
-    const answer = await askIds([id])
-    if (answer === null) continue
-
-    if (answer.found.has(id)) out.set(id, true)
+    if (answer.found) out.set(id, true)
     else if (answer.complete) out.set(id, false)
   }
 
@@ -951,8 +915,13 @@ export const kodikSource: VideoSource = {
     return rows.map((row) => ({ id: row.id, label: row.label, episodes: row.episodes.length }))
   },
 
-  /** Один запрос на два десятка тайтлов: подробности метке доступности не нужны. */
-  presenceCost: 'batch',
+  /**
+   * Вопрос о наличии стоит запроса на тайтл, и объявлено это честно: оптовой
+   * формы у службы нет, а обещать 'batch' значило бы врать слою показа. Он по
+   * этой метке решает, спрашивать ли сразу полку или по тайтлу за раз, — и на
+   * 'batch' отправил бы пачку, которую служба встретит отказом.
+   */
+  presenceCost: 'each',
 
   async askPresence(reqs: readonly VideoRequest[]): Promise<PresenceMap> {
     // Номер Шикимори — единственный вход. Тайтл без него службе не адресуем:
@@ -1038,6 +1007,4 @@ export function forgetKodikVoices(): void {
   foundMemory.clear()
   pendingFound.clear()
   knownShift = 0
-  manyIds = null
-  manyTries = 0
 }

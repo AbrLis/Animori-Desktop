@@ -25,6 +25,7 @@
 import { Logger } from '../utils/logger'
 import type { RawListEntry } from './anilist-list'
 import { fetchBriefsByMal } from './anilist-lookup'
+import { fetchShikiHistoryDates } from './shikimori-history'
 import { hiddenProfileMessage, shikiUserGet } from './shikimori-user'
 
 /**
@@ -63,6 +64,8 @@ export interface ShikiImport {
   lost: number
   /** Названия потерянных, до LOST_NAMES штук: экрану есть что показать. */
   lostTitles: string[]
+  /** Сколько записей получило хоть одну дату из журнала изменений. */
+  dated: number
 }
 
 /**
@@ -231,19 +234,43 @@ function nameOf(rate: RateReply): string {
 }
 
 /**
+ * День события в виде ГГГГ-ММ-ДД — в таком виде дата и живёт в записи.
+ *
+ * Считается по местным суткам нарочно: серия, отмеченная в час ночи, должна
+ * читаться тем числом, каким её видно на Шикимори, а не соседним. Через
+ * toISOString() она уехала бы в UTC и на московском вечере разошлась бы
+ * с тем, что человек видит на сайте.
+ */
+function dayOf(ms: number): string {
+  const date = new Date(ms)
+  const month = String(date.getMonth() + 1).padStart(2, '0')
+  const day = String(date.getDate()).padStart(2, '0')
+
+  return `${date.getFullYear()}-${month}-${day}`
+}
+
+/**
  * Читает список с Шикимори и переводит его в общий вид записи.
  * В память ничего не кладёт и ничего не решает за человека: слияние
  * и замена — дело ядра коллекции.
  *
- * Дат начала и конца просмотра в закладках Шикимори нет вовсе, и они
- * приезжают пустыми. Подставлять вместо них время создания закладки
- * нельзя: это будет число из воздуха в поле, которое человек примет за своё.
+ * Дат в закладках Шикимори нет вовсе, и приезжают они из журнала изменений
+ * (`api/shikimori-history.ts`) — единственного места, где время просмотра
+ * вообще существует. Время создания закладки вместо них не подставляется:
+ * это было бы число из воздуха в поле, которое человек примет за своё.
+ * Журнал даёт настоящие даты и стоит семи секунд на полторы тысячи событий,
+ * поэтому читается всегда, без отдельного тумблера.
  */
 export async function importShikiList(nick: string): Promise<ShikiImport> {
   const user = await findShikiUser(nick)
   const rates = await readRates(user.id)
 
   Logger('API', `Шикимори: список ${user.nick} прочитан, записей ${rates.length}`)
+
+  // Журнал читается после списка, а не вровень с ним: это второй поток
+  // запросов к тому же серверу, и пускать их наперегонки незачем. Неудача
+  // журнала переносом не считается — без дат список остаётся списком.
+  const history = await fetchShikiHistoryDates(user.id)
 
   // Один тайтл в закладках встречается один раз, но страницы могут зайти внахлёст,
   // если список правят прямо во время обхода.
@@ -265,6 +292,7 @@ export async function importShikiList(nick: string): Promise<ShikiImport> {
   const entries: RawListEntry[] = []
   const lostTitles: string[] = []
   let lost = 0
+  let dated = 0
 
   for (const [malId, rate] of byMal) {
     const brief = found.get(malId)
@@ -287,6 +315,13 @@ export async function importShikiList(nick: string): Promise<ShikiImport> {
     // самой старой: местная правка важнее неизвестности.
     const edited = when(rate.updated_at) || when(rate.created_at)
 
+    // Даты из журнала. Пустое место остаётся пустым: у запланированного
+    // тайтла просмотров не было, и выдумывать ему дату нечем.
+    const seen = history.dates.get(`anime:${malId}`)
+    const startedAt = seen?.start == null ? null : dayOf(seen.start)
+    const completedAt = seen?.end == null ? null : dayOf(seen.end)
+    if (startedAt !== null || completedAt !== null) dated++
+
     entries.push({
       mediaId: brief.mediaId,
       malId,
@@ -294,8 +329,8 @@ export async function importShikiList(nick: string): Promise<ShikiImport> {
       score: count(rate.score),
       progress: count(rate.episodes),
       repeat: count(rate.rewatches),
-      startedAt: null,
-      completedAt: null,
+      startedAt,
+      completedAt,
       notes: text(rate.text),
       updatedAt: edited,
       isAdult: brief.isAdult,
@@ -306,7 +341,8 @@ export async function importShikiList(nick: string): Promise<ShikiImport> {
 
   Logger(
     'API',
-    `Шикимори: привязано ${entries.length} из ${byMal.size}, без пары ${lost}`,
+    `Шикимори: привязано ${entries.length} из ${byMal.size}, без пары ${lost}, ` +
+      `с датами ${dated}`,
   )
 
   return {
@@ -316,5 +352,6 @@ export async function importShikiList(nick: string): Promise<ShikiImport> {
     matched: entries.length,
     lost,
     lostTitles,
+    dated,
   }
 }
