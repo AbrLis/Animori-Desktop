@@ -1,0 +1,945 @@
+/* Оформление настроек. Вынесено из SettingsScreen.vue тем же приёмом,
+   что у карточки и плеера: собранный в одном файле экран перестаёт
+   поддаваться точечной правке. Подключается атрибутом src у style scoped,
+   поэтому правила по-прежнему закрыты одним экраном.
+
+   Тот же файл подключают components/CloudBox.vue и components/ProxyBox.vue:
+   обе панели одеты теми же классами, и разводить их по трём файлам пока
+   незачем. */
+
+/* Панели собраны в колонки-обёртки. Раньше они лежали прямо в сетке
+   и разводились по местам через grid-template-areas — и сетка ставила их
+   в общие строки: высокая панель облака держала строку, а под «Оформлением»
+   и «Импортом» до самого низа зияла пустота. Колонка-обёртка такого не умеет:
+   каждая набирает свои панели встык, и высота соседней ей безразлична.
+
+   Обёртки стоят сеткой из двух столбцов, и сетка здесь не ради вида: прокси —
+   единственная панель, которая меняет столбец по ширине окна, и делает это
+   одним свойством grid-column. Флексом того же не выйдет: он переносит
+   в следующий ряд с левого края, и панель под средней колонкой пришлось бы
+   подпирать отступом в её ширину — то есть числом, которое разъедется
+   с первой же правкой долей.
+
+   Две колонки — рабочая ширина окна и половина экрана. Наверху то, чем
+   правят списком, и копия рядом; во втором ряду слева оформление со справкой,
+   справа прокси. Облачная копия — самая высокая панель на экране, поэтому
+   второй ряд начинается сразу под ней: прокси оказывается под копией,
+   а не под пустотой.
+
+   Порядок колонок живёт здесь же, свойством order, поэтому разметка одна
+   на любую ширину окна: перетасовывать обёртки не приходится.
+
+   Потолок ширины держит строку текста читаемой. */
+.am-set {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--am-gap);
+  align-items: start;
+  width: 100%;
+  max-width: 1180px;
+  margin: 0 auto;
+}
+
+.am-set__col {
+  display: flex;
+  flex-direction: column;
+  gap: var(--am-gap);
+  min-width: 0;
+}
+
+/* Фуллскрин: три колонки в один ряд. Раньше их было две при любой ширине,
+   и на широком окне по сторонам оставались пустые поля, а панели тянулись
+   вниз простынёй.
+
+   Справа облачная копия: в ней больше всего строк и ввода, и своя доля
+   шире прочих. В середине то, чем список наполняют, слева оформление
+   и справка — их открывают реже всего.
+
+   Порог 1400px, а не 1200: на 1280 три колонки сжимали панель облака
+   до ширины, где путь файла и ссылка перестают читаться. */
+@media (min-width: 1400px) {
+  .am-set {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1.1fr);
+    max-width: 1680px;
+  }
+
+  /* Три обёртки встают в ряд по порядку — так разметка остаётся одна
+     на любую ширину окна. Прокси в этот ряд не помещается: он уходит
+     во второй, и столбец ему назначается прямо. */
+  .am-set__col--look {
+    order: 1;
+  }
+
+  .am-set__col--main {
+    order: 2;
+  }
+
+  .am-set__col--cloud {
+    order: 3;
+  }
+
+  /* Второй столбец — столбец «Данных»: прокси встаёт под ними, а не под
+     облачной копией, как на половине экрана. */
+  .am-set__col--proxy {
+    order: 4;
+    grid-column: 2;
+  }
+}
+
+/* Узкое окно: одна колонка, и порядок важнее вида. Он тот же, что в разметке:
+   сначала то, чем список заводят, потом копия, затем оформление и прокси.
+
+   Столбец один, поэтому о grid-column у прокси беспокоиться нечего: правило
+   о нём живёт в запросе для широкого окна и сюда не достаёт. */
+@media (max-width: 980px) {
+  .am-set {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.am-box {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+  border-radius: var(--am-r-leaf);
+  transition: border-color var(--am-mid) var(--am-ease);
+}
+
+.am-box:hover {
+  border-color: var(--am-edge);
+}
+
+/* Заголовок панели: без засечки. Панель и так в коробке, у заголовка
+   достаточно веса шрифта — отвлекать взгляд градиентной полоской
+   незачем. Если позже нужно будет отделить «активные» разделы
+   («Шикимори подключен», «Синхронизация идёт»), это будет уже не
+   украшение, а статус — тогда и вернётся, отдельным маркером. */
+.am-box > .am-h3,
+.am-box .am-bar .am-h3 {
+  display: flex;
+  gap: 9px;
+  align-items: center;
+}
+
+.am-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+}
+
+.am-field {
+  flex: 1 1 240px;
+  min-width: 200px;
+}
+
+/* Значок вместо подписи. Служебных действий у облака три — проверить
+   связь, сменить пропуск, отключить, — и словами они занимали ряд
+   шириной в панель, споря за внимание с тем, что делают каждый день.
+   Слова никуда не делись: они в подсказке и в aria-label.
+
+   Ростом со строку, а не с кнопку: значок стоит в строке площадки рядом
+   с названием, и полная высота .am-btn разрывала бы её. */
+.am-icon {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1;
+  color: var(--am-dim);
+  cursor: pointer;
+  background: var(--am-fill-1);
+  border: 1px solid var(--am-line-soft);
+  border-radius: var(--am-r-cap);
+  transition:
+    color var(--am-fast) var(--am-ease),
+    background-color var(--am-fast) var(--am-ease),
+    border-color var(--am-fast) var(--am-ease);
+}
+
+.am-icon:hover:not(:disabled) {
+  color: var(--am-text);
+  background: var(--am-hover);
+  border-color: rgb(var(--am-accent-rgb) / 0.45);
+}
+
+.am-icon:disabled {
+  cursor: default;
+  opacity: 0.5;
+}
+
+/* Площадка строкой: знак, название, состояние и справа то, что с ней
+   можно сделать. Раньше здесь стояли карточки выбора — они были нужны,
+   пока мест было два. Google Диск убран целиком, и карточка осталась
+   одна, с пустотой на месте второй. */
+.am-place {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: center;
+  padding: 11px 12px 11px 14px;
+  background: var(--am-fill-1);
+  border: 1px solid var(--am-line-soft);
+  border-radius: var(--am-r-l);
+}
+
+/* Знак площадки рисует components/BrandMark.vue — здесь только размер.
+   Форму, цвет и скругление он держит сам: одинаковые по весу правила
+   в двух файлах спорили бы, и чья возьмёт, зависело бы от порядка
+   файлов в сборке. */
+.am-place__mark {
+  flex: none;
+  width: 24px;
+  height: 24px;
+}
+
+/* Текст не растягивается на всю строку: сразу за ним стоит «i», и справка
+   должна держаться названия, а не уезжать к правому краю вместе с кнопками.
+   Свободное место забирает .am-place__acts своим margin-left: auto. */
+.am-place__text {
+  display: flex;
+  flex: 0 1 auto;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.am-place__name {
+  font-size: 13.5px;
+  font-weight: 600;
+}
+
+.am-place__note {
+  font-size: 12px;
+  line-height: 1.45;
+  color: var(--am-dim);
+}
+
+.am-place__acts {
+  display: flex;
+  flex: none;
+  gap: 6px;
+  align-items: center;
+  margin-left: auto;
+}
+
+/* Источник списка половиной панели импорта. Обе половины одеты одинаково —
+   знак, название, строка состояния, под ними кнопки, — и разница между
+   AniList и Шикимори читается только по содержимому, а не по виду.
+
+   Раньше две истории шли в панели сплошняком: сначала абзацы и кнопки
+   AniList, следом строка Шикимори с полем, — и где кончается одно
+   и начинается другое, было видно только тому, кто это писал. */
+.am-serv {
+  display: flex;
+  flex-direction: column;
+  gap: 11px;
+  padding: 13px 14px 15px;
+  background: var(--am-fill-1);
+  border: 1px solid var(--am-line-soft);
+  border-radius: var(--am-r-l);
+}
+
+.am-serv__head {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 11px;
+  align-items: center;
+}
+
+/* То же и здесь: знак сервиса рисует components/BrandMark.vue, а этот
+   класс задаёт только размер. Фирменные векторы лежат в src/app/brand
+   и взяты у самих сервисов: рисовать логотипы на глаз бессмысленно. */
+.am-serv__logo {
+  flex: none;
+  width: 28px;
+  height: 28px;
+}
+
+/* Текст забирает свободное место, поэтому строка состояния сама встаёт
+   к правому краю и margin-left: auto ей не нужен. */
+.am-serv__text {
+  display: flex;
+  flex: 1 1 180px;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.am-serv__name {
+  font-size: 13.5px;
+  font-weight: 600;
+}
+
+.am-serv__note {
+  font-size: 12px;
+  line-height: 1.45;
+  color: var(--am-dim);
+}
+
+/* Две главные кнопки: копия туда и копия обратно. Их нажимают каждый день,
+   и они одни во всей панели нарисованы крупно и акцентом — остальное
+   либо значок, либо призрак.
+
+   Направление подписано под названием: «сохранить» и «забрать» на слух
+   отличаются хуже, чем на вид, и значок со строкой «список → облако»
+   снимает вопрос до нажатия. */
+.am-duo {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.am-duo__btn {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  align-items: center;
+  padding: 12px 8px;
+  font: inherit;
+  color: var(--am-text);
+  cursor: pointer;
+  background: rgb(var(--am-accent-rgb) / 0.1);
+  border: 1px solid rgb(var(--am-accent-rgb) / 0.4);
+  border-radius: var(--am-r-l);
+  transition:
+    background-color var(--am-fast) var(--am-ease),
+    border-color var(--am-fast) var(--am-ease),
+    border-radius var(--am-mid) var(--am-ease),
+    transform var(--am-fast) var(--am-ease);
+}
+
+.am-duo__btn:hover:not(:disabled) {
+  background: rgb(var(--am-accent-rgb) / 0.18);
+  border-radius: var(--am-r-drop);
+  transform: translateY(-2px);
+}
+
+.am-duo__btn:active:not(:disabled) {
+  transform: translateY(0);
+}
+
+.am-duo__btn:disabled {
+  cursor: default;
+  opacity: 0.5;
+  transform: none;
+}
+
+/* Значок общепринятый: лоток со стрелкой наружу и внутрь — так рисуют
+   выгрузку и загрузку везде. Раньше здесь стояли стрелки текстом, и ↑
+   с ↓ читались указателем сортировки. Рисунок берёт цвет отсюда: сам он
+   нарисован currentColor. */
+.am-duo__mark {
+  display: block;
+  flex: none;
+  width: 22px;
+  height: 22px;
+  color: var(--am-accent);
+}
+
+.am-duo__name {
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.am-duo__note {
+  font-size: 11px;
+  color: var(--am-dim);
+}
+
+/* Подзаголовок внутри панели с волосяной линией до края. Ссылка для
+   телевизора и чтение по ссылке — отдельные истории, а не ещё две кнопки
+   в общей россыпи, и без такой подписи они склеивались с тем, что выше. */
+.am-sub {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  margin: 2px 0 0;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--am-faint);
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.am-sub::after {
+  flex: 1 1 auto;
+  height: 1px;
+  content: '';
+  background: var(--am-line-soft);
+}
+
+/* Выбор темы: три карточки рядом, выбранная подсвечена акцентом. */
+.am-skins {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.am-skins__btn {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  align-items: center;
+  padding: 13px 8px;
+  font: inherit;
+  color: var(--am-dim);
+  cursor: pointer;
+  background: var(--am-fill-1);
+  border: 1px solid var(--am-line-soft);
+  border-radius: var(--am-r-l);
+  transition:
+    color var(--am-fast) var(--am-ease),
+    background-color var(--am-fast) var(--am-ease),
+    border-color var(--am-fast) var(--am-ease),
+    border-radius var(--am-mid) var(--am-ease),
+    transform var(--am-fast) var(--am-ease);
+}
+
+.am-skins__btn:hover {
+  color: var(--am-text);
+  background: var(--am-hover);
+  border-radius: var(--am-r-drop);
+  transform: translateY(-2px);
+}
+
+.am-skins__btn--on {
+  color: var(--am-text);
+  background: rgb(var(--am-accent-rgb) / 0.12);
+  border-color: rgb(var(--am-accent-rgb) / 0.5);
+  border-radius: var(--am-r-drop);
+  box-shadow: var(--am-sh-glow);
+}
+
+.am-skins__mark {
+  font-size: 20px;
+  line-height: 1;
+}
+
+.am-skins__btn--on .am-skins__mark {
+  color: var(--am-accent);
+}
+
+.am-skins__name {
+  font-size: 12.5px;
+  font-weight: 600;
+}
+
+/* Вопрос перед переносом списка: отделён рамкой, но без крика.
+   Тон берётся от --am-warn: жёлтый литерал на светлой теме слепил. */
+.am-ask {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 13px 15px;
+  background: color-mix(in srgb, var(--am-warn) 10%, transparent);
+  border: 1px solid color-mix(in srgb, var(--am-warn) 42%, transparent);
+  border-radius: var(--am-r-l);
+}
+
+.am-ask__text {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.55;
+  color: var(--am-dim);
+}
+
+/* Просрочка датасета: тот же тон, что у вопроса перед переносом списка.
+   Это подсказка, а не ошибка, и красным её показывать неправильно. */
+.am-stale {
+  margin: 0;
+  padding: 11px 13px;
+  font-size: 12.5px;
+  line-height: 1.55;
+  color: var(--am-dim);
+  background: color-mix(in srgb, var(--am-warn) 10%, transparent);
+  border: 1px solid color-mix(in srgb, var(--am-warn) 42%, transparent);
+  border-radius: var(--am-r-m);
+}
+
+/* Предупреждение о самой настройке: негодный адрес, открытый пароль,
+   несовместимый с окном вид прокси. Тон тот же, что у просрочки датасета, —
+   но это разные вещи, и класс свой: просрочку читают как «пора обновить»,
+   а здесь сказано «так не заработает». Общий класс связал бы их правкой. */
+.am-warn {
+  margin: 0;
+  padding: 11px 13px;
+  font-size: 12.5px;
+  line-height: 1.55;
+  color: var(--am-dim);
+  background: color-mix(in srgb, var(--am-warn) 10%, transparent);
+  border: 1px solid color-mix(in srgb, var(--am-warn) 42%, transparent);
+  border-radius: var(--am-r-m);
+}
+
+/* Поля прокси. Общий .am-field рассчитан на поле в половину строки: минимум
+   в 200px и рост с 240. Виду столько не нужно — он и без того узкий, — а порту
+   хватает и сотни: четыре цифры плюс место под стрелки браузера.
+
+   У адреса, наоборот, запрос снижен. Рост его никуда не делся — в широкой
+   панели он по-прежнему забирает весь остаток строки, — а вот запрос убавлен
+   до 160px. Причина в переносе: строка рвётся по запросам полей, а не по
+   итоговым ширинам, и при общих 240 у адреса три поля вместе требовали 472px.
+   Двухколоночный режим столько даёт лишь с окна в 1088px, и на всём промежутке
+   до него порт уезжал вниз отдельной строкой. С 160px хватает и 981px —
+   самого узкого окна, где колонок ещё две.
+
+   Вид своим списком строку удлинил на пять пикселей: 99 против 94 у прежнего
+   <select>. На самом узком окне, какое допускает приложение (1024px), строке
+   достаётся 405px, а трое полей просят 397 — переноса нет, но запаса здесь
+   восемь пикселей вместо тринадцати. Отсюда и числа ниже: они мерены, а не
+   прикинуты, и мера их — стенд animori-bench/proxy.html. Трёхколоночный режим
+   (от 1400px) строку не вмещает ни с системным выбором, ни с этим: 357px
+   против тех же 392 и 397. Это было и до правки. */
+.am-proxy__kind {
+  flex: 0 0 auto;
+  min-width: 0;
+}
+
+/* Свой список держим одной ширины, а не по подписи.
+   .am-roll тянется за значением: «HTTP» даёт 84px, «SOCKS5» — 99. Без этого
+   адрес уезжал бы влево на пятнадцать пикселей при каждой смене вида, а
+   прежний системный выбор стоял неподвижно. Ширина взята по длинной подписи:
+   короткая в неё впишется, длинная растянет поле сама. У .am-sort в «Моём»
+   рост задан по той же причине. */
+.am-proxy__kind .am-roll {
+  min-width: 99px;
+}
+
+.am-proxy__addr {
+  flex: 1 1 160px;
+  min-width: 150px;
+}
+
+.am-proxy__port {
+  flex: 0 1 118px;
+  min-width: 92px;
+}
+
+/* Строка состояния: подпись сверху, ответ снизу. Ответ длинный и с адресом
+   внутри, а адрес переносить негде — отсюда перенос по любому месту. */
+.am-proxy__state {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 11px 13px;
+  background: var(--am-fill-1);
+  border: 1px solid var(--am-line-soft);
+  border-radius: var(--am-r-l);
+}
+
+/* Подпись та же, что у подзаголовков панели: мелкая, разрядкой, прописными.
+   Она не спорит с ответом за внимание — ответ здесь главный. */
+.am-proxy__name {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--am-faint);
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.am-proxy__text {
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: var(--am-dim);
+  overflow-wrap: anywhere;
+}
+
+/* Атрибуция обязана быть видна, но читают её раз в жизнь: своим кеглем
+   она уходит на второй план и не спорит с фактами выше. */
+.am-fine {
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+/* Плашка репозитория: приглашение, а не служебное сообщение.
+
+   ИМЯ СВОЁ, НЕ .am-ask. Тот занят: это жёлтая плашка вопроса перед
+   переносом списка («Записей: N.»), она живёт в CloudBox, ProxyBox и
+   здесь же, в настройках, — все три подключают этот файл стилей.
+   Первая попытка назвала плашку am-ask и перекрасила их все.
+
+   ЦВЕТ ФИОЛЕТОВЫЙ, А НЕ ЖЁЛТЫЙ, и мягкий: 18% акцента-2 против 7%
+   акцента, не плотная заливка. Жёлтый в программе закреплён за
+   предупреждением, и призыв в его цвете читается поломкой — ровно
+   так первая версия этой плашки и выглядела. Рамка и внутренний
+   блик — как у стеклянных панелей, чтобы плашка не казалась чужой. */
+.am-repo {
+  display: flex;
+  gap: 11px;
+  align-items: center;
+  width: 100%;
+  padding: 12px 14px;
+  font: inherit;
+  font-size: 12.5px;
+  line-height: 1.55;
+  color: var(--am-dim);
+  text-align: left;
+  cursor: pointer;
+  background: linear-gradient(
+    135deg,
+    rgb(var(--am-accent-2-rgb) / 0.18),
+    rgb(var(--am-accent-rgb) / 0.07)
+  );
+  border: 1px solid rgb(var(--am-accent-2-rgb) / 0.32);
+  border-radius: var(--am-r-m);
+  box-shadow: inset 0 1px 0 var(--am-edge);
+  transition:
+    border-color var(--am-fast) var(--am-ease),
+    transform var(--am-fast) var(--am-ease);
+}
+
+/* Отклик на наведение — рамкой и сдвигом, а не подсветкой фона:
+   плашка уже цветная, и вторая заливка сделала бы её пятном. */
+.am-repo:hover,
+.am-repo:focus-visible {
+  border-color: rgb(var(--am-accent-2-rgb) / 0.6);
+  transform: translateY(-1px);
+}
+
+/* Сердце — тем же переходом, что и плашка, только в цвете знака:
+   от фиолетового акцента к сакуре. Заливкой, а не обводкой: на
+   восемнадцати пикселях обведённое сердце читается контуром. */
+.am-repo__heart {
+  flex: none;
+  width: 18px;
+  height: 18px;
+}
+
+.am-repo__stop {
+  stop-color: var(--am-accent-2);
+}
+
+.am-repo__stop--end {
+  stop-color: var(--am-sakura);
+}
+
+/* Выгрузка одним узлом: место и действие рядом. Раньше «Выгрузить в XML»
+   и «Выбрать папку» лежали в общей россыпи кнопок, и связь между ними
+   человеку приходилось додумывать. */
+.am-out {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+}
+
+/* Строка папки — такая же кнопка, как «Выгрузить в XML» рядом: заливка,
+   рамка, капсула и подъём под курсором взяты у .am-btn один в один,
+   иначе в одном ряду стояли бы два разных языка форм.
+
+   Имя класса своё, не am-pick: тем в theme.css одет нативный select,
+   и совпадение имён отдавало этой строке чужие правила — плотный фон
+   выпадающего списка и снятую обводку фокуса. */
+.am-dir {
+  display: flex;
+  flex: 1 1 280px;
+  gap: 12px;
+  align-items: center;
+  min-width: 0;
+  min-height: var(--am-ctl);
+  padding: 6px 6px 6px 15px;
+  font: inherit;
+  color: var(--am-text);
+  text-align: left;
+  cursor: pointer;
+  background: var(--am-fill-2);
+  border: 1px solid var(--am-line-soft);
+  border-radius: var(--am-r-cap);
+  transition:
+    background-color var(--am-fast) var(--am-ease),
+    border-color var(--am-fast) var(--am-ease),
+    transform var(--am-fast) var(--am-ease);
+}
+
+.am-dir:hover:not(:disabled) {
+  background: var(--am-fill-3);
+  border-color: rgb(var(--am-accent-rgb) / 0.45);
+  transform: translateY(-1px);
+}
+
+.am-dir:active:not(:disabled) {
+  transform: translateY(0);
+}
+
+.am-dir:disabled {
+  cursor: default;
+  opacity: 0.5;
+  transform: none;
+}
+
+/* Значок папки: та же роль, что у лупы в поиске — говорит, о чём строка,
+   до чтения подписи. */
+.am-dir__mark {
+  flex: none;
+  font-size: 14px;
+  line-height: 1;
+  color: var(--am-faint);
+}
+
+.am-dir__text {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+
+.am-dir__name {
+  font-size: 11.5px;
+  color: var(--am-dim);
+}
+
+/* Пробелов в путях чаще всего нет, и без разрыва по любому месту строка
+   тянется за край панели и разворачивает всю колонку. */
+.am-dir__path {
+  font-size: 13px;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.am-dir__path--none {
+  font-weight: 400;
+  color: var(--am-dim);
+}
+
+/* Действие внутри строки нарисовано пилюлей: нажимается строка целиком,
+   но глазу нужна цель, а слово без формы читалось подписью. */
+.am-dir__act {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  min-height: 28px;
+  padding: 0 13px;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--am-accent);
+  background: rgb(var(--am-accent-rgb) / 0.14);
+  border-radius: var(--am-r-cap);
+  transition: background-color var(--am-fast) var(--am-ease);
+}
+
+.am-dir:hover:not(:disabled) .am-dir__act {
+  background: rgb(var(--am-accent-rgb) / 0.24);
+}
+
+/* Исход действия: виден сразу и не путается с пояснениями рядом.
+   Перенос по любому месту — ради пути сохранённого файла: его говорят
+   целиком, а в одну строку он не встаёт. */
+.am-note {
+  margin: 0;
+  font-size: 13px;
+  color: var(--am-good);
+  overflow-wrap: anywhere;
+}
+
+/* Настройка-тумблер: вся строка нажимается, название рядом с переключателем.
+   Пояснения под названием больше нет — подпись говорит то же короче. */
+.am-switch {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  padding: 12px 14px;
+  cursor: pointer;
+  background: var(--am-fill-1);
+  border: 1px solid var(--am-line-soft);
+  border-radius: var(--am-r-l);
+  transition: background-color var(--am-fast) var(--am-ease);
+}
+
+.am-switch:hover {
+  background: var(--am-hover);
+}
+
+/* Свой переключатель вместо системной галочки: та игнорирует тему
+   и рисуется по-своему в каждом движке. */
+.am-switch__box {
+  position: relative;
+  flex: none;
+  width: 42px;
+  height: 24px;
+  margin: 0;
+  appearance: none;
+  cursor: pointer;
+  background: var(--am-fill-3);
+  border: 1px solid var(--am-line-soft);
+  border-radius: var(--am-r-cap);
+  transition:
+    background var(--am-fast) var(--am-ease),
+    border-color var(--am-fast) var(--am-ease);
+}
+
+.am-switch__box::before {
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 16px;
+  height: 16px;
+  content: '';
+  background: var(--am-faint);
+  border-radius: var(--am-r-cap);
+  transition:
+    transform var(--am-mid) var(--am-ease),
+    background-color var(--am-fast) var(--am-ease);
+}
+
+.am-switch__box:checked {
+  background: linear-gradient(135deg, var(--am-accent), var(--am-accent-2));
+  border-color: transparent;
+}
+
+.am-switch__box:checked::before {
+  background: var(--am-bg);
+  transform: translateX(18px);
+}
+
+.am-switch__name {
+  min-width: 0;
+  font-weight: 600;
+}
+
+/* Вопрос о возрасте: тот же язык, что у тумблера, но строкой целиком
+   не нажимается — нажимать здесь нечего, отвечают датой. Появляется
+   под тумблером и живёт до ответа или до отмены. */
+/* Поля растягиваются во всю ширину вопроса: колонка, собранная по левому
+   краю, сжимала календарь до ширины его подписи. Кто не тянется — тот
+   говорит об этом сам (`align-self`), как кнопка «Отмена» ниже. */
+.am-age {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  align-items: stretch;
+  margin-top: 10px;
+  padding: 14px;
+  background: var(--am-fill-1);
+  border: 1px solid var(--am-line-soft);
+  border-radius: var(--am-r-l);
+}
+
+.am-age__ask {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--am-dim);
+}
+
+/* Полоса ошибки тянется во всю ширину колонки: в вопросе она одна
+   и читается ответом, а не случайной врезкой. */
+.am-age .am-error {
+  width: 100%;
+}
+
+.am-age__back {
+  align-self: flex-start;
+}
+
+/* Ссылка-кнопка в тексте: внешний адрес открывает оболочка, не разметка. */
+.am-link {
+  padding: 0;
+  font: inherit;
+  color: var(--am-accent);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  cursor: pointer;
+  background: none;
+  border: 0;
+}
+
+/* Состояние подключения точкой: видно без чтения. */
+.am-flag {
+  display: inline-flex;
+  gap: 7px;
+  align-items: center;
+  padding: 5px 12px;
+  font-size: 12.5px;
+  color: var(--am-dim);
+  background: var(--am-fill-1);
+  border: 1px solid var(--am-line-soft);
+  border-radius: var(--am-r-cap);
+}
+
+.am-flag__dot {
+  width: 8px;
+  height: 8px;
+  background: var(--am-faint);
+  border-radius: var(--am-r-cap);
+}
+
+.am-flag--on {
+  color: var(--am-good);
+  background: color-mix(in srgb, var(--am-good) 14%, transparent);
+  border-color: color-mix(in srgb, var(--am-good) 38%, transparent);
+}
+
+.am-flag--on .am-flag__dot {
+  background: var(--am-good);
+  box-shadow: 0 0 8px color-mix(in srgb, var(--am-good) 80%, transparent);
+}
+
+/* Половина импорта стоит внутри панели, и её заливка совпадает с заливкой
+   строки состояния. Без этого строка растворялась бы в половине: она
+   и есть .am-flag на том же фоне. */
+.am-serv .am-flag {
+  background: var(--am-fill-2);
+}
+
+.am-serv .am-flag--on {
+  background: color-mix(in srgb, var(--am-good) 14%, transparent);
+}
+
+.am-facts {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.am-fact {
+  display: flex;
+  gap: 12px;
+  align-items: baseline;
+  justify-content: space-between;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--am-line-soft);
+}
+
+.am-fact:last-child {
+  border-bottom: 0;
+}
+
+.am-fact__name {
+  font-size: 13px;
+  color: var(--am-dim);
+}
+
+.am-fact__value {
+  font-weight: 600;
+  text-align: right;
+}
+
+/* Возраст датасета сверх порога. Раньше здесь стоял литерал: жёлтого
+   в наборе не было. Теперь --am-warn есть и подобран под каждую тему. */
+.am-fact__value--stale {
+  color: var(--am-warn);
+}
+
+code {
+  padding: 1px 6px;
+  font-size: 12.5px;
+  background: var(--am-fill-2);
+  border-radius: var(--am-r-s);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .am-skins__btn:hover,
+  .am-duo__btn:hover:not(:disabled) {
+    transform: none;
+  }
+}

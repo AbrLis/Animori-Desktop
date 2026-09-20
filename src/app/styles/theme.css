@@ -1,0 +1,787 @@
+/* Основа оформления окна: токены тем, формы, движение и общие классы.
+   Цвета, радиусы и тени на экранах берутся только отсюда: иначе третья
+   тема оборачивается обходом двухсот мест с rgba.
+
+   Тема выбирается атрибутом data-am-skin на <html> (см. app/appearance.ts).
+   Тёмная повторена на голом :root: если атрибут ещё не проставлен,
+   окно не должно вспыхнуть белым.
+
+   Прозрачность акцента — через --am-accent-rgb: rgb(var(--am-accent-rgb) / .3).
+   Путать с --am-accent нельзя: в пользовательском слое тот токен держит
+   триплет «r,g,b», а здесь — готовый hex. */
+
+:root {
+  /* Формы. Кроме обычных радиусов есть три несимметричные: сетка из
+     одинаковых скруглённых прямоугольников читается шаблоном. */
+  --am-r-s: 10px;
+  --am-r-m: 14px;
+  --am-r-l: 20px;
+  --am-r-xl: 28px;
+  --am-r-cap: 999px;
+  --am-r-leaf: var(--am-r-xl) var(--am-r-xl) var(--am-r-xl) var(--am-r-s);
+  --am-r-drop: var(--am-r-xl) var(--am-r-s) var(--am-r-xl) var(--am-r-s);
+  --am-r-blob: 46% 54% 40% 60% / 52% 44% 56% 48%;
+
+  /* Размеры окна. Потолок ширины поднят с 1720: на 4K по триста пикселей
+     с каждого края просто пустовало. */
+  --am-page-max: 2280px;
+  --am-side: 248px;
+  --am-side-slim: 84px;
+  --am-tile: clamp(148px, 11.5vw, 216px);
+  --am-ctl: 40px;
+  --am-touch: 44px;
+  --am-gap: 18px;
+  --am-blur: 18px;
+  --am-blur-strong: 34px;
+
+  /* Движение. Одни и те же длительности на всё приложение: разнобой
+     в 0.12s и 0.16s по файлам читался дёрганьем. */
+  --am-fast: 0.14s;
+  --am-mid: 0.28s;
+  --am-slow: 0.55s;
+  --am-ease: cubic-bezier(0.22, 0.61, 0.36, 1);
+  --am-ease-soft: cubic-bezier(0.4, 0, 0.2, 1);
+  --am-drift: 46s;
+}
+
+/* Тёмная: основная тема приложения. */
+:root,
+[data-am-skin='dark'] {
+  color-scheme: dark;
+
+  --am-bg: #070a10;
+  --am-bg-2: #0a0f18;
+  --am-panel: #10161f;
+  --am-panel-2: #141c27;
+  --am-hover: #1a2432;
+  --am-line: #1e2836;
+  --am-line-soft: rgb(255 255 255 / 0.07);
+
+  --am-fill-1: rgb(255 255 255 / 0.04);
+  --am-fill-2: rgb(255 255 255 / 0.07);
+  --am-fill-3: rgb(255 255 255 / 0.11);
+  --am-glass: rgb(19 26 37 / 0.62);
+  --am-glass-2: rgb(255 255 255 / 0.07);
+  /* Плотное стекло — для полосы музыки. Обычное стекло рассчитано
+     на панели, которые стоят на месте; полоса липнет к низу и едет
+     поверх содержимого, и сквозь неё читались строки карточки. */
+  --am-glass-deep: rgb(17 23 33 / 0.9);
+  --am-edge: rgb(255 255 255 / 0.08);
+  --am-veil: rgb(6 9 15 / 0.78);
+
+  --am-text: #e9eef8;
+  --am-dim: #96a5bd;
+  --am-faint: #6b7c95;
+
+  --am-accent: #58a6ff;
+  --am-accent-rgb: 88 166 255;
+  --am-accent-2: #a486ff;
+  --am-accent-2-rgb: 164 134 255;
+  --am-accent-soft: rgb(88 166 255 / 0.14);
+
+  /* Розовый знака приложения. Отдельным токеном, а не через акцент:
+     акцент всех трёх тем синий, а сакура акцентного цвета — уже не
+     сакура. Живёт здесь, а не только в AppMark.vue, потому что цветок
+     вышел за пределы знака: его форму берёт крестик витрины. Остановки
+     градиента в самом знаке пока объявлены на месте — при переносе
+     цветка на остальные кнопки их нужно свести сюда. */
+  --am-sakura: #f5b3c8;
+  --am-sakura-rgb: 245 179 200;
+
+  --am-good: #3ddc97;
+  --am-warn: #ffc75a;
+  --am-bad: #ff7a7a;
+
+  --am-sh-1: 0 1px 2px rgb(0 0 0 / 0.45);
+  --am-sh-2: 0 18px 40px rgb(2 5 10 / 0.55);
+  --am-sh-glow: 0 0 40px rgb(88 166 255 / 0.18);
+
+  --am-aurora-1: rgb(88 166 255 / 0.16);
+  --am-aurora-2: rgb(164 134 255 / 0.14);
+  --am-aurora-3: rgb(61 220 151 / 0.08);
+
+  --am-bar: rgb(9 13 20 / 0.72);
+  --am-scroll: #24313f;
+  --am-scroll-on: #33445a;
+}
+
+/* Светлая. Завеса остаётся тёмной: она лежит поверх баннеров и постеров,
+   а не поверх фона окна. */
+[data-am-skin='light'] {
+  color-scheme: light;
+
+  --am-bg: #f2f5fb;
+  --am-bg-2: #e9eef7;
+  --am-panel: #ffffff;
+  --am-panel-2: #f4f7fc;
+  --am-hover: #e6ecf7;
+  --am-line: #d8e0ee;
+  --am-line-soft: rgb(16 24 40 / 0.1);
+
+  --am-fill-1: rgb(16 24 40 / 0.04);
+  --am-fill-2: rgb(16 24 40 / 0.07);
+  --am-fill-3: rgb(16 24 40 / 0.11);
+  --am-glass: rgb(255 255 255 / 0.7);
+  --am-glass-2: rgb(255 255 255 / 0.86);
+  --am-glass-deep: rgb(255 255 255 / 0.94);
+  --am-edge: rgb(255 255 255 / 0.9);
+  --am-veil: rgb(12 18 30 / 0.72);
+
+  --am-text: #101828;
+  --am-dim: #55637c;
+  --am-faint: #8290a8;
+
+  --am-accent: #2f6bff;
+  --am-accent-rgb: 47 107 255;
+  --am-accent-2: #7c5cff;
+  --am-accent-2-rgb: 124 92 255;
+  --am-accent-soft: rgb(47 107 255 / 0.12);
+
+  /* Лепестки на тон глубже: светлый розовый рядом со светлым окном
+     читается выцветшим. Те же значения, что у остановок знака. */
+  --am-sakura: #f2a6bf;
+  --am-sakura-rgb: 242 166 191;
+
+  --am-good: #12a56b;
+  --am-warn: #b7791f;
+  --am-bad: #d94848;
+
+  --am-sh-1: 0 1px 2px rgb(16 24 40 / 0.08);
+  --am-sh-2: 0 18px 40px rgb(16 24 40 / 0.14);
+  --am-sh-glow: 0 0 40px rgb(47 107 255 / 0.16);
+
+  --am-aurora-1: rgb(47 107 255 / 0.12);
+  --am-aurora-2: rgb(124 92 255 / 0.1);
+  --am-aurora-3: rgb(18 165 107 / 0.07);
+
+  --am-bar: rgb(246 248 253 / 0.78);
+  --am-scroll: #c9d4e6;
+  --am-scroll-on: #aebfd8;
+}
+
+/* AMOLED: чёрный ноль и никакой авроры. Смысл темы в том, что пиксель
+   на таком экране не светится вовсе; серые подложки это съедают. */
+[data-am-skin='amoled'] {
+  color-scheme: dark;
+
+  --am-bg: #000000;
+  --am-bg-2: #000000;
+  --am-panel: #06080c;
+  --am-panel-2: #0a0d12;
+  --am-hover: #12161d;
+  --am-line: #1b212b;
+  --am-line-soft: rgb(255 255 255 / 0.08);
+
+  --am-fill-1: rgb(255 255 255 / 0.035);
+  --am-fill-2: rgb(255 255 255 / 0.06);
+  --am-fill-3: rgb(255 255 255 / 0.1);
+  --am-glass: rgb(255 255 255 / 0.035);
+  --am-glass-2: rgb(255 255 255 / 0.06);
+  /* Здесь стекло почти прозрачное: тема и держится на чёрном. Плотная
+     полоса берёт не прозрачностью, а собственным тоном панели. */
+  --am-glass-deep: rgb(16 20 26 / 0.94);
+  --am-edge: rgb(255 255 255 / 0.08);
+  --am-veil: rgb(0 0 0 / 0.9);
+
+  --am-text: #f1f5fc;
+  --am-dim: #93a2ba;
+  --am-faint: #67788f;
+
+  --am-accent: #63a8ff;
+  --am-accent-rgb: 99 168 255;
+  --am-accent-2: #a486ff;
+  --am-accent-2-rgb: 164 134 255;
+  --am-accent-soft: rgb(99 168 255 / 0.16);
+
+  --am-sakura: #f0a6bf;
+  --am-sakura-rgb: 240 166 191;
+
+  --am-good: #3ddc97;
+  --am-warn: #ffc75a;
+  --am-bad: #ff7a7a;
+
+  --am-sh-1: 0 1px 2px rgb(0 0 0 / 0.8);
+  --am-sh-2: 0 18px 44px rgb(0 0 0 / 0.9);
+  --am-sh-glow: 0 0 40px rgb(99 168 255 / 0.2);
+
+  --am-aurora-1: transparent;
+  --am-aurora-2: transparent;
+  --am-aurora-3: transparent;
+
+  --am-bar: rgb(0 0 0 / 0.82);
+  --am-scroll: #1c2430;
+  --am-scroll-on: #2b3646;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  font-family: 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--am-text);
+  background: var(--am-bg);
+  -webkit-font-smoothing: antialiased;
+  transition:
+    color var(--am-mid) var(--am-ease-soft),
+    background-color var(--am-mid) var(--am-ease-soft);
+}
+
+#app {
+  position: relative;
+  min-height: 100%;
+  isolation: isolate;
+}
+
+/* Аврора под всем окном: три пятна, которые неспешно ездят. Без неё
+   стекло панелей нечего размывать и оно выглядит грязным серым.
+   На AMOLED пятна прозрачные: там цель — истинный чёрный. */
+body::before {
+  position: fixed;
+  inset: -20vmax;
+  z-index: -1;
+  content: '';
+  background:
+    radial-gradient(38vmax 32vmax at 12% 8%, var(--am-aurora-1), transparent 60%),
+    radial-gradient(34vmax 30vmax at 88% 14%, var(--am-aurora-2), transparent 62%),
+    radial-gradient(30vmax 26vmax at 62% 92%, var(--am-aurora-3), transparent 64%);
+  filter: blur(28px);
+  pointer-events: none;
+  animation: am-drift var(--am-drift) var(--am-ease-soft) infinite alternate;
+}
+
+@keyframes am-drift {
+  from {
+    transform: translate3d(-2%, -1%, 0) scale(1);
+  }
+  to {
+    transform: translate3d(2%, 2%, 0) scale(1.08);
+  }
+}
+
+/* Полосы прокрутки. Хромиум, встретив на элементе scrollbar-width или
+   scrollbar-color, целиком выбрасывает наши ::-webkit-scrollbar на нём:
+   поэтому полки и окна с локальным scrollbar-width: thin получали
+   системную полосу и выпадали из темы. Стандартные свойства теперь
+   объявлены сразу на всё окно, а псевдоэлементы оставлены запасом для
+   старого WebKit. scrollbar-color наследуется, scrollbar-width нет —
+   отсюда две записи вместо одной. */
+html {
+  scrollbar-color: var(--am-scroll) transparent;
+}
+
+*,
+*::before,
+*::after {
+  scrollbar-width: thin;
+}
+
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+::-webkit-scrollbar-track,
+::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--am-scroll);
+  border: 2px solid transparent;
+  border-radius: var(--am-r-cap);
+  background-clip: content-box;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--am-scroll-on);
+  background-clip: content-box;
+}
+
+::selection {
+  background: rgb(var(--am-accent-rgb) / 0.32);
+}
+
+/* Фокус виден всегда и одинаково: без этого клавиатурный обход окна
+   превращается в угадывание. Гасится только там, где есть своя рамка. */
+:focus-visible {
+  outline: 2px solid var(--am-accent);
+  outline-offset: 2px;
+}
+
+.am-page {
+  display: flex;
+  flex-direction: column;
+  gap: var(--am-gap);
+}
+
+.am-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+}
+
+/* Заголовок в шапке не несёт своего нижнего отступа. У .am-h3 он в 10 px
+   и там отбивает заголовок от содержимого, а в ряду отбивать нечего:
+   с ним выравнивание по центру поднимало заголовок на пять пикселей
+   выше соседей, и счётчик кадров, кнопка «Ещё» и метка облака стояли
+   ниже его строки. */
+.am-bar > .am-h3 {
+  margin-bottom: 0;
+}
+
+.am-bar__gap {
+  flex: 1 1 auto;
+}
+
+.am-h2 {
+  margin: 0;
+  font-size: 19px;
+  font-weight: 680;
+  letter-spacing: -0.015em;
+}
+
+.am-h3 {
+  margin: 0 0 10px;
+  font-size: 14.5px;
+  font-weight: 650;
+  letter-spacing: -0.005em;
+}
+
+.am-dim {
+  color: var(--am-dim);
+}
+
+.am-meta {
+  font-size: 12.5px;
+  color: var(--am-faint);
+}
+
+/* Ошибка — полоса сбоку, а не красная плашка во всю ширину:
+   при двух ошибках плашки читались катастрофой. */
+.am-error {
+  margin: 0;
+  padding: 11px 14px;
+  font-size: 13px;
+  color: var(--am-bad);
+  background: color-mix(in srgb, var(--am-bad) 10%, transparent);
+  border-left: 2px solid var(--am-bad);
+  border-radius: 0 var(--am-r-m) var(--am-r-m) 0;
+}
+
+.am-empty {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  align-items: center;
+  padding: clamp(40px, 9vh, 90px) 20px;
+  font-size: 13.5px;
+  color: var(--am-dim);
+  text-align: center;
+}
+
+/* Знак пустого состояния. Размер здесь задаётся кеглем, а сам знак рисуется
+   в EmptyMark.vue: прежде на этом месте стоял символ шрифта, и шесть разных
+   символов выходили шестью разными штрихами.
+
+   opacity отсюда убрана. У нарисованного знака штрих втрое тоньше набранного,
+   и полупрозрачность поверх --am-faint съедала его совсем: знак пропадал
+   раньше, чем его успевали заметить. Поле снизу больше прежнего на четыре
+   пикселя: строку набранного символа раздувала высота строки шрифта, а у
+   вектора её нет. */
+.am-empty__mark {
+  display: block;
+  margin-bottom: 10px;
+  font-size: 34px;
+  color: var(--am-faint);
+  animation: am-mark-in var(--am-mid) var(--am-ease) both;
+}
+
+/* Знак проявляется, а не появляется. Пустое состояние — это ответ на действие:
+   поиск, смена закладки, выбор дня. Короткий подъём сообщает, что ответ
+   пришёл, а не что экран моргнул. Движется один знак: слова рядом читаются
+   сразу, иначе их пришлось бы ждать.
+
+   В кадрах объявлено только «откуда»: «куда» — это собственные значения
+   знака, и второй раз их писать незачем. */
+@keyframes am-mark-in {
+  from {
+    opacity: 0;
+    transform: scale(0.84);
+  }
+}
+
+/* Панель — стекло над авророй. Псевдоэлементов здесь нет нарочно:
+   общий класс с ::before ломал бы разметку всюду, где он уже использован. */
+.am-panel {
+  padding: 16px 18px;
+  background: var(--am-glass);
+  border: 1px solid var(--am-line-soft);
+  border-radius: var(--am-r-l);
+  box-shadow: var(--am-sh-1), inset 0 1px 0 var(--am-edge);
+  backdrop-filter: blur(var(--am-blur)) saturate(1.4);
+}
+
+/* Стекло без отступов: для своих кластеров на экранах. */
+.am-glass {
+  background: var(--am-glass);
+  border: 1px solid var(--am-line-soft);
+  box-shadow: inset 0 1px 0 var(--am-edge);
+  backdrop-filter: blur(var(--am-blur)) saturate(1.4);
+}
+
+.am-btn {
+  display: inline-flex;
+  gap: 8px;
+  align-items: center;
+  justify-content: center;
+  min-height: var(--am-ctl);
+  padding: 0 16px;
+  font: inherit;
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--am-text);
+  cursor: pointer;
+  background: var(--am-fill-2);
+  border: 1px solid var(--am-line-soft);
+  border-radius: var(--am-r-cap);
+  transition:
+    color var(--am-fast) var(--am-ease),
+    background-color var(--am-fast) var(--am-ease),
+    border-color var(--am-fast) var(--am-ease),
+    transform var(--am-fast) var(--am-ease);
+}
+
+.am-btn:hover {
+  background: var(--am-fill-3);
+  border-color: rgb(var(--am-accent-rgb) / 0.45);
+  transform: translateY(-1px);
+}
+
+.am-btn:active {
+  transform: translateY(0);
+}
+
+.am-btn:disabled {
+  cursor: default;
+  opacity: 0.5;
+  transform: none;
+}
+
+.am-btn--ghost {
+  color: var(--am-dim);
+  background: none;
+}
+
+.am-btn--ghost:hover {
+  color: var(--am-text);
+  background: var(--am-fill-1);
+}
+
+/* Главное действие экрана: акцентный градиент и свечение. */
+.am-btn--soft {
+  color: var(--am-text);
+  background: linear-gradient(
+    100deg,
+    rgb(var(--am-accent-rgb) / 0.26),
+    rgb(var(--am-accent-2-rgb) / 0.18)
+  );
+  border-color: rgb(var(--am-accent-rgb) / 0.4);
+}
+
+.am-btn--soft:hover {
+  box-shadow: 0 12px 28px rgb(var(--am-accent-rgb) / 0.22);
+}
+
+.am-btn--wide {
+  width: 100%;
+}
+
+.am-input {
+  width: 100%;
+  min-height: var(--am-ctl);
+  padding: 0 14px;
+  font: inherit;
+  font-size: 13.5px;
+  color: var(--am-text);
+  background: var(--am-fill-1);
+  border: 1px solid var(--am-line-soft);
+  border-radius: var(--am-r-cap);
+  transition:
+    background-color var(--am-fast) var(--am-ease),
+    border-color var(--am-fast) var(--am-ease);
+}
+
+.am-input::placeholder {
+  color: var(--am-faint);
+}
+
+/* У поля ввода своя рамка при фокусе: обводка поверх капсулы давала
+   два кольца одно в другом. */
+.am-input:focus {
+  background: var(--am-fill-2);
+  border-color: var(--am-accent);
+  outline: none;
+}
+
+/* Поиск: обёртка со значком внутри поля. */
+.am-search {
+  position: relative;
+  flex: 1 1 260px;
+  min-width: 0;
+}
+
+.am-search .am-input {
+  padding-left: 38px;
+}
+
+.am-search__mark {
+  position: absolute;
+  top: 50%;
+  left: 14px;
+  font-size: 14px;
+  color: var(--am-faint);
+  pointer-events: none;
+  transform: translateY(-50%);
+}
+
+.am-chip {
+  display: inline-flex;
+  gap: 7px;
+  align-items: center;
+  min-height: 32px;
+  padding: 0 13px;
+  font: inherit;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--am-dim);
+  cursor: pointer;
+  background: var(--am-fill-1);
+  border: 1px solid var(--am-line-soft);
+  border-radius: var(--am-r-cap);
+  transition:
+    color var(--am-fast) var(--am-ease),
+    background-color var(--am-fast) var(--am-ease),
+    border-color var(--am-fast) var(--am-ease);
+}
+
+.am-chip:hover {
+  color: var(--am-text);
+  background: var(--am-fill-2);
+}
+
+.am-chip--on {
+  color: var(--am-text);
+  background: var(--am-accent-soft);
+  border-color: rgb(var(--am-accent-rgb) / 0.45);
+}
+
+.am-chip__num {
+  font-size: 11.5px;
+  color: var(--am-faint);
+  font-variant-numeric: tabular-nums;
+}
+
+.am-chip--on .am-chip__num {
+  color: var(--am-accent);
+}
+
+/* Переключатель из двух-трёх кнопок в одной капсуле. */
+.am-seg {
+  display: inline-flex;
+  gap: 2px;
+  padding: 3px;
+  background: var(--am-fill-1);
+  border: 1px solid var(--am-line-soft);
+  border-radius: var(--am-r-cap);
+}
+
+.am-seg__btn {
+  min-height: 30px;
+  padding: 0 14px;
+  font: inherit;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--am-dim);
+  cursor: pointer;
+  background: none;
+  border: 0;
+  border-radius: var(--am-r-cap);
+  transition:
+    color var(--am-fast) var(--am-ease),
+    background-color var(--am-mid) var(--am-ease);
+}
+
+.am-seg__btn:hover {
+  color: var(--am-text);
+}
+
+.am-seg__btn--on {
+  color: var(--am-text);
+  background: var(--am-glass-2);
+  box-shadow: var(--am-sh-1), inset 0 1px 0 var(--am-edge);
+}
+
+/* Нативный выбор: appearance не сбрасываем — без стрелки список
+   перестаёт читаться списком. Фон обязан быть плотным: полупрозрачную
+   заливку система переносит в выпадающее меню, и оно белеет вместе
+   с белым текстом на тёмных темах. */
+.am-pick {
+  min-height: var(--am-ctl);
+  padding: 0 12px;
+  font: inherit;
+  font-size: 13.5px;
+  color: var(--am-text);
+  cursor: pointer;
+  background: var(--am-panel-2);
+  border: 1px solid var(--am-line-soft);
+  border-radius: var(--am-r-cap);
+}
+
+.am-pick:hover,
+.am-pick:focus {
+  border-color: var(--am-accent);
+  outline: none;
+}
+
+/* Пункты красим отдельно: выпадающее меню рисует система, и наш фон
+   она не наследует. */
+.am-pick option,
+.am-pick optgroup {
+  color: var(--am-text);
+  background: var(--am-panel);
+}
+
+/* Сетка плиток: ширина плитки тянется за окном, а не заколочена в 168px:
+   на фуллскрине крошки постеров терялись. */
+.am-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(var(--am-tile), 1fr));
+  gap: var(--am-gap);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+/* Полка в один ряд с горизонтальной прокруткой. Отступы сверху и по
+   бокам — не украшение: плитка под курсором приподнимается и растёт,
+   а горизонтальная прокрутка режет всё, что вышло за край. */
+.am-rail {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: var(--am-tile);
+  gap: 14px;
+  margin: 0;
+  padding: 14px 6px 16px;
+  overflow-x: auto;
+  list-style: none;
+  overscroll-behavior-x: contain;
+}
+
+.am-line {
+  display: block;
+  width: 100%;
+  height: 4px;
+  overflow: hidden;
+  background: var(--am-fill-2);
+  border-radius: var(--am-r-cap);
+}
+
+.am-line__fill {
+  display: block;
+  height: 100%;
+  background: linear-gradient(90deg, var(--am-accent), var(--am-accent-2));
+  border-radius: var(--am-r-cap);
+  transition: width var(--am-slow) var(--am-ease);
+}
+
+/* Заглушка на время загрузки: блик вместо пульса прозрачности —
+   мигание целой сетки было бы рябью. */
+.am-skeleton {
+  position: relative;
+  overflow: hidden;
+  background: var(--am-fill-1);
+  border-radius: var(--am-r-m);
+}
+
+.am-skeleton::after {
+  position: absolute;
+  inset: 0;
+  content: '';
+  background: linear-gradient(
+    100deg,
+    transparent 20%,
+    var(--am-fill-2) 50%,
+    transparent 80%
+  );
+  animation: am-shine 1.5s var(--am-ease-soft) infinite;
+}
+
+@keyframes am-shine {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(100%);
+  }
+}
+
+.am-hold {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(var(--am-tile), 1fr));
+  gap: var(--am-gap);
+}
+
+.am-hold__art {
+  display: block;
+  aspect-ratio: 2 / 3;
+  border-radius: var(--am-r-leaf);
+}
+
+.am-hold__line {
+  display: block;
+  height: 12px;
+  margin-top: 9px;
+  border-radius: var(--am-r-s);
+}
+
+/* Стекло без поддержки размытия — просто панель: полупрозрачный фон
+   без blur даёт нечитаемый текст поверх авроры. */
+@supports not (backdrop-filter: blur(1px)) {
+  .am-panel,
+  .am-glass {
+    background: var(--am-panel);
+  }
+}
+
+@media (max-width: 1080px) {
+  :root {
+    --am-gap: 14px;
+  }
+}
+
+/* Системная просьба о покое сильнее наших красот: гасим всё движение,
+   а не только часть. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    scroll-behavior: auto !important;
+  }
+
+  body::before {
+    animation: none;
+  }
+}

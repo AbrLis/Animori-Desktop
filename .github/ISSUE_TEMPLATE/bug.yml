@@ -1,0 +1,73 @@
+name: Что-то сломалось
+description: Ошибка в приложении
+labels: ['bug']
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Спасибо, что нашли время на отчёт. Чем точнее заполнены поля, тем быстрее найдётся причина.
+  - type: input
+    id: version
+    attributes:
+      label: Версия
+      description: Видна в настройках, раздел «О программе».
+      placeholder: 3.0.0
+    validations:
+      required: true
+  - type: input
+    id: environment
+    attributes:
+      label: Окружение
+      description: Версия Windows и установлен ли WebView2.
+      placeholder: Windows 11 23H2
+    validations:
+      required: true
+  - type: dropdown
+    id: screen
+    attributes:
+      label: Экран
+      options:
+        - Главная
+        - Моё
+        - История
+        - Поиск
+        - Тайтл
+        - Студия
+        - Просмотр
+        - Настройки
+        - Журнал
+        - Другое
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Что делали, чего ждали, что получилось
+      description: Пошагово, даже если шагов всего два. Скриншот можно просто перетащить сюда.
+      placeholder: |
+        1. Открыл карточку тайтла.
+        2. Нажал кнопку «Смотреть».
+        Ждал плеер, получил пустое окно.
+    validations:
+      required: true
+  - type: input
+    id: network
+    attributes:
+      label: Настройка сети
+      description: Включена ли настройка соединения в настройках.
+      placeholder: выключена
+  - type: textarea
+    id: log
+    attributes:
+      label: Записи журнала
+      description: Экран журнала открывается адресом окна #/log. Если записей нет, оставьте поле пустым.
+      render: text
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Перед отправкой
+      options:
+        - label: Стоит последняя версия AniMori
+          required: true
+        - label: Поиск по существующим issue ничего похожего не дал
+          required: true

@@ -1,0 +1,54 @@
+{
+  "compilerOptions": {
+    "target": "ESNext",
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "lib": ["ESNext", "DOM", "DOM.Iterable"],
+    // greasemonkey убран: это описания GM_*, которые даёт менеджер скриптов.
+    // Здесь их нет и быть не может: своё окно, свой мост, свои права.
+    "types": ["vite/client", "node"],
+
+    "strict": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "noFallthroughCasesInSwitch": true,
+    "noUncheckedIndexedAccess": true,
+
+    "resolveJsonModule": true,
+    "esModuleInterop": true,
+    "isolatedModules": true,
+    "skipLibCheck": true,
+    "useDefineForClassFields": true,
+    "forceConsistentCasingInFileNames": true,
+
+    // Этап 2: SFC компилирует vue-tsc, ему нужен preserve.
+    "jsx": "preserve",
+
+    "noEmit": true,
+    "sourceMap": true,
+
+    "baseUrl": ".",
+    "paths": {
+      // Пункт 1.3: те же соответствия старых имён новым каталогам, что в resolve.alias
+      // внутри vite.config.ts. Править надо сразу в двух файлах: расхождение даёт
+      // самый неприятный сорт отказа — сборка идёт, а проверка типов падает, или наоборот.
+      //
+      // Ушли шесть строк, ведшие в src/userscript и src/shared/adblock: жизненный цикл
+      // чужого SPA, словарь и его загрузчик, фичи надстройки, блокировщик рекламы.
+      // Проверка типов теперь сама найдёт любой оставшийся импорт в те места:
+      // имя перестало разрешаться — именно это и нужно перед вычисткой файлов.
+      "@/api/*": ["src/shared/api/*"],
+      "@/bridge": ["src/shared/bridge/index"],
+      "@/bridge/*": ["src/shared/bridge/*"],
+      "@/core/*": ["src/shared/core/*"],
+      "@/utils/*": ["src/shared/utils/*"],
+      "@/*": ["src/*"],
+      // Этап 3.4: реальную цель '@bridge-impl' выбирает resolve.alias в vite.config.ts.
+      // Прежде там было две реализации на три режима, и тайпчекеру приходилось
+      // давать одну из них по выбору; теперь цель одна и совпадает со сборкой.
+      "@bridge-impl": ["src/shared/bridge/TauriBridge"]
+    }
+  },
+  "include": ["src/**/*.ts", "src/**/*.d.ts", "src/**/*.vue", "vite.config.ts"],
+  "exclude": ["node_modules", "dist", "src-tauri"]
+}
