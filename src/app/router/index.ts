@@ -12,9 +12,21 @@
 // вело в плеер, из которого на неё только что и вышли.
 import { computed, ref, type ComputedRef } from 'vue'
 
-import { DEFAULT_ROUTE, SCREEN_NAMES, type Route, type ScreenName } from './routes'
+import { DEFAULT_ROUTE, SCREEN_DEPTH, SCREEN_NAMES, type Route, type ScreenName } from './routes'
 
 const state = ref<Route>(DEFAULT_ROUTE)
+
+/**
+ * Направление смены экрана. `deep` — ушли внутрь, `back` — вышли наружу,
+ * `even` — остались на той же глубине: это смена вкладки, направления у неё
+ * нет вовсе.
+ */
+export type NavDirection = 'deep' | 'back' | 'even'
+
+const direction = ref<NavDirection>('even')
+
+/** Направление последнего перехода. Сменяется вместе с currentRoute. */
+export const navDirection: ComputedRef<NavDirection> = computed(() => direction.value)
 
 /** Адрес, с которого пришли на нынешний: по нему видно, куда ведёт «назад». */
 let before: Route | null = null
@@ -68,11 +80,31 @@ export function peekPrevious(): Route | null {
   return before
 }
 
+/**
+ * Направление берётся из глубины экранов, а не из самой истории.
+ *
+ * История помнит, откуда пришли, но не говорит, куда идём: возврат из плеера
+ * в карточку и переход из поиска в карточку выглядят в ней одинаково — обе
+ * смены адреса. А для экрана они противоположны: в первом случае человек
+ * выходит наружу, во втором уходит внутрь, и содержимое должно приходить
+ * с той стороны, куда он направился.
+ *
+ * Два экрана одной глубины дают `even`: из карточки в карточку по франшизе
+ * человек не углубляется, он берёт соседний тайтл того же уровня.
+ */
+function step(from: ScreenName, to: ScreenName): NavDirection {
+  const gap = SCREEN_DEPTH[to] - SCREEN_DEPTH[from]
+  if (gap > 0) return 'deep'
+  if (gap < 0) return 'back'
+  return 'even'
+}
+
 /** Ставит адрес и запоминает прежний. Повтор того же адреса за переход не в счёт. */
 function land(next: Route): void {
   const now = state.value
   if (next.name === now.name && next.params.id === now.params.id) return
 
+  direction.value = step(now.name, next.name)
   before = now
   state.value = next
 }

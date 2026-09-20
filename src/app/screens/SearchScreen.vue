@@ -28,6 +28,7 @@ import { peekRussianName, prefetchRussianNames } from '@/core/media-title'
 import { onPlayableChange, peekPlayable, primePlayable, requestPlayable } from '@/core/playable'
 import { Logger } from '@/utils/logger'
 
+import EmptyMark from '../components/EmptyMark.vue'
 import MediaTile from '../components/MediaTile.vue'
 import { navigate } from '../router'
 import { toPlayAsk, toTileRow, type TileRow } from '../tile-row'
@@ -409,19 +410,19 @@ onBeforeUnmount(() => {
     </ul>
 
     <div v-else-if="asked === ''" class="am-empty">
-      <span class="am-empty__mark" aria-hidden="true">⌕</span>
+      <span class="am-empty__mark"><EmptyMark name="magnifier" /></span>
       <span>Начните вводить название.</span>
       <span>Можно по-русски, по-английски или на латинице.</span>
     </div>
 
     <div v-else-if="short" class="am-empty">
-      <span class="am-empty__mark" aria-hidden="true">⌨</span>
+      <span class="am-empty__mark"><EmptyMark name="keyboard" /></span>
       <span>Слишком короткое слово.</span>
       <span>Наберите {{ MIN_WORD_LEN }} знака — или нажмите Enter, чтобы искать как есть.</span>
     </div>
 
     <div v-else-if="rows.length === 0 && !busy" class="am-empty">
-      <span class="am-empty__mark" aria-hidden="true">⊘</span>
+      <span class="am-empty__mark"><EmptyMark name="magnifier" /></span>
       <span>Ничего не нашлось.</span>
       <span>Попробуйте другое слово.</span>
     </div>

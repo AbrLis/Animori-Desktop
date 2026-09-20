@@ -140,7 +140,7 @@ fn read_proxy(app: &AppHandle) -> Option<(String, String, String)> {
 /// отказ 403 у стороннего API. Версия берётся из Cargo, другой в Rust нет.
 fn user_agent() -> String {
     format!(
-        "AniMori/{} (+https://github.com/foulnike/AniMori-AniList-Toolkit)",
+        "AniMori/{} (+https://github.com/foulnike/Animori-Desktop)",
         env!("CARGO_PKG_VERSION")
     )
 }

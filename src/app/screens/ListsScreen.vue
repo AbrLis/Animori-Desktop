@@ -27,13 +27,15 @@
 // знака незачем.
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 
+import { keepAllowed } from '@/core/adult'
 import { editEntry, getEntry, initCollection } from '@/core/collection'
 import { countByStatus, countEntries, selectEntries } from '@/core/collection-view'
-import { partsOut, peekLook } from '@/core/media-looks'
+import { partsCeiling, peekLook } from '@/core/media-looks'
 import { searchOwnList } from '@/core/media-search'
 import type { SnapshotEntry } from '@/core/snapshot'
 import { Logger } from '@/utils/logger'
 
+import EmptyMark from '../components/EmptyMark.vue'
 import EntrySheet from '../components/EntrySheet.vue'
 import MediaRow from '../components/MediaRow.vue'
 import MediaTile from '../components/MediaTile.vue'
@@ -123,6 +125,13 @@ const limit = ref(PAGE_LIMIT)
 /** Сколько строк отобралось до обрезки потолком. */
 const picked = ref(0)
 
+/**
+ * Сколько строк спрятал тумблер показа взрослого. Нужно подписи под списком:
+ * закладка на сорок три записи, где видно сорок, читалась бы потерей своих
+ * же данных, а не отбором.
+ */
+const hidden = ref(0)
+
 /** Метка конца списка: по её появлению в окне заказывается добор. */
 const tailMark = ref<HTMLElement | null>(null)
 
@@ -171,7 +180,7 @@ const editLook = computed(() => (editId.value > 0 ? peekLook(editId.value) : nul
 
 /** Сколько серий уже вышло. Без облика потолка нет, и окно его не выдумывает. */
 const editParts = computed<number | null>(() =>
-  editLook.value === null ? null : partsOut(editLook.value),
+  editLook.value === null ? null : partsCeiling(editLook.value),
 )
 
 /** Идёт ли показ: онгоингу окно не ставит «Просмотрено» на потолке счёта. */
@@ -182,6 +191,9 @@ const editOngoing = computed<boolean>(() => (editLook.value?.airingEpisode ?? nu
  * по ним перерисовываются плитки, когда добрались обложки и названия.
  */
 let foundEntries: SnapshotEntry[] = []
+
+/** Сколько находок последнего поиска спрятал тумблер. Тоже не реактивное. */
+let foundHidden = 0
 
 /** Номер идущего поиска: старый видит, что его ответ больше не нужен. */
 let searchRun = 0
@@ -202,10 +214,20 @@ function describe(e: unknown): string {
  * человек, поэтому потолок отрезается уже после сортировки всей закладки.
  */
 function redraw(): void {
-  counts.value = countByStatus()
-  total.value = countEntries()
+  // Взрослое прячется и здесь: тумблер один на всё приложение, и своя закладка
+  // не уголок, где он не действует.
+  //
+  // Числа считаются по видимому, а не по всей коллекции: подпись «Закладки: 43»
+  // над сорока строками читалась бы пропажей, а не отбором. Сколько спрятано,
+  // сказано словами ниже — так счёт и список сходятся, и ничего не теряется
+  // молча.
+  const raw = searching.value ? foundEntries : selectEntries({ status: [activeStatus.value] })
+  const list = keepAllowed(raw, (entry) => entry.isAdult)
 
-  const list = searching.value ? foundEntries : selectEntries({ status: [activeStatus.value] })
+  counts.value = countByStatus({ hideAdult: true })
+  total.value = countEntries({ hideAdult: true })
+  // Поиск считает спрятанное сам: он отсеивает находки ещё до выдачи.
+  hidden.value = searching.value ? foundHidden : raw.length - list.length
 
   picked.value = list.length
   rows.value = sortEntries(list, sortKey.value).slice(0, limit.value).map(toRow)
@@ -249,6 +271,7 @@ async function runSearch(): Promise<void> {
 
   if (asked === '') {
     foundEntries = []
+    foundHidden = 0
     refill()
     return
   }
@@ -259,7 +282,8 @@ async function runSearch(): Promise<void> {
     const found = await searchOwnList(asked, FOUND_LIMIT)
     if (mine !== searchRun) return
 
-    foundEntries = found
+    foundEntries = found.entries
+    foundHidden = found.hidden
     refill()
   } catch (e) {
     Logger('WARN', 'Списки: поиск по своему списку не удался', e)
@@ -516,10 +540,18 @@ onBeforeUnmount(() => {
       </ul>
     </template>
 
-    <div v-else-if="total === 0" class="am-empty">
-      <span class="am-empty__mark" aria-hidden="true">⊘</span>
+    <!-- Пустой список и список, целиком скрытый меткой 18+, — разные вещи,
+         и говорить о них одними словами нельзя: первое правда, второе ложь. -->
+    <div v-else-if="total === 0 && hidden === 0" class="am-empty">
+      <span class="am-empty__mark"><EmptyMark name="tray" /></span>
       <span>Записей пока нет.</span>
       <span>Добавьте аниме из поиска или перенесите список с AniList в настройках.</span>
+    </div>
+
+    <div v-else-if="total === 0" class="am-empty">
+      <span class="am-empty__mark"><EmptyMark name="tray" /></span>
+      <span>Все записи скрыты меткой 18+.</span>
+      <span>Показ взрослого включается в настройках, в разделе оформления.</span>
     </div>
 
     <div v-else-if="searchBusy && rows.length === 0" class="am-empty">
@@ -527,14 +559,31 @@ onBeforeUnmount(() => {
     </div>
 
     <div v-else-if="searching && rows.length === 0" class="am-empty">
-      <span class="am-empty__mark" aria-hidden="true">⌕</span>
-      <span>В своём списке ничего не нашлось.</span>
-      <span>Попробуйте поискать в каталоге.</span>
+      <span class="am-empty__mark"><EmptyMark name="magnifier" /></span>
+      <template v-if="hidden > 0">
+        <span>Нашлось только скрытое меткой 18+.</span>
+        <span>Показ взрослого включается в настройках, в разделе оформления.</span>
+      </template>
+      <template v-else>
+        <span>В своём списке ничего не нашлось.</span>
+        <span>Попробуйте поискать в каталоге.</span>
+      </template>
     </div>
 
+    <!-- Пустая закладка — не пустой список: записи у человека есть, они
+         просто в других закладках. Отсюда и второй совет: прежде здесь
+         стояла одна строка «записей нет», и она читалась как потеря
+         списка целиком. Тот же случай — закладка, где всё скрыто меткой 18+. -->
     <div v-else-if="rows.length === 0" class="am-empty">
-      <span class="am-empty__mark" aria-hidden="true">⊘</span>
-      <span>В этой закладке записей нет.</span>
+      <span class="am-empty__mark"><EmptyMark name="tray" /></span>
+      <template v-if="hidden > 0">
+        <span>Здесь всё скрыто меткой 18+.</span>
+        <span>Показ взрослого включается в настройках, в разделе оформления.</span>
+      </template>
+      <template v-else>
+        <span>В этой закладке записей нет.</span>
+        <span>Загляните в соседние закладки — или добавьте аниме из поиска.</span>
+      </template>
     </div>
 
     <!-- Отметка показа висит только на плитках: только они показывают метку
@@ -594,6 +643,7 @@ onBeforeUnmount(() => {
 
     <p class="am-lists__foot">
       {{ rows.length }} из {{ shown }} · всего {{ total }}
+      <template v-if="hidden > 0"> · скрыто 18+: {{ hidden }}</template>
       <template v-if="looksBusy"> · обложки…</template>
       <template v-if="titlesBusy"> · названия…</template>
       <template v-if="playBusy"> · доступность…</template>

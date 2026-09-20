@@ -19,6 +19,8 @@ import { getDbStats } from '@/core/db'
 import type { DbStats } from '@/core/types'
 import { clearLogs, readLogs, registerLogSink, type LogEntry, type LogType } from '@/utils/logger'
 
+import EmptyMark from '../components/EmptyMark.vue'
+
 /**
  * Виды записей для отбора. Порядок не алфавитный, а по частоте вопроса:
  * сначала «что сломалось», потом «что происходило».
@@ -289,6 +291,7 @@ onBeforeUnmount(() => {
         <li><span>Облики плиток</span><b>{{ store.looks }}</b></li>
         <li><span>Метки доступности</span><b>{{ store.playable }}</b></li>
         <li><span>Соответствия Aniliberty</span><b>{{ store.anilibertyLinks }}</b></li>
+        <li><span>Кадры и ролики</span><b>{{ store.screenshots }}</b></li>
         <li><span>Персонажи</span><b>{{ store.characters }}</b></li>
         <li><span>Персонал</span><b>{{ store.staff }}</b></li>
         <li><span>Темы</span><b>{{ store.themes }}</b></li>
@@ -303,13 +306,14 @@ onBeforeUnmount(() => {
         <li class="am-log__store--sum"><span>Занято</span><b>{{ store.estimatedSize }}</b></li>
       </ul>
       <p class="am-meta">
-        Каждая запись здесь — запрос, которого мы больше не делаем. Нули у карточек
-        и номеров MAL правдивы: на диск они пока не ложатся.
+        Каждая запись здесь — запрос, которого мы больше не делаем. Ноль у номеров
+        MAL правдив: стор заведён миграцией, но писать в него некому — пары номеров
+        добываются заново при каждом запуске.
       </p>
     </div>
 
     <div v-if="rows.length === 0" class="am-empty">
-      <span class="am-empty__mark" aria-hidden="true">⊘</span>
+      <span class="am-empty__mark"><EmptyMark name="journal" /></span>
       <span>Записей нет. Журнал пишется, пока открыто окно.</span>
     </div>
 

@@ -2,11 +2,33 @@
 // Музыка тайтла: опенинги и эндинги с AnimeThemes. Плеер в блоке один,
 // а темы — строки списка: выбранная заряжается в плеер и звучит.
 //
+// ПОЛОСА ВНИЗУ, ПУЛЬТ И СПИСОК — В ОКНЕ
+//
+// Прежде это была плитка доски на две колонки и ростом около трёхсот
+// двадцати пикселей: шапка со счётчиком, пульт с таймлайном, окно списка
+// на четыре строки. Место в раскладке карточки понадобилось плитке кадров,
+// а музыка признана вещью второстепенной — так этот блок стал полосой
+// в одну строку, прижатой к низу окна.
+//
+// Что где лежит теперь. В полосе — то, что нужно при звуке: шаг, пуск,
+// тема и время. Всё остальное — громкость, перемешивание, повтор, таймлайн
+// с перемоткой, список тем целиком и построчные действия — уехало в окно
+// за кнопкой справа. Окно то же самое, что у подбора и записи в список:
+// затемнение, коробка по центру, закрытие по крестику, подложке и Escape.
+//
+// ПОЧЕМУ ЛИПНЕТ К НИЗУ, А НЕ СТОИТ В ПОТОКЕ
+//
+// Стоя в потоке, полоса всё равно отнимала бы у карточки строку, а под
+// низом окна уже оставлено поле в семьдесят два пикселя (padding у .am-view)
+// — полоса встаёт в него и не накрывает ни одной плитки. Пока страница
+// прокручивается, она на виду; у конца страницы ложится на своё место
+// в разметке. Токен z-index держит её над плитками и под окнами.
+//
 // ПОЧЕМУ ПЛЕЕР ОДИН, А НЕ КНОПКА В КАЖДОЙ СТРОКЕ
 //
 // Кнопки по строкам давали восемь огрызков плеера: у каждой своя полоса
 // и ни у одной — ни перемотки, ни повтора, ни громкости. Управление
-// собрано в один пульт над списком, и все органы нарисованы здесь же:
+// собрано в один пульт, и все органы нарисованы здесь же:
 // родной <audio> с системными кнопками в стеклянной панели выглядит
 // деталью от другого приложения.
 //
@@ -14,38 +36,42 @@
 // тянется только по выбору темы и в базу не кладётся — тема весит
 // мегабайты, а кэш заведён под мелкие ответы служб, не под музыку.
 //
-// ЦЕНТР ДЕРЖИТ СЕТКА, А НЕ ПОДОБРАННЫЕ ОТСТУПЫ
+// ЦЕНТР ПУЛЬТА ДЕРЖИТ СЕТКА, А НЕ ПОДОБРАННЫЕ ОТСТУПЫ
 //
-// Цветок пуска стоит по центру над полосой, подпись звучащего — по центру
-// под ней, а органы разведены по сторонам: слева перемешивание и звёздочка,
-// справа повтор с громкостью. Ряд собран сеткой 1fr | auto | 1fr, крайние
-// клетки равны по ширине, а боковые группы прижаты к середине: так цветок
-// стоит ровно в центре панели, чем бы ни наполнились бока. Распоры
-// фиксированной ширины приходилось бы подгонять заново после каждой правки
-// боковых групп и на каждом масштабе окна.
+// В окне цветок пуска стоит по центру над полосой, подпись звучащего —
+// под ней, а органы разведены по сторонам: слева порядок звучания, справа
+// громкость. Ряд собран сеткой 1fr | auto | 1fr, крайние клетки равны
+// по ширине, а боковые группы прижаты к середине: так цветок стоит ровно
+// в центре пульта, чем бы ни наполнились бока. Распоры фиксированной
+// ширины приходилось бы подгонять заново после каждой правки боковых групп
+// и на каждом масштабе окна.
 //
-// Звёздочка «избранное» пока ни к чему не привязана: она заведена на рост,
-// и нажатие живёт только в памяти открытой карточки — хранилища избранных
-// тем в приложении нет. Кнопка стоит в ряду уже сейчас, чтобы потом не
-// перекраивать пульт заново.
+// В самой полосе середина отдана подписи звучащего: она тянется (flex: 1)
+// и режется многоточием, потому что названия тем длиннее полосы.
+//
+// Звёздочки «избранное» здесь больше нет. Она стояла на рост — нажатие
+// жило в памяти карточки и никуда не уходило, — но системы избранных тем
+// в приложении не будет, и кнопка, которая ничего не делает, хуже
+// отсутствующей: она обещает сохранение.
 //
 // СПИСОК ПРОКРУЧИВАЕТСЯ, А НЕ РАСКРЫВАЕТСЯ
 //
-// Видно ровно четыре строки, остальные достаются прокруткой внутри блока.
-// Раскрытие всего списка кнопкой растягивало карточку на восемь тем и
-// уводило вниз всё, что стоит под музыкой, а вернуть прежний рост можно
-// было только найдя ту же кнопку снова. Окно постоянной высоты держит
-// соседние блоки на месте при любом числе тем.
+// Видно ровно шесть строк, остальные достаются прокруткой внутри окна.
+// Раскрытие всего списка кнопкой растянуло бы окно на двенадцать тем
+// у One Piece, а вернуть прежний рост можно было бы только найдя ту же
+// кнопку снова. Окно постоянной высоты держит соседние части на месте
+// при любом числе тем.
 //
 // Высота окна не подобрана числом: она считается из высоты строки и
 // просвета между строками — --am-tune-row и --am-tune-gap в стилях, — а
 // самой строке рост задан явно. Иначе правка отступов строки оставляла бы
-// снизу полоску пятой, и «видно четыре» превращалось бы в «видно четыре
+// снизу полоску седьмой, и «видно шесть» превращалось бы в «видно шесть
 // с половиной».
 //
 // Звучащая строка доводится в окно сама: темы уезжают за нижний край без
 // участия человека — по концу трека и перемешиванием, — и без доводки
-// список стоял бы на первых четырёх строках, пока играет седьмая.
+// список стоял бы на первых строках, пока играет седьмая. Доводка идёт
+// и при открытии окна: список появляется в разметке только вместе с ним.
 //
 // СКАЧАТЬ, СКОПИРОВАТЬ И СТРИМИНГИ — ЧАСТЬ СТРОКИ И ТОЛЬКО ПОД КУРСОРОМ
 //
@@ -90,11 +116,11 @@
 // AnimeThemes нет, и запрос такого режима просто ломает
 // воспроизведение. Обмен звука на дрожание лепестков не стоит того.
 //
-// Панель молчит, пока тем нет: у половины тайтлов AnimeThemes не знает
-// ничего, и пустая коробка «Музыка» была бы честной, но бесполезной.
-import { computed, onBeforeUnmount, ref, watch } from 'vue'
+// Полоса молчит, пока тем нет: у половины тайтлов AnimeThemes не знает
+// ничего, и пустая полоса «Музыка» была бы честной, но бесполезной.
+import { computed, nextTick, onBeforeUnmount, ref, watch } from 'vue'
 
-import { fetchMalThemes, type ThemeLink } from '@/api/animethemes'
+import { fetchMalThemes, type ThemeItem, type ThemeLink } from '@/api/animethemes'
 import { Bridge } from '@/bridge'
 import { Logger } from '@/utils/logger'
 
@@ -165,17 +191,20 @@ const loop = ref(false)
 const vol = ref(keepVol)
 const mute = ref(false)
 
-/** Перемешивание: следующая тема берётся случайно, а не по порядку. */
-const shuffle = ref(false)
-
 /**
- * Звёздочка «избранное» на рост: состояние живёт только в памяти карточки
- * и никуда не уходит — хранилища избранных тем пока нет.
+ * Перемешивание: автоматически следующая тема берётся случайно, а не по
+ * порядку. На кнопки шага оно не влияет — почему, сказано в stepBy.
  */
-const fav = ref(false)
+const shuffle = ref(false)
 
 /** Тянут ручку таймлайна: показания времени в это время наши, не плеера. */
 const drag = ref(false)
+
+/**
+ * Открыто ли окно тем. Пульт и список живут там, а не в полосе: полосе
+ * досталась одна строка, и всё остальное уехало в окно за кнопкой.
+ */
+const sheet = ref(false)
 
 /** Ключи строк в работе и с отметками: отметка горит у своей кнопки, не у всех. */
 const saving = ref<string | null>(null)
@@ -193,6 +222,12 @@ const nowRow = computed<TuneRow | null>(
 
 /** Первая тема со звуком: с неё начинает пустой плеер. */
 const firstSound = computed<TuneRow | null>(() => rows.value.find((row) => row.audio !== null) ?? null)
+
+/** Проигрываемые темы: у остальных звука нет, и шагать по ним некуда. */
+const sounds = computed<TuneRow[]>(() => rows.value.filter((row) => row.audio !== null))
+
+/** Шаг возможен, когда тем хотя бы две: одна и так звучит. */
+const canStep = computed<boolean>(() => sounds.value.length > 1)
 
 const donePart = computed<string>(() =>
   len.value > 0 ? `${Math.min(100, (at.value / len.value) * 100)}%` : '0%',
@@ -278,6 +313,41 @@ function nextRow(): TuneRow | null {
   return rows.value.slice(now + 1).find((row) => row.audio !== null) ?? null
 }
 
+/**
+ * Шаг по списку проигрываемых тем: +1 — следующая, −1 — предыдущая.
+ *
+ * Ход по кругу: с последней темы «дальше» ведёт на первую. Это расходится
+ * с автоматическим переходом намеренно. Конец списка — это «темы кончились»,
+ * и звук там и правда замирает (nextRow выше). Нажатие же — явная просьба
+ * дать следующую тему, и молчание на последней читалось бы отказом.
+ *
+ * Перемешивание на шаг не влияет: оно меняет только автоматический выбор
+ * следующей темы. Кнопка обязана вести в одно и то же место списка, иначе
+ * «назад» после случайного «дальше» ведёт не туда, откуда пришли, и список
+ * перестаёт быть списком.
+ */
+function stepBy(delta: 1 | -1): void {
+  const list = sounds.value
+  if (list.length < 2) return
+
+  const now = list.findIndex((row) => row.key === pick.value)
+  // Ничего не заряжено: «дальше» начинает с первой темы, «назад» — с последней,
+  // так же как главная кнопка пустого плеера начинает с первой.
+  const from = now < 0 ? (delta > 0 ? -1 : 0) : now
+  const row = list[(from + delta + list.length) % list.length]
+  if (row === undefined) return
+
+  charge(row)
+}
+
+function onPrev(): void {
+  stepBy(-1)
+}
+
+function onNext(): void {
+  stepBy(1)
+}
+
 /** Заряжает тему в плеер и пускает её. */
 function charge(row: TuneRow): void {
   if (row.audio === null) return
@@ -296,7 +366,7 @@ function charge(row: TuneRow): void {
 }
 
 /**
- * Доводит звучащую строку в окно списка: видно четыре строки, а тема
+ * Доводит звучащую строку в окно списка: видно шесть строк, а тема
  * сменяется и сама — по концу трека и перемешиванием. Ближним краем,
  * а не серединой: доводка обязана показать строку, а не перетряхивать
  * окно на каждой смене темы.
@@ -308,6 +378,17 @@ function showPick(): void {
 
   const item = box.querySelector(`[data-key="${key}"]`)
   item?.scrollIntoView({ block: 'nearest', inline: 'nearest' })
+}
+
+/**
+ * Открывает окно тем и доводит звучащую строку в видимую часть.
+ *
+ * Доводка ждёт появления списка в разметке: у закрытого окна списка нет,
+ * и вызов сразу после смены состояния застал бы пустую ссылку.
+ */
+function openSheet(): void {
+  sheet.value = true
+  void nextTick(showPick)
 }
 
 /** Нажатие по строке: своя тема — пауза и пуск, чужая — смена. */
@@ -348,11 +429,6 @@ function onLoop(): void {
 /** Перемешивание меняет только выбор следующей темы: звук не трогаем. */
 function onShuffle(): void {
   shuffle.value = !shuffle.value
-}
-
-/** Звёздочка на рост: нажатие пока никуда не сохраняется — см. шапку. */
-function onFav(): void {
-  fav.value = !fav.value
 }
 
 /** Перемотка на месте: и стрелками, и прыжком по полосе. */
@@ -605,7 +681,6 @@ async function load(): Promise<void> {
   saving.value = null
   saved.value = null
   copied.value = null
-  fav.value = false
 
   const id = props.malId
   if (id === null) return
@@ -614,29 +689,32 @@ async function load(): Promise<void> {
     const themes = await fetchMalThemes(id)
     if (mine !== run || themes === null) return
 
+    // Ключ обязан быть уникален, даже когда номера совпали. Две разные песни
+    // под одним номером случаются: слаг без цифры даёт тот же номер, что и
+    // первая заставка, а версия вроде OP1-EN4Kids — тоже первую. С одинаковыми
+    // ключами Vue путает строки при обновлении, и в списке появляется одна
+    // и та же песня дважды. Подпись от номера не пострадает: она показывает
+    // то, что сказал сервис, и совпавшие номера в ней так и останутся.
     const out: TuneRow[] = []
+    const taken = new Map<string, number>()
 
-    themes.openings.forEach((t) => {
+    const add = (kind: 'OP' | 'ED', t: ThemeItem): void => {
+      const tag = `${kind}${t.seq}`
+      const seen = taken.get(tag) ?? 0
+      taken.set(tag, seen + 1)
+
       out.push({
-        key: `OP${t.seq}`,
-        tag: `OP${t.seq}`,
+        key: seen === 0 ? tag : `${tag}.${seen + 1}`,
+        tag,
         title: t.title,
         artist: t.artist,
         audio: t.audio,
         links: t.links,
       })
-    })
+    }
 
-    themes.endings.forEach((t) => {
-      out.push({
-        key: `ED${t.seq}`,
-        tag: `ED${t.seq}`,
-        title: t.title,
-        artist: t.artist,
-        audio: t.audio,
-        links: t.links,
-      })
-    })
+    themes.openings.forEach((t) => add('OP', t))
+    themes.endings.forEach((t) => add('ED', t))
 
     rows.value = out
   } catch (e) {
@@ -658,290 +736,549 @@ onBeforeUnmount(stop)
 </script>
 
 <template>
-  <div v-if="rows.length > 0" class="am-panel am-tune" @keydown="onKey">
-    <div class="am-tune__head">
-      <h3 class="am-h3">Музыка</h3>
-      <span class="am-tune__count">{{ rows.length }}</span>
-    </div>
+  <!-- Полоса вместо плитки: пуск, шаг, звучащая тема и время одной строкой,
+       а пульт и список тем — в окне по кнопке справа. Полоса липнет к низу
+       окна и места в раскладке карточки не занимает вовсе: освободившийся
+       слот достался плитке кадров, а музыке — второе место по положению. -->
+  <div v-if="rows.length > 0" class="am-tune" @keydown="onKey">
+    <div class="am-tune__top">
+      <button
+        v-tip="'Предыдущая тема'"
+        class="am-tune__step"
+        type="button"
+        aria-label="Предыдущая тема"
+        :disabled="!canStep"
+        @click="onPrev"
+      >
+        <svg class="am-tune__glyph am-tune__glyph--fill" viewBox="0 0 16 16" aria-hidden="true">
+          <path d="M11.9 3.5 6.2 8l5.7 4.5z" />
+          <rect x="4" y="3.9" width="1.3" height="8.2" rx="0.65" />
+        </svg>
+      </button>
 
-    <!-- Пульт: цветок пуска по центру с органами по сторонам, под ним
-         таймлайн, под таймлайном подпись звучащего. -->
-    <div class="am-tune__deck">
-      <div class="am-tune__organs">
-        <!-- Левая сторона: перемешивание и звёздочка на рост. -->
-        <div class="am-tune__tools am-tune__tools--left">
-          <button
-            v-tip="shuffle ? 'Перемешивание включено' : 'Перемешать темы'"
-            class="am-tune__tool"
-            :class="{ 'am-tune__tool--on': shuffle }"
-            type="button"
-            aria-label="Перемешать темы"
-            :aria-pressed="shuffle"
-            @click="onShuffle"
-          >
-            <svg class="am-tune__glyph" viewBox="0 0 16 16">
-              <path d="M2.6 4.4h2.2l6 7.2h2.4" />
-              <path d="M2.6 11.6h2.2l2.1-2.6" />
-              <path d="M9.5 6.3l1.3-1.9h2.4" />
-              <path d="M11.3 2.6l2 1.8-2 1.8" />
-              <path d="M11.3 9.8l2 1.8-2 1.8" />
-            </svg>
-          </button>
+      <button
+        v-tip="playHint"
+        class="am-tune__hit"
+        :class="{ 'am-tune__hit--live': playing }"
+        type="button"
+        :aria-label="playHint"
+        @click="onPlay"
+      >
+        <SakuraBloom />
+        <span class="am-tune__mark" aria-hidden="true">
+          <svg v-if="playing" class="am-tune__sign" viewBox="0 0 16 16">
+            <rect x="4" y="3.2" width="2.9" height="9.6" rx="1.2" />
+            <rect x="9.1" y="3.2" width="2.9" height="9.6" rx="1.2" />
+          </svg>
+          <svg v-else class="am-tune__sign" viewBox="0 0 16 16">
+            <path d="M5.2 3.4 12.4 8l-7.2 4.6z" />
+          </svg>
+        </span>
+      </button>
 
-          <button
-            v-tip="fav ? 'В избранном' : 'В избранное'"
-            class="am-tune__tool"
-            :class="{ 'am-tune__tool--on': fav }"
-            type="button"
-            aria-label="В избранное"
-            :aria-pressed="fav"
-            @click="onFav"
-          >
-            <svg class="am-tune__glyph" :class="{ 'am-tune__glyph--full': fav }" viewBox="0 0 16 16">
-              <path d="M8 2.4l1.8 3.6 4 .6-2.9 2.8.7 4L8 11.5l-3.6 1.9.7-4L2.2 6.6l4-.6z" />
-            </svg>
-          </button>
-        </div>
+      <button
+        v-tip="'Следующая тема'"
+        class="am-tune__step"
+        type="button"
+        aria-label="Следующая тема"
+        :disabled="!canStep"
+        @click="onNext"
+      >
+        <svg class="am-tune__glyph am-tune__glyph--fill" viewBox="0 0 16 16" aria-hidden="true">
+          <path d="M4.1 3.5 9.8 8l-5.7 4.5z" />
+          <rect x="10.7" y="3.9" width="1.3" height="8.2" rx="0.65" />
+        </svg>
+      </button>
 
-        <button
-          v-tip="playHint"
-          class="am-tune__hit"
-          :class="{ 'am-tune__hit--live': playing }"
-          type="button"
-          :aria-label="playHint"
-          @click="onPlay"
-        >
-          <SakuraBloom />
-          <span class="am-tune__mark" aria-hidden="true">
-            <svg v-if="playing" class="am-tune__sign" viewBox="0 0 16 16">
-              <rect x="4" y="3.2" width="2.9" height="9.6" rx="1.2" />
-              <rect x="9.1" y="3.2" width="2.9" height="9.6" rx="1.2" />
-            </svg>
-            <svg v-else class="am-tune__sign" viewBox="0 0 16 16">
-              <path d="M5.2 3.4 12.4 8l-7.2 4.6z" />
-            </svg>
-          </span>
-        </button>
+      <span v-if="nowRow" class="am-tune__tag">{{ nowRow.tag }}</span>
 
-        <div class="am-tune__tools am-tune__tools--right">
-          <button
-            v-tip="loop ? 'Повтор включён' : 'Повторять тему'"
-            class="am-tune__tool"
-            :class="{ 'am-tune__tool--on': loop }"
-            type="button"
-            aria-label="Повторять тему"
-            @click="onLoop"
-          >
-            <svg class="am-tune__glyph" viewBox="0 0 16 16">
-              <path d="M4.4 5.2h5.2a2.8 2.8 0 0 1 2.8 2.8v.4" />
-              <path d="M11.6 10.8H6.4a2.8 2.8 0 0 1-2.8-2.8V7.6" />
-              <path d="M6.2 3.2 4.1 5.2l2.1 2" />
-              <path d="M9.8 12.8l2.1-2-2.1-2" />
-            </svg>
-          </button>
-
-          <button
-            v-tip="mute ? 'Включить звук' : 'Без звука'"
-            class="am-tune__tool"
-            type="button"
-            aria-label="Громкость"
-            @click="onMute"
-          >
-            <svg class="am-tune__glyph" viewBox="0 0 16 16">
-              <path d="M3 6.2h2.1L8.4 3.4v9.2L5.1 9.8H3z" />
-              <template v-if="!mute">
-                <path d="M10.6 6.1a2.6 2.6 0 0 1 0 3.8" />
-                <path d="M12.4 4.4a5 5 0 0 1 0 7.2" />
-              </template>
-              <template v-else>
-                <path d="M10.8 6.4l3.2 3.2" />
-                <path d="M14 6.4l-3.2 3.2" />
-              </template>
-            </svg>
-          </button>
-
-          <!-- Громкость тем же органом, что таймлайн, только короче: две разные
-               полосы в одном пульте читались бы деталями от разных приборов. -->
-          <div
-            class="am-tune__vol"
-            role="slider"
-            aria-label="Уровень громкости"
-            :aria-valuetext="volPart"
-            @pointerdown="onVolDown"
-            @pointermove="onVolMove"
-          >
-            <span class="am-tune__track">
-              <span class="am-tune__done" :style="{ width: volPart }" />
-            </span>
-            <span class="am-tune__knob" :style="{ left: volPart }" />
-          </div>
-        </div>
-      </div>
-
-      <!-- Полоса своя: у родного ползунка ни формы темы, ни нужной толщины.
-           Захват указателя нужен, чтобы тяга не срывалась за краем полосы. -->
-      <div class="am-tune__wave">
-        <span class="am-tune__clock">{{ atText }}</span>
-        <div
-          class="am-tune__seek"
-          :class="{ 'am-tune__seek--hold': drag }"
-          role="slider"
-          aria-label="Перемотка"
-          :aria-valuetext="`${atText} из ${lenText}`"
-          @pointerdown="onSeekDown"
-          @pointermove="onSeekMove"
-          @pointerup="onSeekUp"
-          @pointercancel="onSeekUp"
-        >
-          <span class="am-tune__track">
-            <span class="am-tune__done" :style="{ width: donePart }" />
-          </span>
-          <span class="am-tune__knob" :style="{ left: donePart }" />
-        </div>
-        <span class="am-tune__clock">{{ lenText }}</span>
-      </div>
-
-      <div class="am-tune__now">
-        <span v-if="nowRow" class="am-tune__nowtag">{{ nowRow.tag }}</span>
+      <!-- Подпись звучащего занимает всю середину полосы, а длинное название
+           режется многоточием: целиком оно в подсказке. -->
+      <span v-tip="nowRow ? rowLabel(nowRow) : 'Тема не выбрана'" class="am-tune__now">
         <span class="am-tune__nowname">{{ nowRow ? nowRow.title : 'Выберите тему' }}</span>
         <span v-if="nowRow && nowRow.artist" class="am-tune__nowartist">{{ nowRow.artist }}</span>
-      </div>
+      </span>
+
+      <span class="am-tune__clock">{{ atText }} / {{ lenText }}</span>
+
+      <button
+        v-tip="`Все темы: ${rows.length}`"
+        class="am-tune__open"
+        type="button"
+        aria-label="Все темы"
+        @click="openSheet"
+      >
+        <svg class="am-tune__glyph" viewBox="0 0 16 16" aria-hidden="true">
+          <path d="M3.4 4.6h9.2" />
+          <path d="M3.4 8h9.2" />
+          <path d="M3.4 11.4h6" />
+        </svg>
+        <span class="am-tune__opennum">{{ rows.length }}</span>
+      </button>
     </div>
 
-    <!-- Окно в четыре строки: остальные темы достаются прокруткой, и рост
-         блока от их числа не зависит. Ключ темы висит на пункте разметкой:
-         по нему звучащая строка доводится в видимую часть. -->
-    <ul ref="listBox" class="am-tune__list">
-      <!-- Пункт списка и есть строка: одежда, подсветка и рамка выбора на нём,
-           а кнопка выбора со спутниками — соседи внутри. Вложить кнопку
-           в кнопку вёрстка не позволяет. -->
-      <li
-        v-for="row in rows"
-        :key="row.key"
-        :data-key="row.key"
-        class="am-tune__item"
-        :class="{ 'am-tune__item--on': row.key === pick }"
-      >
-        <button
-          v-tip="row.audio === null ? 'Записи нет' : `Слушать ${row.tag}`"
-          class="am-tune__row"
-          :class="{ 'am-tune__row--mute': row.audio === null }"
-          type="button"
-          :disabled="row.audio === null"
-          @click="onRow(row)"
-        >
-          <!-- Три палочки у звучащей строки: место под знак занято всегда,
-               иначе пуск сдвигал бы названия соседних строк. -->
-          <span class="am-tune__beat" aria-hidden="true">
-            <span v-if="row.key === pick && playing" class="am-tune__beats">
-              <i /><i /><i />
-            </span>
-            <span v-else class="am-tune__dot" />
-          </span>
-
-          <span class="am-tune__tag">{{ row.tag }}</span>
-
-          <span class="am-tune__text">
-            <span class="am-tune__name">{{ row.title }}</span>
-            <span v-if="row.artist" class="am-tune__artist">{{ row.artist }}</span>
-          </span>
-        </button>
-
-        <!-- Три стриминга круглыми знаками, как ярлычки под постером. -->
-        <span class="am-tune__tunes">
-          <button
-            v-for="place in streamsFor(row)"
-            :key="place.brand"
-            v-tip="place.hint"
-            class="am-tune__jump"
-            type="button"
-            :aria-label="place.hint"
-            @click="openLink(place.url)"
-          >
-            <BrandMark class="am-tune__brand" :name="place.brand" />
-          </button>
-        </span>
-
-        <span class="am-tune__acts">
-          <button
-            v-tip="copied === row.key ? 'Скопировано' : 'Скопировать название и автора'"
-            class="am-tune__act"
-            :class="{ 'am-tune__act--done': copied === row.key }"
-            type="button"
-            aria-label="Скопировать название и автора"
-            @click="onCopy(row)"
-          >
-            <svg v-if="copied === row.key" class="am-tune__glyph" viewBox="0 0 16 16">
-              <path d="M3.6 8.4 6.4 11.2 12.4 5" />
-            </svg>
-            <svg v-else class="am-tune__glyph" viewBox="0 0 16 16">
-              <rect x="5.6" y="2.6" width="7.8" height="9.4" rx="1.6" />
-              <path d="M10.4 13.4H4.2a1.6 1.6 0 0 1-1.6-1.6V5.2" />
-            </svg>
-          </button>
-
-          <!-- Без звуковой записи скачивать нечего: у темы есть только подпись. -->
-          <button
-            v-tip="
-              row.audio === null
-                ? 'Записи нет'
-                : saving === row.key
-                  ? 'Скачивается…'
-                  : saved === row.key
-                    ? 'Сохранено'
-                    : 'Скачать трек'
-            "
-            class="am-tune__act"
-            :class="{
-              'am-tune__act--done': saved === row.key,
-              'am-tune__act--wait': saving === row.key,
-            }"
-            type="button"
-            :disabled="row.audio === null || saving !== null"
-            aria-label="Скачать трек"
-            @click="onSave(row)"
-          >
-            <svg v-if="saving === row.key" class="am-tune__glyph" viewBox="0 0 16 16">
-              <path d="M8 2.2a5.8 5.8 0 1 1-5.8 5.8" />
-            </svg>
-            <svg v-else-if="saved === row.key" class="am-tune__glyph" viewBox="0 0 16 16">
-              <path d="M3.6 8.4 6.4 11.2 12.4 5" />
-            </svg>
-            <svg v-else class="am-tune__glyph" viewBox="0 0 16 16">
-              <path d="M8 2.8v6.8" />
-              <path d="M5.2 7.2 8 10l2.8-2.8" />
-              <path d="M3.2 12.4h9.6" />
-            </svg>
-          </button>
-        </span>
-      </li>
-    </ul>
+    <!-- Таймлайн — нижняя кромка полосы: отдельного ряда у него нет, а тяга
+         идёт по тому же обработчику, что и в пульте. -->
+    <div
+      class="am-tune__seek"
+      :class="{ 'am-tune__seek--hold': drag }"
+      role="slider"
+      aria-label="Перемотка"
+      :aria-valuetext="`${atText} из ${lenText}`"
+      @pointerdown="onSeekDown"
+      @pointermove="onSeekMove"
+      @pointerup="onSeekUp"
+      @pointercancel="onSeekUp"
+    >
+      <span class="am-tune__track">
+        <span class="am-tune__done" :style="{ width: donePart }" />
+      </span>
+      <span class="am-tune__knob" :style="{ left: donePart }" />
+    </div>
   </div>
+
+  <!-- Окно тем: пульт целиком и полный список. Уезжает в body — окно поверх
+       всего, и с полосой по разметке оно не соседствует. -->
+  <Teleport to="body">
+    <div v-if="sheet && rows.length > 0" class="am-sheet am-tune__sheet">
+      <button class="am-sheet__veil" type="button" aria-label="Закрыть" @click="sheet = false" />
+
+      <div
+        class="am-sheet__box"
+        role="dialog"
+        aria-modal="true"
+        aria-label="Музыка тайтла"
+        @keydown="onKey"
+      >
+        <header class="am-sheet__top">
+          <h3 class="am-h3">Музыка</h3>
+          <span class="am-tune__count">{{ rows.length }}</span>
+          <span class="am-bar__gap" />
+          <button class="am-btn am-btn--ghost" type="button" @click="sheet = false">
+            Закрыть
+          </button>
+        </header>
+
+        <div class="am-sheet__body">
+            <div class="am-tune__deck">
+              <div class="am-tune__organs">
+                <!-- Левая сторона: порядок звучания — перемешивание и повтор.
+                     Раньше повтор стоял справа, рядом с громкостью, и правая
+                     колонка выходила на 40 пикселей шире левой: при узком окне
+                     именно она первая вылезала за панель. Теперь справа осталась
+                     только громкость, а колонки почти равны. -->
+                <div class="am-tune__tools am-tune__tools--left">
+                  <button
+                    v-tip="shuffle ? 'Перемешивание включено' : 'Перемешать темы'"
+                    class="am-tune__tool"
+                    :class="{ 'am-tune__tool--on': shuffle }"
+                    type="button"
+                    aria-label="Перемешать темы"
+                    :aria-pressed="shuffle"
+                    @click="onShuffle"
+                  >
+                    <svg class="am-tune__glyph" viewBox="0 0 16 16">
+                      <path d="M2.6 4.4h2.2l6 7.2h2.4" />
+                      <path d="M2.6 11.6h2.2l2.1-2.6" />
+                      <path d="M9.5 6.3l1.3-1.9h2.4" />
+                      <path d="M11.3 2.6l2 1.8-2 1.8" />
+                      <path d="M11.3 9.8l2 1.8-2 1.8" />
+                    </svg>
+                  </button>
+
+                  <button
+                    v-tip="loop ? 'Повтор включён' : 'Повторять тему'"
+                    class="am-tune__tool"
+                    :class="{ 'am-tune__tool--on': loop }"
+                    type="button"
+                    aria-label="Повторять тему"
+                    :aria-pressed="loop"
+                    @click="onLoop"
+                  >
+                    <svg class="am-tune__glyph" viewBox="0 0 16 16">
+                      <path d="M4.4 5.2h5.2a2.8 2.8 0 0 1 2.8 2.8v.4" />
+                      <path d="M11.6 10.8H6.4a2.8 2.8 0 0 1-2.8-2.8V7.6" />
+                      <path d="M6.2 3.2 4.1 5.2l2.1 2" />
+                      <path d="M9.8 12.8l2.1-2-2.1-2" />
+                    </svg>
+                  </button>
+                </div>
+
+                <div class="am-tune__mid">
+                  <!-- Шаг стоит рядом с пуском, а не в сторонах пульта: это один орган —
+                       перевод звучащего, — и разносить его по краям значило бы тянуться
+                       через весь блок. Размер общий с остальными органами: пуск крупнее
+                       не от важности, а потому что его рисует распускающаяся сакура,
+                       и у неё свой слой. -->
+                  <button
+                    v-tip="'Предыдущая тема'"
+                    class="am-tune__tool"
+                    type="button"
+                    aria-label="Предыдущая тема"
+                    :disabled="!canStep"
+                    @click="onPrev"
+                  >
+                    <svg class="am-tune__glyph am-tune__glyph--fill" viewBox="0 0 16 16" aria-hidden="true">
+                      <path d="M11.9 3.5 6.2 8l5.7 4.5z" />
+                      <rect x="4" y="3.9" width="1.3" height="8.2" rx="0.65" />
+                    </svg>
+                  </button>
+
+                  <button
+                    v-tip="playHint"
+                    class="am-tune__hit"
+                    :class="{ 'am-tune__hit--live': playing }"
+                    type="button"
+                    :aria-label="playHint"
+                    @click="onPlay"
+                  >
+                    <SakuraBloom />
+                    <span class="am-tune__mark" aria-hidden="true">
+                      <svg v-if="playing" class="am-tune__sign" viewBox="0 0 16 16">
+                        <rect x="4" y="3.2" width="2.9" height="9.6" rx="1.2" />
+                        <rect x="9.1" y="3.2" width="2.9" height="9.6" rx="1.2" />
+                      </svg>
+                      <svg v-else class="am-tune__sign" viewBox="0 0 16 16">
+                        <path d="M5.2 3.4 12.4 8l-7.2 4.6z" />
+                      </svg>
+                    </span>
+                  </button>
+
+                  <button
+                    v-tip="'Следующая тема'"
+                    class="am-tune__tool"
+                    type="button"
+                    aria-label="Следующая тема"
+                    :disabled="!canStep"
+                    @click="onNext"
+                  >
+                    <svg class="am-tune__glyph am-tune__glyph--fill" viewBox="0 0 16 16" aria-hidden="true">
+                      <path d="M4.1 3.5 9.8 8l-5.7 4.5z" />
+                      <rect x="10.7" y="3.9" width="1.3" height="8.2" rx="0.65" />
+                    </svg>
+                  </button>
+                </div>
+
+                <!-- Правая сторона: громкость. -->
+                <div class="am-tune__tools am-tune__tools--right">
+                  <button
+                    v-tip="mute ? 'Включить звук' : 'Без звука'"
+                    class="am-tune__tool"
+                    type="button"
+                    aria-label="Громкость"
+                    @click="onMute"
+                  >
+                    <svg class="am-tune__glyph" viewBox="0 0 16 16">
+                      <path d="M3 6.2h2.1L8.4 3.4v9.2L5.1 9.8H3z" />
+                      <template v-if="!mute">
+                        <path d="M10.6 6.1a2.6 2.6 0 0 1 0 3.8" />
+                        <path d="M12.4 4.4a5 5 0 0 1 0 7.2" />
+                      </template>
+                      <template v-else>
+                        <path d="M10.8 6.4l3.2 3.2" />
+                        <path d="M14 6.4l-3.2 3.2" />
+                      </template>
+                    </svg>
+                  </button>
+
+                  <!-- Громкость тем же органом, что таймлайн, только короче: две разные
+                       полосы в одном пульте читались бы деталями от разных приборов. -->
+                  <div
+                    class="am-tune__vol"
+                    role="slider"
+                    aria-label="Уровень громкости"
+                    :aria-valuetext="volPart"
+                    @pointerdown="onVolDown"
+                    @pointermove="onVolMove"
+                  >
+                    <span class="am-tune__track">
+                      <span class="am-tune__done" :style="{ width: volPart }" />
+                    </span>
+                    <span class="am-tune__knob" :style="{ left: volPart }" />
+                  </div>
+                </div>
+              </div>
+
+              <!-- Полоса своя: у родного ползунка ни формы темы, ни нужной толщины.
+                   Захват указателя нужен, чтобы тяга не срывалась за краем полосы. -->
+              <div class="am-tune__wave">
+                <span class="am-tune__clock">{{ atText }}</span>
+                <div
+                  class="am-tune__seek"
+                  :class="{ 'am-tune__seek--hold': drag }"
+                  role="slider"
+                  aria-label="Перемотка"
+                  :aria-valuetext="`${atText} из ${lenText}`"
+                  @pointerdown="onSeekDown"
+                  @pointermove="onSeekMove"
+                  @pointerup="onSeekUp"
+                  @pointercancel="onSeekUp"
+                >
+                  <span class="am-tune__track">
+                    <span class="am-tune__done" :style="{ width: donePart }" />
+                  </span>
+                  <span class="am-tune__knob" :style="{ left: donePart }" />
+                </div>
+                <span class="am-tune__clock">{{ lenText }}</span>
+              </div>
+
+              <div class="am-tune__now">
+                <span v-if="nowRow" class="am-tune__nowtag">{{ nowRow.tag }}</span>
+                <span class="am-tune__nowname">{{ nowRow ? nowRow.title : 'Выберите тему' }}</span>
+                <span v-if="nowRow && nowRow.artist" class="am-tune__nowartist">{{ nowRow.artist }}</span>
+              </div>
+            </div>
+
+            <!-- Окно в четыре строки: остальные темы достаются прокруткой, и рост
+                 блока от их числа не зависит. Ключ темы висит на пункте разметкой:
+                 по нему звучащая строка доводится в видимую часть. -->
+            <ul ref="listBox" class="am-tune__list">
+              <!-- Пункт списка и есть строка: одежда, подсветка и рамка выбора на нём,
+                   а кнопка выбора со спутниками — соседи внутри. Вложить кнопку
+                   в кнопку вёрстка не позволяет. -->
+              <li
+                v-for="row in rows"
+                :key="row.key"
+                :data-key="row.key"
+                class="am-tune__item"
+                :class="{ 'am-tune__item--on': row.key === pick }"
+              >
+                <button
+                  v-tip="row.audio === null ? 'Записи нет' : `Слушать ${row.tag}`"
+                  class="am-tune__row"
+                  :class="{ 'am-tune__row--mute': row.audio === null }"
+                  type="button"
+                  :disabled="row.audio === null"
+                  @click="onRow(row)"
+                >
+                  <!-- Три палочки у звучащей строки: место под знак занято всегда,
+                       иначе пуск сдвигал бы названия соседних строк. -->
+                  <span class="am-tune__beat" aria-hidden="true">
+                    <span v-if="row.key === pick && playing" class="am-tune__beats">
+                      <i /><i /><i />
+                    </span>
+                    <span v-else class="am-tune__dot" />
+                  </span>
+
+                  <span class="am-tune__tag">{{ row.tag }}</span>
+
+                  <span class="am-tune__text">
+                    <span class="am-tune__name">{{ row.title }}</span>
+                    <span v-if="row.artist" class="am-tune__artist">{{ row.artist }}</span>
+                  </span>
+                </button>
+
+                <!-- Три стриминга круглыми знаками, как ярлычки под постером. -->
+                <span class="am-tune__tunes">
+                  <button
+                    v-for="place in streamsFor(row)"
+                    :key="place.brand"
+                    v-tip="place.hint"
+                    class="am-tune__jump"
+                    type="button"
+                    :aria-label="place.hint"
+                    @click="openLink(place.url)"
+                  >
+                    <BrandMark class="am-tune__brand" :name="place.brand" />
+                  </button>
+                </span>
+
+                <span class="am-tune__acts">
+                  <button
+                    v-tip="copied === row.key ? 'Скопировано' : 'Скопировать название и автора'"
+                    class="am-tune__act"
+                    :class="{ 'am-tune__act--done': copied === row.key }"
+                    type="button"
+                    aria-label="Скопировать название и автора"
+                    @click="onCopy(row)"
+                  >
+                    <svg v-if="copied === row.key" class="am-tune__glyph" viewBox="0 0 16 16">
+                      <path d="M3.6 8.4 6.4 11.2 12.4 5" />
+                    </svg>
+                    <svg v-else class="am-tune__glyph" viewBox="0 0 16 16">
+                      <rect x="5.6" y="2.6" width="7.8" height="9.4" rx="1.6" />
+                      <path d="M10.4 13.4H4.2a1.6 1.6 0 0 1-1.6-1.6V5.2" />
+                    </svg>
+                  </button>
+
+                  <!-- Без звуковой записи скачивать нечего: у темы есть только подпись. -->
+                  <button
+                    v-tip="
+                      row.audio === null
+                        ? 'Записи нет'
+                        : saving === row.key
+                          ? 'Скачивается…'
+                          : saved === row.key
+                            ? 'Сохранено'
+                            : 'Скачать трек'
+                    "
+                    class="am-tune__act"
+                    :class="{
+                      'am-tune__act--done': saved === row.key,
+                      'am-tune__act--wait': saving === row.key,
+                    }"
+                    type="button"
+                    :disabled="row.audio === null || saving !== null"
+                    aria-label="Скачать трек"
+                    @click="onSave(row)"
+                  >
+                    <svg v-if="saving === row.key" class="am-tune__glyph" viewBox="0 0 16 16">
+                      <path d="M8 2.2a5.8 5.8 0 1 1-5.8 5.8" />
+                    </svg>
+                    <svg v-else-if="saved === row.key" class="am-tune__glyph" viewBox="0 0 16 16">
+                      <path d="M3.6 8.4 6.4 11.2 12.4 5" />
+                    </svg>
+                    <svg v-else class="am-tune__glyph" viewBox="0 0 16 16">
+                      <path d="M8 2.8v6.8" />
+                      <path d="M5.2 7.2 8 10l2.8-2.8" />
+                      <path d="M3.2 12.4h9.6" />
+                    </svg>
+                  </button>
+                </span>
+              </li>
+            </ul>
+        </div>
+      </div>
+    </div>
+  </Teleport>
 </template>
 
 <style scoped>
-.am-tune {
+/* Токены роста списка. Объявлены и на полосе, и на окне: список живёт
+   в окне, а окно уезжает в body — общего предка у них нет, и унаследовать
+   эти числа от полосы окну нечем. */
+.am-tune,
+.am-tune__sheet {
   /* На этих числах стоит рост окна списка: строка в 36px — это 32px кнопки
      строки и по 2px отступов пункта, просвет между строками 2px. Токенами,
      а не числом в max-height: подобранная высота разъезжалась бы с первой
-     же правкой отступов строки, и снизу оставалась бы полоска пятой. */
+     же правкой отступов строки, и снизу оставалась бы полоска седьмой. */
   --am-tune-row: 36px;
   --am-tune-gap: 2px;
+}
+
+/* ПОЛОСА. Одна строка над нижней кромкой окна: сверху органы и подпись
+   звучащего, снизу таймлайн во всю ширину. Липнет к низу — под ней уже
+   оставлено поле в .am-view, поэтому ни одной плитки она не накрывает.
+
+   Стекло, а не плотная заливка: под полосой проезжают плитки доски,
+   и глухая плашка читалась бы дырой в странице. */
+.am-tune {
+  position: sticky;
+  bottom: 0;
+  z-index: 5;
 
   display: flex;
   flex-direction: column;
-  gap: 12px;
   min-width: 0;
+  padding: 4px 12px 0;
+  /* Стекло плотнее общего: полоса липнет к низу и едет поверх содержимого
+     карточки, а сквозь прежнее стекло читались строки под ней — полоса
+     выглядела не полосой, а пятном. Насквозь всё же видно: под ней должно
+     угадываться, что страница кончилась. */
+  background: var(--am-glass-deep);
+  border: 1px solid var(--am-line-soft);
+  border-radius: var(--am-r-l);
+  box-shadow: var(--am-sh-2);
+  backdrop-filter: blur(var(--am-blur-strong)) saturate(1.25);
 }
 
-.am-tune__head {
+/* Верхний ряд полосы: шаг, пуск, тема, время, кнопка списка. Высота задана,
+   а не набрана содержимым: по ней же посчитан рост полосы.
+
+   Имя с __top, а не с __row: __row занято кнопкой строки списка, и общее имя
+   связало бы ростом два разных предмета. */
+.am-tune__top {
   display: flex;
   gap: 10px;
   align-items: center;
+  height: 34px;
+  min-width: 0;
 }
 
-.am-tune__head .am-h3 {
-  margin: 0;
+/* ПУСК В ПОЛОСЕ МЕНЬШЕ, ЧЕМ В ПУЛЬТЕ. Сорок шесть пикселей здесь задавали бы
+   рост всей полосы, а цветку и на тридцати двух есть где распуститься:
+   нависание за край уменьшено вместе с кнопкой. */
+.am-tune .am-tune__hit {
+  --am-bloom-out: 2px;
+
+  width: 32px;
+  height: 32px;
+}
+
+/* Шаг по темам — круглыш того же роста, что кнопка списка: органы одной
+   полосы должны быть одного размера, иначе ряд читается кривым. */
+.am-tune__step,
+.am-tune__open {
+  display: grid;
+  flex: none;
+  place-items: center;
+  height: 26px;
+  padding: 0;
+  color: var(--am-dim);
+  cursor: pointer;
+  background: none;
+  border: 0;
+  border-radius: var(--am-r-cap);
+  transition:
+    color var(--am-fast) var(--am-ease),
+    background-color var(--am-fast) var(--am-ease);
+}
+
+.am-tune__step {
+  width: 26px;
+}
+
+.am-tune__step:hover,
+.am-tune__step:focus-visible,
+.am-tune__open:hover,
+.am-tune__open:focus-visible {
+  color: var(--am-text);
+  background: var(--am-fill-2);
+}
+
+.am-tune__step:disabled {
+  color: var(--am-faint);
+  cursor: default;
+}
+
+.am-tune__step:disabled:hover {
+  background: none;
+}
+
+/* Кнопка списка шире прочих: в ней кнопка и счётчик тем одним органом.
+   Счётчик — часть кнопки, а не подпись рядом: нажатие одно. */
+.am-tune__open {
+  grid-auto-flow: column;
+  gap: 5px;
+  padding: 0 8px;
+}
+
+.am-tune__opennum {
+  font-size: 11px;
+  font-weight: 650;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Подпись звучащего занимает всю середину полосы и прижата влево:
+   центровка осталась пульту, где ей есть что центровать. */
+.am-tune .am-tune__now {
+  flex: 1;
+  justify-content: flex-start;
+}
+
+/* Таймлайн нижней кромкой: своя высота, растягиваться ему некуда —
+   в колонке полосы рост по главной оси был бы вертикальным. */
+.am-tune .am-tune__seek {
+  flex: none;
+  height: 14px;
+}
+
+/* Знаки полосы мельче, чем в пульте: девятнадцать пикселей на кнопке
+   в двадцать шесть — это знак во всю кнопку, без воздуха вокруг. */
+.am-tune .am-tune__glyph {
+  width: 15px;
+  height: 15px;
 }
 
 /* Счётчик тем бледной пилюлей: цифра рядом с заголовком заменяет подпись
@@ -954,6 +1291,99 @@ onBeforeUnmount(stop)
   background: var(--am-fill-1);
   border-radius: var(--am-r-cap);
   font-variant-numeric: tabular-nums;
+}
+
+/* ОКНО ТЕМ. Тот же приём, что у подбора и записи в список: затемнение,
+   коробка по центру, шапка на месте, ездит только середина. Имена классов
+   общие с теми окнами (.am-sheet и его части), а правила свои: у каждого окна
+   здесь свой scoped-блок, и эта копия — четвёртая по той же причине, что
+   и три предыдущие. Свести их в один общий стиль — отдельная работа.
+
+   Ширина 760: строка темы — это знак, номер, название, исполнитель и пять
+   кнопок, и в узкой коробке они не помещаются в одну строку. */
+.am-sheet {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: clamp(12px, 3vw, 32px);
+}
+
+/* Занавес — кнопка: клик мимо коробки закрывает, и это доступно с клавиатуры. */
+.am-sheet__veil {
+  position: absolute;
+  inset: 0;
+  padding: 0;
+  cursor: default;
+  background: var(--am-veil);
+  border: 0;
+  backdrop-filter: blur(6px);
+  animation: am-tune-veil var(--am-mid) var(--am-ease) both;
+}
+
+.am-sheet__box {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  width: min(760px, 100%);
+  max-height: min(86vh, 900px);
+  overflow: hidden;
+  background: var(--am-panel);
+  border: 1px solid var(--am-line);
+  border-radius: var(--am-r-drop);
+  box-shadow:
+    var(--am-sh-2),
+    inset 0 1px 0 var(--am-edge);
+  animation: am-tune-in var(--am-mid) var(--am-ease-soft) both;
+}
+
+@keyframes am-tune-veil {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes am-tune-in {
+  from {
+    opacity: 0;
+    transform: translateY(14px) scale(0.985);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* Шапка держится на месте: список тем длинный, и уехавший заголовок
+   с кнопкой закрытия заставлял бы искать их прокруткой. */
+.am-sheet__top {
+  display: flex;
+  flex: 0 0 auto;
+  gap: 10px;
+  align-items: center;
+  padding: 14px clamp(14px, 1.8vw, 22px);
+  border-bottom: 1px solid var(--am-line-soft);
+}
+
+.am-sheet__top .am-h3 {
+  margin: 0;
+}
+
+/* Середина окна ездит сама: пульт и список вместе выше коробки. */
+.am-sheet__body {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  gap: 12px;
+  min-height: 0;
+  padding: 14px clamp(14px, 1.8vw, 22px) 16px;
+  overflow-y: auto;
+  overscroll-behavior-y: contain;
 }
 
 /* Пульт тремя рядами по центру: органы, таймлайн, подпись звучащего. */
@@ -970,8 +1400,13 @@ onBeforeUnmount(stop)
 /* Центр держит сетка, а не подобранные отступы: крайние колонки равные,
    и цветок в средней стоит по середине панели при любой ширине боковых
    групп. Просвет колонок широкий нарочно — мелкие органы не должны
-   липнуть к цветку. */
+   липнуть к цветку.
+
+   Ряд — контейнер для запроса по ширине: именно по нему решается,
+   помещается ли громкость (правило ниже). Ставлю на ряд, а не на панель:
+   у ряда нет отступов и рамки, и порог считается по чистой ширине. */
 .am-tune__organs {
+  container-type: inline-size;
   display: grid;
   grid-template-columns: 1fr auto 1fr;
   gap: 18px;
@@ -1131,10 +1566,39 @@ onBeforeUnmount(stop)
 }
 
 /* Громкость короче таймлайна, но не огрызок: на шестидесяти пикселях
-   одно деление шло шесть процентов, и уровень выставлялся наугад. */
+   одно деление шло шесть процентов, и уровень выставлялся наугад.
+
+   СЖИМАЕТСЯ, А НЕ ВЫЛЕЗАЕТ. Прежде здесь стояло flex: none, и ползунок
+   держал свои 96 пикселей при любой ширине панели: в узком окне правая
+   группа не влезала в свою колонку сетки (колонки равные, а правая была
+   почти вдвое шире левой) и ползунок выезжал за панель. Теперь база 96
+   и разрешение сжаться: при свободном месте ползунок держит свои 96,
+   при тесном отдаёт ширину первым. Именно первым — кнопка звука важнее,
+   потому что одна выключает звук совсем. */
 .am-tune__vol {
-  flex: none;
-  width: 96px;
+  flex: 0 1 96px;
+  min-width: 0;
+}
+
+/* ПРЕДОХРАНИТЕЛЬ. Ползунок сжимается, но ниже 48 пикселей он перестаёт
+   быть органом: деление идёт по два процента, попасть мышью нечем.
+   Там он убирается вовсе — но не звук: кнопка рядом остаётся, выключить
+   звук по-прежнему можно.
+
+   ПОЧЕМУ ЗАПРОС ПО КОНТЕЙНЕРУ, А НЕ ПО ОКНУ. Ширина панели зависит от
+   раскладки карточки, а не от окна: одно и то же окно даёт разную
+   панель в зависимости от соседних колонок, и медиазапрос срабатывал
+   бы вразнобой. container-type: inline-size стоит на ряде органов —
+   у него нет ни отступов, ни рамки, поэтому порог считается прямо
+   по его ширине.
+
+   ПОРОГ 340. Ряд: две равные колонки, между ними цветок с шагом (130)
+   и два просвета по 18. На ползунок остаётся (340 − 166) / 2 − 40 = 47
+   пикселей — ровно тот предел, где он ещё что-то значит. */
+@container (max-width: 340px) {
+  .am-tune__vol {
+    display: none;
+  }
 }
 
 .am-tune__track {
@@ -1175,8 +1639,24 @@ onBeforeUnmount(stop)
   transform: translate(-50%, -50%) rotate(38deg) scale(1.1);
 }
 
-/* Боковые группы прижаты к цветку, а не растянуты по клетке: иначе органы
-   уехали бы к краям панели, а центр держался бы только на честном слове. */
+/* Середина пульта: шаг по списку и пуск одним рядом. Зазор уже, чем между
+   колонками сетки: шаг и пуск — один орган, и зазор в 18 пикселей разорвал
+   бы его натрое. */
+.am-tune__mid {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+/* Боковые группы занимают свою колонку целиком, а к цветку прижимают
+   содержимое (justify-content), не себя. Раньше прижималась сама группа
+   через justify-self, и в этом заключалась поломка: при justify-self
+   ширина группы мерится по содержимому, то есть ползунок обязан был
+   занять свои 96 пикселей всегда — сжиматься ему было некуда, минимум
+   колонки сетки поднимался до 136, и всё, что не влезло, выезжало
+   за панель. Теперь у группы definite-ширина колонки, ползунок внутри
+   неё сжимается как обычный flex-элемент, а органы по-прежнему стоят
+   вплотную к цветку. */
 .am-tune__tools {
   display: flex;
   gap: 6px;
@@ -1185,11 +1665,11 @@ onBeforeUnmount(stop)
 }
 
 .am-tune__tools--left {
-  justify-self: end;
+  justify-content: flex-end;
 }
 
 .am-tune__tools--right {
-  justify-self: start;
+  justify-content: flex-start;
 }
 
 /* Органы пульта размером под палец, а не под прицел: рядом
@@ -1217,6 +1697,18 @@ onBeforeUnmount(stop)
   background: var(--am-fill-2);
 }
 
+/* Шаг выключен, когда тема со звуком одна: шагать некуда, и кнопка
+   говорит об этом, а не молча повторяет ту же тему с начала. */
+.am-tune__tool:disabled {
+  color: var(--am-faint);
+  cursor: default;
+  opacity: 0.4;
+}
+
+.am-tune__tool:disabled:hover {
+  background: none;
+}
+
 /* Включённый орган светится акцентом: без этого состояние кнопки
    приходилось бы проверять на слух. */
 .am-tune__tool--on {
@@ -1234,22 +1726,31 @@ onBeforeUnmount(stop)
   stroke-linejoin: round;
 }
 
-/* Залитый знак у звёздочки: обвод и заливка различают «в избранном»
-   и «добавить» надёжнее, чем один цвет. */
-.am-tune__glyph--full {
+/* Заливкой, а не обводкой: треугольник шага — сплошной знак, и обведённый
+   на девятнадцати пикселях он читается пустой скобкой. Так же нарисован
+   и знак пуска (.am-tune__sign), так что рядом они одной плотности.
+
+   Обводка снята целиком, а не у треугольника: полоса записана прямоугольником
+   именно потому, что заливка должна накрыть и её, — отрезком она осталась бы
+   нулевой ширины и пропала. */
+.am-tune__glyph--fill {
   fill: currentcolor;
+  stroke: none;
 }
 
-/* Окно списка ростом ровно в четыре строки: пятая и дальше достаются
+/* Окно списка ростом ровно в шесть строк: седьмая и дальше достаются
    прокруткой. Просветы в счёте участвуют — без них снизу выглядывала бы
-   полоска пятой строки и обещала бы больше, чем видно. Прокрутка не уходит
+   полоска седьмой строки и обещала бы больше, чем видно. Прокрутка не уходит
    на страницу: докрутив список до конца, человек продолжал бы листать
-   карточку и терял бы блок из вида. */
+   окно и терял бы строки из вида.
+
+   Шесть, а не четыре, как было в плитке: список переехал в окно, и высота
+   его больше не поджимает карточку — тем у One Piece двенадцать. */
 .am-tune__list {
   display: flex;
   flex-direction: column;
   gap: var(--am-tune-gap);
-  max-height: calc(var(--am-tune-row) * 4 + var(--am-tune-gap) * 3);
+  max-height: calc(var(--am-tune-row) * 6 + var(--am-tune-gap) * 5);
   margin: 0;
   padding: 0;
   overflow-y: auto;

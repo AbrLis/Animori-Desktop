@@ -38,6 +38,30 @@
 // порядком дня и месяца по языку системы. Теперь дату берёт DatePick:
 // один календарь на все темы, по-русски и с «Сегодня»/«Стереть» внутри,
 // поэтому внешняя кнопка «Сегодня» рядом с полем больше не нужна.
+//
+// ЧЕРНОВИК, А НЕ ПРАВКА НАПРЯМУЮ
+//
+// Прежде каждое нажатие уходило наружу сразу: тронул оценку — запись
+// изменилась, даже если передумал и вышел крестиком. Отменять было
+// нечего и нечем, шторка не держала своего состояния вовсе.
+//
+// Теперь шторка правит черновик, а наружу уходит только «Готово»: оно
+// отдаёт все разошедшиеся поля разом. Крестик, подложка и Escape
+// черновик выбрасывают. Пока правка уходит в момент нажатия, слова
+// «не сохранять» на крестике были бы неправдой — это и есть причина
+// переделки, а не просто порядок кнопок.
+//
+// ПОДТВЕРЖДЕНИЕ НА КНОПКЕ
+//
+// «Готово» отвечает: кнопка на короткое время становится «Сохранено»
+// с галочкой, и только потом шторка закрывается. Без этого ответа
+// сохранение видно лишь по исчезнувшей шторке — а исчезает она
+// одинаково и при сохранении, и при отмене: было ли записано, узнать
+// неоткуда. Подтверждение — ответ на вопрос, а не украшение.
+//
+// Правок не было — шторка закрывается сразу, без «Сохранено»:
+// подтверждать нечего, а сказать «сохранено» про нетронутую запись
+// значит соврать.
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 
 import { partsWord, statusList, statusWord } from '../labels'
@@ -47,6 +71,9 @@ import SakuraBloom from './SakuraBloom.vue'
 
 /** Шаг оценки. Десятибалльная шкала у AniList дробная, половины достаточно. */
 const SCORE_STEP = 0.5
+
+/** Сколько кнопка «Готово» держит подтверждение, прежде чем закрыть шторку. */
+const SAVE_HOLD = 900
 
 /** Быстрые оценки одним нажатием: целые баллы шкалы. */
 const QUICK_MARKS: ReadonlyArray<number> = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
@@ -84,11 +111,24 @@ const emit = defineEmits<{
 const statuses = statusList()
 const partsName = partsWord()
 
-const nowStatus = computed(() => statusWord(props.status === '' ? null : props.status))
+// Черновик записи. Правится только он; наружу уходит по «Готово».
+// Даты держатся строкой, а не string | null: так их отдаёт DatePick,
+// и пустая строка у него — законный ответ «даты нет». Сравнение с тем,
+// что пришло сверху, идёт через ?? '' по той же причине.
+const pickStatus = ref(props.status)
+const pickScore = ref(props.score10)
+const pickProgress = ref(props.progress)
+const pickRepeat = ref(props.repeat)
+const pickStarted = ref(props.startedAt ?? '')
+const pickCompleted = ref(props.completedAt ?? '')
+
+const nowStatus = computed(() => statusWord(pickStatus.value === '' ? null : pickStatus.value))
 
 /** Строка счёта вида «7 из 12». Неизвестный итог не выдумывается. */
 const partsText = computed(() =>
-  props.partsTotal === null ? String(props.progress) : `${props.progress} из ${props.partsTotal}`,
+  props.partsTotal === null
+    ? String(pickProgress.value)
+    : `${pickProgress.value} из ${props.partsTotal}`,
 )
 
 /** Подпись прыжка к потолку: у онгоинга это край вышедшего, а не конец. */
@@ -97,18 +137,22 @@ const endHint = computed(() => (props.ongoing === true ? 'До вышедшег�
 /** Доля пройденного для полосы. */
 const donePart = computed(() => {
   const total = props.partsTotal
-  if (total === null || total <= 0) return props.status === 'COMPLETED' ? '100%' : '0%'
+  if (total === null || total <= 0) return pickStatus.value === 'COMPLETED' ? '100%' : '0%'
 
-  const part = Math.min(1, Math.max(0, props.progress / total))
+  const part = Math.min(1, Math.max(0, pickProgress.value / total))
   return `${Math.round(part * 100)}%`
 })
 
 /**
- * Черновик комментария. Поле правится часто и мелко, а каждая буква наружу —
- * это правка записи и взвод записи снимка, поэтому отдаём по уходу из поля.
+ * Черновик комментария. Теперь это часть общего черновика: наружу он
+ * уходит вместе со всем остальным по «Готово», а не по уходу из поля.
  */
 const draft = ref(props.notes ?? '')
 let lastSent = props.notes ?? ''
+
+/** Кнопка «Готово» отвечает «Сохранено» и держит ответ SAVE_HOLD. */
+const saved = ref(false)
+let hold: number | null = null
 
 // Значение сверху могло измениться обновлением списка: подхватываем, но не
 // затираем то, что человек уже набрал в поле.
@@ -140,13 +184,12 @@ function markStyle(mark: number): Record<string, string> {
 
 /** Оценка шагом шкалы, с обрезкой по краям: шкала списка — от 0 до 10. */
 function bumpScore(delta: number): void {
-  const next = Math.round((props.score10 + delta) / SCORE_STEP) * SCORE_STEP
-  const fixed = Math.min(10, Math.max(0, Math.round(next * 10) / 10))
-  if (fixed !== props.score10) emit('score', fixed)
+  const next = Math.round((pickScore.value + delta) / SCORE_STEP) * SCORE_STEP
+  pickScore.value = Math.min(10, Math.max(0, Math.round(next * 10) / 10))
 }
 
 function setScore(value: number): void {
-  if (value !== props.score10) emit('score', value)
+  pickScore.value = value
 }
 
 /**
@@ -156,24 +199,22 @@ function setScore(value: number): void {
  */
 function finishParts(): void {
   if (props.ongoing === true) return
-  if (props.status !== 'COMPLETED') emit('status', 'COMPLETED')
-  if (props.completedAt === null) emit('completedAt', today())
+  if (pickStatus.value !== 'COMPLETED') pickStatus.value = 'COMPLETED'
+  if (pickCompleted.value === '') pickCompleted.value = today()
 }
 
 /** Счёт серий шагом. Выше известного итога не пускаем: больше, чем есть, не посмотришь. */
 function bumpProgress(delta: number): void {
   const total = props.partsTotal
-  const next = props.progress + delta
-  const fixed = Math.max(0, total === null ? next : Math.min(total, next))
-  if (fixed === props.progress) return
+  const next = pickProgress.value + delta
+  pickProgress.value = Math.max(0, total === null ? next : Math.min(total, next))
 
-  emit('progress', fixed)
-  if (total !== null && fixed >= total) finishParts()
+  if (total !== null && pickProgress.value >= total) finishParts()
 }
 
 /** Прыжок к началу счёта. Закладку не трогает: ноль серий — это не «брошено». */
 function resetParts(): void {
-  if (props.progress !== 0) emit('progress', 0)
+  pickProgress.value = 0
 }
 
 /**
@@ -184,14 +225,13 @@ function fillParts(): void {
   const total = props.partsTotal
   if (total === null) return
 
-  if (total !== props.progress) emit('progress', total)
+  pickProgress.value = total
   finishParts()
 }
 
 /** Пересмотры. Потолка у них нет, а ниже нуля уходить бессмысленно. */
 function bumpRepeat(delta: number): void {
-  const fixed = Math.max(0, props.repeat + delta)
-  if (fixed !== props.repeat) emit('repeat', fixed)
+  pickRepeat.value = Math.max(0, pickRepeat.value + delta)
 }
 
 /** Сегодняшний день в виде ГГГГ-ММ-ДД. Через метку времени день съезжал бы. */
@@ -203,30 +243,76 @@ function today(): string {
   return `${now.getFullYear()}-${pad(month)}-${pad(day)}`
 }
 
-/** Пустая строка наружу значит «стереть дату»: так договорились с коллекцией. */
 function onStarted(value: string): void {
-  emit('startedAt', value)
+  pickStarted.value = value
 }
 
 function onCompleted(value: string): void {
-  emit('completedAt', value)
+  pickCompleted.value = value
 }
 
-function sendNotes(): void {
+/** Разошёлся ли черновик с тем, что пришло сверху. */
+function hasEdits(): boolean {
+  return (
+    pickStatus.value !== props.status ||
+    pickScore.value !== props.score10 ||
+    pickProgress.value !== props.progress ||
+    pickRepeat.value !== props.repeat ||
+    pickStarted.value !== (props.startedAt ?? '') ||
+    pickCompleted.value !== (props.completedAt ?? '') ||
+    draft.value.trim() !== lastSent
+  )
+}
+
+/**
+ * Отдаёт наружу все разошедшиеся поля разом. Неизменённые не трогает:
+ * лишняя правка записи — это лишняя запись в журнал и лишний взвод
+ * снимка, а человек её не просил.
+ *
+ * Пустая строка в датах значит «стереть»: так договорились с коллекцией.
+ */
+function commit(): void {
+  if (pickStatus.value !== props.status) emit('status', pickStatus.value)
+  if (pickScore.value !== props.score10) emit('score', pickScore.value)
+  if (pickProgress.value !== props.progress) emit('progress', pickProgress.value)
+  if (pickRepeat.value !== props.repeat) emit('repeat', pickRepeat.value)
+  if (pickStarted.value !== (props.startedAt ?? '')) emit('startedAt', pickStarted.value)
+  if (pickCompleted.value !== (props.completedAt ?? '')) emit('completedAt', pickCompleted.value)
+
   const asked = draft.value.trim()
   if (asked === lastSent) return
   lastSent = asked
   emit('notes', asked)
 }
 
-function onClose(): void {
-  sendNotes()
+/** «Готово»: сохраняет черновик и отвечает на кнопке. */
+function onDone(): void {
+  // Повторное нажатие во время подтверждения: закрытие уже назначено.
+  if (saved.value) return
+
+  if (!hasEdits()) {
+    emit('close')
+    return
+  }
+
+  commit()
+  saved.value = true
+  hold = window.setTimeout(() => emit('close'), SAVE_HOLD)
+}
+
+/**
+ * Крестик, подложка и Escape: черновик выбрасывается, наружу не уходит
+ * ничего. Раньше здесь дописывался комментарий «уход мимо кнопки
+ * «Готово» не должен терять набранный текст» — теперь ровно наоборот:
+ * потеря набранного и есть смысл этого пути.
+ */
+function onDrop(): void {
   emit('close')
 }
 
 /** Закрытие по Escape: окно поверх экрана без этого раздражает. */
 function onKey(event: KeyboardEvent): void {
-  if (event.key === 'Escape') onClose()
+  if (event.key === 'Escape') onDrop()
 }
 
 onMounted(() => {
@@ -235,8 +321,9 @@ onMounted(() => {
 
 onBeforeUnmount(() => {
   window.removeEventListener('keydown', onKey)
-  // Уход мимо кнопки «Готово» тоже не должен терять набранный текст.
-  sendNotes()
+  // Таймер держит ссылку на шторку: без снятия он дотянет до закрытия
+  // уже убранного окна, а emit('close') после этого — лишний.
+  if (hold !== null) clearTimeout(hold)
 })
 </script>
 
@@ -244,7 +331,7 @@ onBeforeUnmount(() => {
   <!-- Перенос в body: причина в шапке файла, коротко — fixed внутри экрана
        мерился от списка, а не от окна браузера. -->
   <Teleport to="body">
-    <div class="am-sheet" role="dialog" aria-modal="true" @click.self="onClose">
+    <div class="am-sheet" role="dialog" aria-modal="true" @click.self="onDrop">
       <div class="am-sheet__box">
         <header class="am-sheet__top">
           <div class="am-sheet__text">
@@ -253,13 +340,18 @@ onBeforeUnmount(() => {
           </div>
 
           <!-- Подпись кнопкам нужна своя: знак спрятан от чтецов, а подсказка
-               живёт отдельным слоем в body и именем кнопки не становится. -->
+               живёт отдельным слоем в body и именем кнопки не становится.
+
+               Подпись говорит «без сохранения», а не просто «закрыть»:
+               крестик теперь выбрасывает правки, и молчать об этом
+               нельзя — иначе человек узнаёт о пропаже только по записи
+               в списке. -->
           <button
-            v-tip="'Закрыть'"
+            v-tip="'Закрыть без сохранения'"
             class="am-sheet__close"
             type="button"
-            aria-label="Закрыть"
-            @click="onClose"
+            aria-label="Закрыть без сохранения"
+            @click="onDrop"
           >
             <SakuraBloom />
             <span aria-hidden="true">×</span>
@@ -274,9 +366,9 @@ onBeforeUnmount(() => {
                 v-for="item in statuses"
                 :key="item.key"
                 class="am-pick"
-                :class="{ 'am-pick--on': item.key === status }"
+                :class="{ 'am-pick--on': item.key === pickStatus }"
                 type="button"
-                @click="emit('status', item.key)"
+                @click="pickStatus = item.key"
               >
                 {{ item.title }}
               </button>
@@ -296,7 +388,7 @@ onBeforeUnmount(() => {
                 <SakuraBloom />
                 <span aria-hidden="true">−</span>
               </button>
-              <span class="am-step__value">{{ markText(score10) }}</span>
+              <span class="am-step__value">{{ markText(pickScore) }}</span>
               <button
                 v-tip="'Больше'"
                 class="am-step"
@@ -314,7 +406,7 @@ onBeforeUnmount(() => {
                 v-for="mark in QUICK_MARKS"
                 :key="mark"
                 class="am-pick am-pick--num"
-                :class="{ 'am-pick--on': mark === score10 }"
+                :class="{ 'am-pick--on': mark === pickScore }"
                 :style="markStyle(mark)"
                 type="button"
                 @click="setScore(mark)"
@@ -392,7 +484,7 @@ onBeforeUnmount(() => {
                 <SakuraBloom />
                 <span aria-hidden="true">−</span>
               </button>
-              <span class="am-step__value">{{ repeat }}</span>
+              <span class="am-step__value">{{ pickRepeat }}</span>
               <button
                 v-tip="'Больше'"
                 class="am-step"
@@ -408,12 +500,12 @@ onBeforeUnmount(() => {
 
           <section class="am-field">
             <span class="am-field__name">Начато</span>
-            <DatePick :value="startedAt" title="Начато" @pick="onStarted" />
+            <DatePick :value="pickStarted" title="Начато" @pick="onStarted" />
           </section>
 
           <section class="am-field">
             <span class="am-field__name">Закончено</span>
-            <DatePick :value="completedAt" title="Закончено" @pick="onCompleted" />
+            <DatePick :value="pickCompleted" title="Закончено" @pick="onCompleted" />
           </section>
 
           <section class="am-field am-field--wide">
@@ -423,7 +515,6 @@ onBeforeUnmount(() => {
               class="am-input am-note"
               rows="3"
               placeholder="Личная заметка, остаётся в вашем списке"
-              @blur="sendNotes"
             />
           </section>
         </div>
@@ -431,7 +522,12 @@ onBeforeUnmount(() => {
         <footer class="am-sheet__foot">
           <span class="am-bar__gap" />
 
-          <button class="am-btn" type="button" @click="onClose">Готово</button>
+          <button class="am-btn" :class="{ 'am-btn--done': saved }" type="button" @click="onDone">
+            <svg v-if="saved" class="am-btn__tick" viewBox="0 0 16 16" aria-hidden="true">
+              <path d="M3.4 8.5 6.4 11.5 12.6 5" />
+            </svg>
+            {{ saved ? 'Сохранено' : 'Готово' }}
+          </button>
         </footer>
       </div>
     </div>
@@ -755,6 +851,26 @@ onBeforeUnmount(() => {
   display: flex;
   gap: 10px;
   align-items: center;
+}
+
+/* Подтверждение: цвет и галочка, а не только слово. По одному слову
+   не скажешь — изменилась кнопка или это уже другая; зелёный из темы
+   читается как «получилось» и не спорит с акцентом. Обводку не трогаю:
+   --am-good-rgb в теме нет, а подбирать её на глаз незачем. */
+.am-btn--done {
+  color: var(--am-good);
+}
+
+/* Галочка штрихом, а не заливкой: на пятнадцати пикселях залитый
+   знак расплывается в кляксу, а штрих держит форму. */
+.am-btn__tick {
+  width: 15px;
+  height: 15px;
+  fill: none;
+  stroke: currentcolor;
+  stroke-width: 1.9;
+  stroke-linecap: round;
+  stroke-linejoin: round;
 }
 
 /* Узкое окно: столбец один, иначе поля сжимаются до нечитаемых. */

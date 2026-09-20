@@ -41,9 +41,11 @@
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 
 import BrandMark from '../components/BrandMark.vue'
+import EmptyMark from '../components/EmptyMark.vue'
 import EntrySheet from '../components/EntrySheet.vue'
 import PeopleBox from '../components/PeopleBox.vue'
 import RichText from '../components/RichText.vue'
+import ShotBox from '../components/ShotBox.vue'
 import TuneBox from '../components/TuneBox.vue'
 import { genreWord } from '../labels'
 import { currentRoute, navigate } from '../router'
@@ -99,6 +101,7 @@ const {
   mainTitle,
   heroStyle,
   about,
+  aboutWait,
   aboutLinks,
   facts,
   ratings,
@@ -159,7 +162,7 @@ watch(mediaId, () => {
 <template>
   <section class="am-page">
     <div v-if="mediaId === 0" class="am-empty">
-      <span class="am-empty__mark" aria-hidden="true">⊘</span>
+      <span class="am-empty__mark"><EmptyMark name="question" /></span>
       <span>Аниме не выбрано: в адресе нет номера.</span>
       <span>Откройте карточку из списков или поиска.</span>
     </div>
@@ -179,95 +182,101 @@ watch(mediaId, () => {
           <div class="am-hero__veil" />
 
           <div class="am-hero__body">
-            <!-- Постер и оценки площадок одной колонкой: ярлычки стоят под
-                 картинкой и по её ширине, чтобы читаться её подписью,
-                 а не ещё одним рядом пилюль у названия. -->
-            <div class="am-hero__stack">
-              <img
-                v-if="card.cover"
-                class="am-hero__cover"
-                :src="card.cover"
-                :alt="mainTitle"
-                decoding="async"
-              />
-              <span v-else class="am-hero__cover am-hero__cover--empty" aria-hidden="true">?</span>
+            <!-- Постер и текст — одной группой: половину шапки занимают они
+                 вдвоём, а не каждый по отдельности. Иначе текст рос по
+                 содержимому: при десятке студий ряд пилюль не переносился,
+                 а вытеснял описание в узкую полосу справа. -->
+            <div class="am-hero__lead">
+              <!-- Постер и оценки площадок одной колонкой: ярлычки стоят под
+                   картинкой и по её ширине, чтобы читаться её подписью,
+                   а не ещё одним рядом пилюль у названия. -->
+              <div class="am-hero__stack">
+                <img
+                  v-if="card.cover"
+                  class="am-hero__cover"
+                  :src="card.cover"
+                  :alt="mainTitle"
+                  decoding="async"
+                />
+                <span v-else class="am-hero__cover am-hero__cover--empty" aria-hidden="true">?</span>
 
-              <!-- Площадка названа знаком, а не словом: так ярлычок вдвое
-                   короче и три штуки встают в ряд под постером. Название
-                   осталось в подсказке — там ему и место. -->
-              <ul v-if="ratings.length > 0" class="am-hero__marks">
-                <li
-                  v-for="rate in ratings"
-                  :key="rate.key"
-                  v-tip="`Средняя оценка на ${rate.label}`"
-                  class="am-hero__mark"
-                >
-                  <BrandMark
-                    v-if="MARK_BRAND[rate.key]"
-                    class="am-hero__markicon"
-                    :name="MARK_BRAND[rate.key]!"
-                  />
-                  <span class="am-hero__markval">{{ rate.value }}</span>
-                </li>
-              </ul>
-            </div>
-
-            <div class="am-hero__text">
-              <h2 class="am-hero__title">{{ mainTitle }}</h2>
-              <p v-if="card.romaji" class="am-hero__sub">{{ card.romaji }}</p>
-              <p v-if="card.native" class="am-hero__sub">{{ card.native }}</p>
-
-              <ul class="am-pills">
-                <li v-if="score10 > 0" v-tip="'Моя оценка'" class="am-pill am-pill--mine">
-                  ★ {{ scoreText(score10) }}
-                </li>
-                <li v-for="item in facts" :key="item" class="am-pill">{{ item }}</li>
-                <li v-if="card.isAdult" class="am-pill am-pill--adult">18+</li>
-              </ul>
-
-              <ul v-if="card.genres.length > 0" class="am-pills">
-                <li v-for="genre in card.genres" :key="genre" class="am-pill am-pill--soft">
-                  {{ genreWord(genre) }}
-                </li>
-              </ul>
-
-              <ul v-if="card.studios.length > 0" class="am-pills">
-                <li v-for="studio in card.studios" :key="studio.studioId">
-                  <button
-                    v-tip="`Работы студии ${studio.name}`"
-                    class="am-pill am-pill--studio"
-                    :class="{ 'am-pill--studio-main': studio.main }"
-                    type="button"
-                    @click="openStudio(studio.studioId)"
+                <!-- Площадка названа знаком, а не словом: так ярлычок вдвое
+                     короче и три штуки встают в ряд под постером. Название
+                     осталось в подсказке — там ему и место. -->
+                <ul v-if="ratings.length > 0" class="am-hero__marks">
+                  <li
+                    v-for="rate in ratings"
+                    :key="rate.key"
+                    v-tip="`Средняя оценка на ${rate.label}`"
+                    class="am-hero__mark"
                   >
-                    <img
-                      v-if="studioLogo(studio.name)"
-                      class="am-pill__logo"
-                      :src="studioLogo(studio.name)!"
-                      alt=""
-                      loading="lazy"
-                      decoding="async"
+                    <BrandMark
+                      v-if="MARK_BRAND[rate.key]"
+                      class="am-hero__markicon"
+                      :name="MARK_BRAND[rate.key]!"
                     />
-                    {{ studio.name }}
+                    <span class="am-hero__markval">{{ rate.value }}</span>
+                  </li>
+                </ul>
+              </div>
+
+              <div class="am-hero__text">
+                <h2 class="am-hero__title">{{ mainTitle }}</h2>
+                <p v-if="card.romaji" class="am-hero__sub">{{ card.romaji }}</p>
+                <p v-if="card.native" class="am-hero__sub">{{ card.native }}</p>
+
+                <ul class="am-pills">
+                  <li v-if="score10 > 0" v-tip="'Моя оценка'" class="am-pill am-pill--mine">
+                    ★ {{ scoreText(score10) }}
+                  </li>
+                  <li v-for="item in facts" :key="item" class="am-pill">{{ item }}</li>
+                  <li v-if="card.isAdult" class="am-pill am-pill--adult">18+</li>
+                </ul>
+
+                <ul v-if="card.genres.length > 0" class="am-pills">
+                  <li v-for="genre in card.genres" :key="genre" class="am-pill am-pill--soft">
+                    {{ genreWord(genre) }}
+                  </li>
+                </ul>
+
+                <ul v-if="card.studios.length > 0" class="am-pills">
+                  <li v-for="studio in card.studios" :key="studio.studioId">
+                    <button
+                      v-tip="`Работы студии ${studio.name}`"
+                      class="am-pill am-pill--studio"
+                      :class="{ 'am-pill--studio-main': studio.main }"
+                      type="button"
+                      @click="openStudio(studio.studioId)"
+                    >
+                      <img
+                        v-if="studioLogo(studio.name)"
+                        class="am-pill__logo"
+                        :src="studioLogo(studio.name)!"
+                        alt=""
+                        loading="lazy"
+                        decoding="async"
+                      />
+                      {{ studio.name }}
+                    </button>
+                  </li>
+                </ul>
+
+                <div class="am-acts">
+                  <button
+                    v-tip="'Источники спрашиваются при открытии плеера'"
+                    class="am-acts__play"
+                    type="button"
+                    @click="openPlayer"
+                  >
+                    <span aria-hidden="true">▶</span>
+                    <span>Смотреть</span>
                   </button>
-                </li>
-              </ul>
 
-              <div class="am-acts">
-                <button
-                  v-tip="'Источники спрашиваются при открытии плеера'"
-                  class="am-acts__play"
-                  type="button"
-                  @click="openPlayer"
-                >
-                  <span aria-hidden="true">▶</span>
-                  <span>Смотреть</span>
-                </button>
-
-                <button class="am-acts__save" type="button" @click="sheetOpen = true">
-                  <span v-if="listed" class="am-acts__dot" aria-hidden="true" />
-                  {{ listLabel }}
-                </button>
+                  <button class="am-acts__save" type="button" @click="sheetOpen = true">
+                    <span v-if="listed" class="am-acts__dot" aria-hidden="true" />
+                    {{ listLabel }}
+                  </button>
+                </div>
               </div>
             </div>
 
@@ -280,6 +289,11 @@ watch(mediaId, () => {
 
               <div class="am-hero__scroll">
                 <RichText v-if="about" class="am-about am-about--art" :text="about" />
+                <div v-else-if="aboutWait" class="am-about__hold" aria-hidden="true">
+                  <span class="am-skeleton am-about__hold-line" />
+                  <span class="am-skeleton am-about__hold-line" />
+                  <span class="am-skeleton am-about__hold-line am-about__hold-line--short" />
+                </div>
                 <p v-else class="am-hero__sub">Описания ни один источник не дал.</p>
               </div>
 
@@ -309,6 +323,11 @@ watch(mediaId, () => {
               <!-- Разметка источника живая: ссылки, спойлеры и начертания рисует
                    компонент, а типографика .am-about остаётся на его корне. -->
               <RichText v-if="about" class="am-about" :text="about" />
+              <div v-else-if="aboutWait" class="am-about__hold" aria-hidden="true">
+                <span class="am-skeleton am-about__hold-line" />
+                <span class="am-skeleton am-about__hold-line" />
+                <span class="am-skeleton am-about__hold-line am-about__hold-line--short" />
+              </div>
               <p v-else class="am-dim">Описания ни один источник не дал.</p>
 
               <p v-if="aboutLinks.length > 0" class="am-about__tail">
@@ -329,9 +348,13 @@ watch(mediaId, () => {
           <!-- Музыка и франшиза делят ряд поровну. Обёртка сквозная: блок
                молчит, когда тем нет или MAL ID не разрешён, и пустой колонки
                после себя не оставляет: оставшаяся плитка растягивается на ряд. -->
-          <div class="am-board__tune">
-            <TuneBox :mal-id="card.malId" />
-          </div>
+          <!-- Кадры и трейлер стоят там, где раньше был плеер: музыка ушла
+               полосой вниз, а её место на доске заняла плитка кадров. -->
+          <ShotBox
+            :media-id="mediaId"
+            :mal-id="card.malId"
+            :trailer="card.trailer"
+          />
 
           <div v-if="franchiseRows.length > 0" class="am-panel am-fran">
             <h3 class="am-h3">Франшиза</h3>
@@ -341,9 +364,11 @@ watch(mediaId, () => {
                  поднимается по всей полке: он даром. Директива живёт
                  в app/see-tile.ts и зарегистрирована на всё приложение в main.ts. -->
             <div ref="franList" class="am-rail">
+              <!-- Ключ по записи, а не по узлу Шикимори: у раздробленной части
+                   строк несколько, и все они при одном номере MAL. -->
               <article
                 v-for="work in franchiseRows"
-                :key="work.malId ?? work.name"
+                :key="work.mediaId ?? work.malId ?? work.name"
                 v-seen="() => onPartSeen(work)"
                 class="am-part"
               >
@@ -425,6 +450,11 @@ watch(mediaId, () => {
             <PeopleBox :media-id="mediaId" />
           </div>
         </div>
+
+        <!-- Музыка последним в странице и липнет к низу окна: место в раскладке
+             карточки ей больше не отведено, а под низом окна уже оставлено поле
+             (padding у .am-view), в которое полоса и встаёт. -->
+        <TuneBox :mal-id="card.malId" />
 
         <!-- Признак онгоинга окну нужен для автозакладки: у идущего сезона
              потолок счёта — последняя вышедшая серия, а не конец истории,
@@ -599,6 +629,47 @@ watch(mediaId, () => {
   mask-composite: intersect;
 }
 
+/* Плитки доски берут свою высоту, а не тянутся по соседу. Растянутая
+   по ряду панель оставляет под своим содержимым пустую полосу — дыра
+   внутри панели читается поломкой. Кадры берут свою высоту всегда;
+   франшиза тянется, и об этом ниже.
+
+   `:deep` у кадров не для красоты. Плитка кадров — чужой компонент,
+   и корней у него пять: две панели да три окна через `Teleport`. Vue
+   передаёт родительский признак области видимости только тогда, когда
+   корень у ребёнка один (см. `filterSingleRoot` в runtime-core): с пятью
+   корнями признак не достаётся никому, и правило вида
+   `.am-board > .am-shots[data-v-…]` не совпадает ни с чем. Молча —
+   правило есть, стилей нет. `:deep` ставит признак на предка,
+   и селектор снова работает. */
+.am-board > :deep(.am-shots),
+.am-board > .am-fran {
+  align-self: start;
+}
+
+/* Рядом с кадрами франшиза тянется по ряду: высоту ряда задают кадры,
+   и низы сходятся на любой ширине окна. Прежде список держал ровно три
+   строки, и высоты сходились только на широком окне — на 2560 оставалось
+   одиннадцать пикселей, на 1920 тридцать три, и ряд кончался лесенкой.
+   Три строки были подгонкой под ширину: потолок списка не умеет знать,
+   какой высоты выйдут кадры, потому что они растут вместе с колонкой
+   доски. Растягивание решает задачу без подгонки.
+
+   `contain: size` — чтобы содержимое списка не участвовало в расчёте
+   высоты ряда. Без него ряд задавала бы франшиза: у неё на три десятка
+   частей это семьсот пикселей против двухсот семидесяти у кадров, и
+   кадры стояли бы посреди пустой панели. Это и был прежний потолок —
+   только считался он наперёд, а не по факту. */
+.am-board:has(.am-shots) > .am-fran {
+  align-self: stretch;
+  contain: size;
+}
+
+/* Потолка у списка рядом с кадрами нет: высоту ему задаёт ряд. */
+.am-board:has(.am-shots) .am-fran .am-rail {
+  max-height: none;
+}
+
 /* Доска: ряд из двух равных колонок вместо плотного потока по измерению.
    После ухода записи и оценок раскладывать осталось три плитки,
    и шаги сетки со скриптом-измерителем стали ценой без выгоды:
@@ -623,12 +694,22 @@ watch(mediaId, () => {
 }
 
 /* Плитка-одиночка занимает всю ширину ряда: у половины тайтлов нет
-   либо тем, либо франшизы, и вторая колонка оставалась бы чёрной дырой.
-   Проверяем наличие самих панелей, а не обёрток: виджет музыки
+   либо кадров, либо франшизы, и вторая колонка оставалась бы чёрной дырой.
+   Проверяем наличие самих панелей, а не обёрток: виджет кадров
    сам решает, рисоваться ли ему, и родитель об этом не знает. */
-.am-board:not(:has(.am-tune)) .am-fran,
-.am-board:not(:has(.am-fran)) .am-tune {
+.am-board:not(:has(.am-shots)) .am-fran {
   grid-column: 1 / -1;
+}
+
+/* Кадры без франшизы растягиваются не сами, а через доску: колонка
+   у доски остаётся одна, и плитка занимает её целиком. Так вышло не
+   от лени. Прежнее правило вешало `grid-column: 1 / -1` прямо на плитку,
+   а плитка — чужой компонент с пятью корнями, и родительского признака
+   области видимости на ней нет (подробнее у `align-self` выше). Правило
+   не совпадало ни с чем, и половина доски стояла пустой, хотя в разметке
+   всё было написано верно. Колонка же принадлежит доске: она и решает. */
+.am-board:not(:has(.am-fran)) {
+  grid-template-columns: minmax(0, 1fr);
 }
 
 /* Хронология в плитке-одиночке идёт мозаикой два на два: строки с одной
@@ -639,7 +720,7 @@ watch(mediaId, () => {
    а в тот же ряд третьим столбцом — край плитки обрезал его пополам.
    Теперь рост строки равен строке хронологии, а потолок плитки — двум
    таким строкам: четыре наименования видно, дальше прокрутка вниз. */
-.am-board:not(:has(.am-tune)) .am-fran .am-rail {
+.am-board:not(:has(.am-shots)) .am-fran .am-rail {
   display: grid;
   grid-auto-flow: row;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -653,28 +734,42 @@ watch(mediaId, () => {
 
 /* Строка мозаики не должна вылезать за свой столбец: без обрезки длинное
    название растягивало столбец и ломало равенство колонок. */
-.am-board:not(:has(.am-tune)) .am-fran .am-rail .am-part {
+.am-board:not(:has(.am-shots)) .am-fran .am-rail .am-part {
   min-width: 0;
   overflow: hidden;
 }
 
 /* Список берёт высоту, которую дала строка, но не выше четырёх
    наименований: дальше прокрутка. Прежний потолок долей экрана резал
-   последнюю строку посередине и разнился от окна к окну. */
+   последнюю строку посередине и разнился от окна к окну.
+   Рядом с кадрами потолка нет — там высоту списку задаёт ряд,
+   см. правило с `contain: size` выше. */
 .am-board .am-fran .am-rail {
   flex: 1 1 auto;
   min-height: 0;
   max-height: calc(4 * var(--am-fran-row) + 6px);
 }
 
-/* Узкое окно — одна колонка: плеер и строки франшизы в половине
+/* Узкое окно — одна колонка: сетка кадров и строки франшизы в половине
    такой ширины уже не читаются. */
 @media (max-width: 1000px) {
   .am-board {
     grid-template-columns: minmax(0, 1fr);
   }
 
-  .am-board:not(:has(.am-tune)) .am-fran .am-rail {
+  /* В одну колонку ряд у франшизы свой, и высоту ей не у кого взять:
+     тянуться по соседу она может только в паре с кадрами. Здесь
+     и содержимое снова считаем, и потолок возвращаем строками —
+     четыре, как у прочих списков. */
+  .am-board:has(.am-shots) > .am-fran {
+    contain: none;
+  }
+
+  .am-board:has(.am-shots) .am-fran .am-rail {
+    max-height: calc(4 * var(--am-fran-row) + 6px);
+  }
+
+  .am-board:not(:has(.am-shots)) .am-fran .am-rail {
     display: flex;
     max-height: calc(4 * var(--am-fran-row) + 6px);
   }

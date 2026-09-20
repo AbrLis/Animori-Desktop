@@ -23,11 +23,12 @@ import { Bridge } from '@/bridge'
 import { hiddenCount, keepAllowed } from '@/core/adult'
 import { editEntry, getEntry, type EntryLook } from '@/core/collection'
 import { fetchFranchise, type FranchiseWork } from '@/core/franchise'
-import { partsOut } from '@/core/media-looks'
+import { partsAired, partsCeiling } from '@/core/media-looks'
 import {
   getRussianTitle,
   peekRussianName,
   prefetchRussianNames,
+  type RussianAskState,
   type RussianTitle,
 } from '@/core/media-title'
 import {
@@ -59,6 +60,25 @@ const SEEN_PAUSE_MS = 200
  * и оценками не самая мелкая запись.
  */
 const SHOWN_KEEP = 5
+
+/**
+ * Сколько раз переспросить русский источник при сбое.
+ *
+ * Сбой — не отказ: сеть могла моргнуть, а Шикимори отвечает 429 на темпе.
+ * Один повтор через паузу закрывает почти все такие случаи, а второй стоит
+ * недорого и страхует от затяжного отказа. Дальше смысла нет: человек
+ * уже видит карточку, и держать её без описания хуже, чем показать
+ * английский текст.
+ */
+const RU_TRIES = 2
+
+/** Пауза перед повтором: успевает отпустить и короткий сбой, и темп. */
+const RU_PAUSE_MS = 1200
+
+/** Пауза. Повтор без неё долбит источник тем же темпом, что его и уронил. */
+function nap(ms: number): Promise<void> {
+  return new Promise((allow) => setTimeout(allow, ms))
+}
 
 /** Оценка площадки для героя. */
 export interface Rating {
@@ -106,6 +126,8 @@ export interface MediaCardView {
   donePart: ComputedRef<string>
   progressText: ComputedRef<string>
   about: ComputedRef<string>
+  /** Описание ещё не приехало: вместо текста показывается заглушка. */
+  aboutWait: ComputedRef<boolean>
   aboutLinks: ComputedRef<MediaLink[]>
   facts: ComputedRef<string[]>
   ratings: ComputedRef<Rating[]>
@@ -160,6 +182,17 @@ export function dateText(value: string | null): string {
 export function useMediaCard(mediaId: Ref<number>): MediaCardView {
   const card = ref<MediaCard | null>(null)
   const russian = ref<RussianTitle | null>(null)
+
+  /**
+   * Чем кончился вопрос к русскому источнику. `wait` — спросили, ответа нет.
+   *
+   * Отдельно от самой карточки затем, что пустая карточка ничего не значит:
+   * она бывает и отказом источника, и сбоем. Пока ответа нет, английский
+   * описание не показывается — иначе текст мигает латиницей и через
+   * секунду подменяется русским.
+   */
+  const ruState = ref<RussianAskState | 'wait'>('wait')
+
   const busy = ref(true)
   const trouble = ref('')
 
@@ -281,7 +314,7 @@ export function useMediaCard(mediaId: Ref<number>): MediaCardView {
    * У идущего сезона объявленного итога часто нет вовсе.
    */
   const partsTotal = computed<number | null>(() =>
-    card.value === null ? null : partsOut(card.value),
+    card.value === null ? null : partsCeiling(card.value),
   )
 
   /** Объявленный итог: сколько серий всего обещано. */
@@ -347,9 +380,22 @@ export function useMediaCard(mediaId: Ref<number>): MediaCardView {
   const about = computed<string>(() => {
     // Пустая строка от русского источника не гасит английский текст с AniList.
     const ru = russian.value?.description?.trim() ?? ''
-    const en = card.value?.description?.trim() ?? ''
-    return ru !== '' ? ru : en
+    if (ru !== '') return ru
+
+    // Английский показывается только когда русский источник ответил. Пока
+    // ответа нет, описание стоит заглушкой: подмена латиницы на кириллицу
+    // на глазах читается как поломка, а не как загрузка. Отказ ('none')
+    // английский разрешает — это и есть настоящий «перевода нет».
+    if (ruState.value === 'wait') return ''
+
+    return card.value?.description?.trim() ?? ''
   })
+
+  /**
+   * Описание ещё в пути. Отдельно от пустого `about`: тогда как раз и видно,
+   * стоит ли вместо текста заглушка или честное «описаний нет».
+   */
+  const aboutWait = computed<boolean>(() => ruState.value === 'wait')
 
   /**
    * Бледный хвост под описанием: номера каталогов и источник текста
@@ -379,9 +425,11 @@ export function useMediaCard(mediaId: Ref<number>): MediaCardView {
     if (partsPlanned.value !== null) list.push(`Серий: ${partsPlanned.value}`)
 
     // У идущего сезона важно не обещанное, а то, что уже можно смотреть.
-    if (found.airingEpisode !== null && partsTotal.value !== null) {
-      list.push(`Вышло: ${partsTotal.value}`)
-    }
+    // Счёт берётся у `partsAired`, а не у знаменателя полосы: у анонса тот
+    // подменяет ноль объявленным итогом, и «Вышло» показывало одиннадцать
+    // серий там, где не вышло ни одной.
+    const aired = partsAired(found)
+    if (aired !== null) list.push(`Вышло: ${aired}`)
 
     if (found.duration) list.push(`${found.duration} мин`)
 
@@ -471,6 +519,7 @@ export function useMediaCard(mediaId: Ref<number>): MediaCardView {
   function forgetShown(): void {
     card.value = null
     russian.value = null
+    ruState.value = 'wait'
     platformRatings.value = null
     franchise.value = null
   }
@@ -638,6 +687,8 @@ export function useMediaCard(mediaId: Ref<number>): MediaCardView {
 
     if (id === 0) {
       forgetShown()
+      // Ждать нечего: карточки нет, и заглушка описания висела бы вечно.
+      ruState.value = 'none'
       busy.value = false
       return
     }
@@ -648,6 +699,10 @@ export function useMediaCard(mediaId: Ref<number>): MediaCardView {
       // ни доборов — подробности, дерево и оценки лежат готовыми.
       card.value = seen.card
       russian.value = seen.russian
+      // В памяти показа лежит уже отвеченное: спрашивать источник не будем,
+      // и ждать нечего. Иначе описание простояло бы заглушкой до закрытия
+      // карточки, хотя ответ давно известен.
+      ruState.value = seen.russian === null ? 'none' : 'ready'
       platformRatings.value = seen.ratings
       franchise.value = seen.franchise
       priming = Promise.resolve()
@@ -718,12 +773,40 @@ export function useMediaCard(mediaId: Ref<number>): MediaCardView {
       if (mine === run) busy.value = false
     }
 
-    try {
-      const found = await getRussianTitle(id)
-      if (mine === run) russian.value = found
-    } catch (e) {
-      // Без русского названия карточка живая: останется латиница.
-      Logger('WARN', `Карточка ${id}: русское название не добылось`, e)
+    await beginRussian(mine, id)
+  }
+
+  /**
+   * Русская карточка с повтором на сбое.
+   *
+   * Исход «сбой» отличается от «перевода нет» и потому требует повтора:
+   * сбой не запоминается источником, сеть возвращается, и без повтора
+   * человек получал бы английское описание там, где через секунду приехал
+   * бы русский текст. Перезагрузка окна была единственным лечением, и это
+   * ровно то, от чего здесь предохранитель.
+   *
+   * Когда попытки кончились, исход считается отказом: карточка без описания
+   * хуже карточки с английским.
+   */
+  async function beginRussian(mine: number, id: number): Promise<void> {
+    for (let tryNo = 1; ; tryNo += 1) {
+      const ask = await getRussianTitle(id)
+      if (mine !== run) return
+
+      if (ask.state !== 'fail') {
+        russian.value = ask.title
+        ruState.value = ask.state
+        return
+      }
+
+      if (tryNo >= RU_TRIES) {
+        Logger('WARN', `Карточка ${id}: русский источник не ответил, показываем английский`)
+        ruState.value = 'none'
+        return
+      }
+
+      await nap(RU_PAUSE_MS)
+      if (mine !== run) return
     }
   }
 
@@ -747,8 +830,17 @@ export function useMediaCard(mediaId: Ref<number>): MediaCardView {
     return logos.value?.get(name.trim().toLowerCase()) ?? null
   }
 
-  /** Имя части франшизы: русское, когда фон уже добыл. */
+  /**
+   * Имя части франшизы.
+   *
+   * У раздробленной части русское имя одно на все её записи — узел Шикимори
+   * один, — и строки вышли бы неразличимыми. Различает их только хвост
+   * названия AniList, и он идёт первым: имя в строке обрезается по концу,
+   * и хвост в конце пропадал бы ровно там, где он и нужен.
+   */
   function franchiseName(work: FranchiseWork): string {
+    if (work.stage !== null) return `${work.stage} · ${work.name}`
+
     return work.mediaId === null ? work.name : (peekRussianName(work.mediaId) ?? work.name)
   }
 
@@ -758,9 +850,15 @@ export function useMediaCard(mediaId: Ref<number>): MediaCardView {
     return statusWord(getEntry(work.mediaId)?.status ?? null)
   }
 
-  /** Подсказка части франшизы: полное имя и вид. */
+  /**
+   * Подсказка части франшизы: полное имя записи и вид.
+   *
+   * У раздробленной части в строке стоит один хвост, и целиком название
+   * помещается только здесь.
+   */
   function franchiseHint(work: FranchiseWork): string {
-    return work.kind === null ? work.name : `${work.name} · ${work.kind}`
+    const full = work.stage !== null && work.title !== null ? work.title : work.name
+    return work.kind === null ? full : `${full} · ${work.kind}`
   }
 
   /**
@@ -843,6 +941,7 @@ export function useMediaCard(mediaId: Ref<number>): MediaCardView {
     donePart,
     progressText,
     about,
+    aboutWait,
     aboutLinks,
     facts,
     ratings,

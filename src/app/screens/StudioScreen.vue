@@ -25,6 +25,7 @@ import {
 import { studioLogos } from '@/core/studio-logos'
 import { Logger } from '@/utils/logger'
 
+import EmptyMark from '../components/EmptyMark.vue'
 import MediaTile from '../components/MediaTile.vue'
 import { currentRoute, navigate } from '../router'
 import { toPlayAsk, toTileRow, type TileRow } from '../tile-row'
@@ -403,8 +404,9 @@ watch(studioId, () => {
 <template>
   <section class="am-page">
     <div v-if="studioId === 0" class="am-empty">
-      <span class="am-empty__mark" aria-hidden="true">⊘</span>
+      <span class="am-empty__mark"><EmptyMark name="question" /></span>
       <span>Студия не выбрана: в адресе нет номера.</span>
+      <span>Откройте студию из карточки аниме.</span>
     </div>
 
     <template v-else>
@@ -438,9 +440,13 @@ watch(studioId, () => {
         </li>
       </ul>
 
+      <!-- Пустая студия — не ошибка и не пустой поиск: работы студии приходят
+           из AniList, и добавить их отсюда нельзя. Прежде здесь висела одна
+           строка, и она читалась как «не прогрузилось». -->
       <div v-else-if="rows.length === 0 && !busy && trouble === ''" class="am-empty">
-        <span class="am-empty__mark" aria-hidden="true">⊘</span>
+        <span class="am-empty__mark"><EmptyMark name="studio" /></span>
         <span>У студии пока ничего не числится.</span>
+        <span>Так и в AniList: добавить работы отсюда нельзя.</span>
       </div>
 
       <!-- Отметка показа на каждой плитке: только о попавших в окно

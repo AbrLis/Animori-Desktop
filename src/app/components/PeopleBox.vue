@@ -341,13 +341,9 @@ watch(
   align-items: center;
 }
 
-.am-folk .am-h3::before {
-  flex: 0 0 auto;
-  width: 3px;
-  height: 14px;
-  content: '';
-  background: linear-gradient(180deg, var(--am-accent), var(--am-accent-2));
-  border-radius: var(--am-r-cap);
+.am-folk .am-h3 {
+  /* Засечка перед заголовком жила как украшение. Смысла она не несла:
+     разрядка шрифтом делает то же самое. Убрана. */
 }
 
 /* Общая полка растягивает треки на всю ширину: при горсти лиц это разнос. */

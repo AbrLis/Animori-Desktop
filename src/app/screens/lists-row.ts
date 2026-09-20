@@ -13,7 +13,7 @@
 import { onScopeDispose, ref, type Ref } from 'vue'
 
 import { setupVideoSources } from '@/api/video-sources'
-import { notOutYet, partsOut, peekLook, warmLooks, type MediaLook } from '@/core/media-looks'
+import { notOutYet, partsCeiling, peekLook, warmLooks, type MediaLook } from '@/core/media-looks'
 import { peekRussianName, prefetchRussianNames } from '@/core/media-title'
 import {
   onPlayableChange,
@@ -155,8 +155,11 @@ function ratingOf(entry: SnapshotEntry): number {
 /**
  * Порядок показа. Названия сравниваются по-русски, поэтому список может
  * слегка переставиться, когда доберутся переводы: до них сравнивать нечего.
+ *
+ * На входе список только для чтения: отбор взрослого возвращает неизменяемый
+ * срез, и копия здесь и так делается.
  */
-export function sortEntries(list: SnapshotEntry[], key: SortName): SnapshotEntry[] {
+export function sortEntries(list: readonly SnapshotEntry[], key: SortName): SnapshotEntry[] {
   const out = [...list]
 
   switch (key) {
@@ -184,7 +187,7 @@ export function toRow(entry: SnapshotEntry): Row {
   const look = peekLook(entry.mediaId)
 
   // У идущего сезона знаменателем служат вышедшие серии.
-  const parts = partsOut(look)
+  const parts = partsCeiling(look)
 
   return {
     mediaId: entry.mediaId,

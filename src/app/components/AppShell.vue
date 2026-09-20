@@ -31,7 +31,7 @@
 import { computed } from 'vue'
 
 import { APPEARANCES, appearance, setAppearance } from '../appearance'
-import { currentRoute, goBack, navigate } from '../router'
+import { currentRoute, goBack, navigate, navDirection } from '../router'
 import { MENU, SCREEN_TITLES } from '../router/routes'
 
 import AppMark from './AppMark.vue'
@@ -139,7 +139,14 @@ function onReload(): void {
       </header>
 
       <main class="am-view">
-        <div :key="active" class="am-view__hold">
+        <div
+          :key="active"
+          class="am-view__hold"
+          :class="{
+            'am-view__hold--deep': navDirection === 'deep',
+            'am-view__hold--back': navDirection === 'back',
+          }"
+        >
           <slot />
         </div>
       </main>
@@ -300,36 +307,38 @@ function onReload(): void {
   );
 }
 
-/* Активный пункт помечен каплей слева, а не рамкой: её видно и в узком
-   рельсе, где подписи скрыты. */
-.am-side__item--on::before {
-  position: absolute;
-  top: 50%;
-  left: 2px;
-  width: 3px;
-  height: 18px;
-  content: '';
-  background: linear-gradient(180deg, var(--am-accent), var(--am-accent-2));
-  border-radius: var(--am-r-cap);
-  box-shadow: 0 0 10px rgb(var(--am-accent-rgb) / 0.6);
-  transform: translateY(-50%);
-  animation: am-mark var(--am-mid) var(--am-ease) both;
+/* Свёрнутая рельса: подпись не занимает места (она скрыта opacity:0
+   и потому не видна, но в разметке место занимает и значок прижат
+   к левому краю пункта отступом padding-left:14 — полоса выглядит
+   «лесенкой влево»). Переключаем пункт на узкий бокс (только
+   значок) и центрируем по рельсе: у активного пункта подложка-
+   капсула теперь охватывает значок ровно. Раскрытая рельса
+   (:hover, :focus-within) возвращает обычную раскладку — отступы,
+   подпись и значок у левого края. */
+.am-side:not(:hover):not(:focus-within) .am-side__item {
+  justify-content: center;
+  padding: 0;
+  gap: 0;
+}
+.am-side:not(:hover):not(:focus-within) .am-side__text {
+  width: 0;
+  height: 0;
+  overflow: hidden;
+  opacity: 0;
 }
 
-@keyframes am-mark {
-  from {
-    height: 4px;
-    opacity: 0;
-  }
-  to {
-    height: 18px;
-    opacity: 1;
-  }
-}
+/* Активный пункт помечен своей подложкой, а не каплей слева: капля
+   была тем же синим штрихом, что и у заголовков, и так же ничего не
+   значила сверх подложки. Подложку видно и в узком рельсе, где
+   подписи скрыты, — она и остаётся единственной меткой. */
 
 /* Значок пункта — в своём квадрате с центровкой по двум осям. text-align
    ровнял только по горизонтали, а по вертикали знак стоял на базовой
-   линии шрифта: у разных символов она разная, и ряд пунктов плясал. */
+   линии шрифта: у разных символов она разная, и ряд пунктов плясал.
+   line-height приравнен к высоте квадрата: тогда линейный бокс
+   совпадает с ячейкой грида, и place-items: center кладёт глиф ровно
+   в середину (без него остаётся однопиксельный сдвиг от шрифтовой
+   метрики ascender/descender). */
 .am-side__icon {
   display: grid;
   flex: none;
@@ -337,7 +346,7 @@ function onReload(): void {
   width: 18px;
   height: 18px;
   font-size: 16px;
-  line-height: 1;
+  line-height: 18px;
 }
 
 .am-side__foot {
@@ -573,11 +582,52 @@ function onReload(): void {
 }
 
 /* Смена экрана всплывает, а не моргает: ключ на имени экрана перезапускает
-   эту анимацию на каждом переходе. */
+   эту анимацию на каждом переходе. Это же движение остаётся на смене вкладок:
+   вкладки стоят вровень, и сдвиг вбок сообщал бы о переходе, которого не было. */
 @keyframes am-rise {
   from {
     opacity: 0;
     transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* Внутрь и наружу содержимое приходит с той стороны, куда человек направился:
+   ушли вглубь — справа, вернулись — слева. Движется только приходящий экран:
+   уходящий к этому моменту уже снят разметкой, и держать его ради прощания
+   значило бы платить задержкой за красоту, которой никто не просил.
+
+   Восемнадцать пикселей — не мало, а ровно столько, сколько позволяет боковое
+   поле .am-view (clamp(18px, 2vw, 44px)): сдвиг уходит в поле, а не за край
+   окна, и горизонтальной прокрутки на переходе не возникает. Обрезать .am-view
+   ради большего размаха нельзя: внутри лежит плеер, а там есть прилипающая
+   панель, которая от обрезки перестаёт прилипать. */
+.am-view__hold--deep {
+  animation-name: am-deep;
+}
+
+.am-view__hold--back {
+  animation-name: am-back;
+}
+
+@keyframes am-deep {
+  from {
+    opacity: 0;
+    transform: translate3d(18px, 0, 0);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes am-back {
+  from {
+    opacity: 0;
+    transform: translate3d(-18px, 0, 0);
   }
   to {
     opacity: 1;
@@ -600,8 +650,7 @@ function onReload(): void {
 
 /* Спокойное движение: системная просьба сильнее наших красот. */
 @media (prefers-reduced-motion: reduce) {
-  .am-view__hold,
-  .am-side__item--on::before {
+  .am-view__hold {
     animation: none;
   }
 

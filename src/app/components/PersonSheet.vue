@@ -20,8 +20,8 @@ import { fetchStaffWorks, type StaffWork } from '@/api/anilist-staff-works'
 import { keepAllowed } from '@/core/adult'
 import { peekRussianName, prefetchRussianNames } from '@/core/media-title'
 import {
+  askRussianPersonFull,
   getRussianPerson,
-  getRussianPersonFull,
   peekRussianPerson,
   type RussianPerson,
 } from '@/core/person-title'
@@ -60,6 +60,22 @@ const staffCard = ref<StaffCard | null>(null)
 const busy = ref(true)
 const expanded = ref(false)
 
+/**
+ * Карточка не доехала: сервер не ответил ни на повтор. Прежде это выглядело
+ * как «карточки нет» — на экране оставался один постер, и помочь могла
+ * только перезагрузка окна.
+ */
+const cardFailed = ref(false)
+
+/**
+ * Русский источник спрошен, ответа ещё нет. Пока правды нет, английское
+ * описание не показывается: иначе текст меняется на глазах.
+ */
+const ruWait = ref(false)
+
+/** Русский источник не ответил: повтор возможен кнопкой. */
+const ruFailed = ref(false)
+
 /** Главные работы автора: полка постеров под описанием. */
 const works = ref<StaffWork[]>([])
 
@@ -86,8 +102,16 @@ function translateAllowed(): boolean {
   return current.value.kind === 'character' ? settings.translateCharacters : settings.translateStaff
 }
 
-/** Описание из загруженных данных. Русское, когда есть, важнее английского. */
+/**
+ * Описание из загруженных данных. Русское, когда есть, важнее английского.
+ *
+ * Пока русский источник не ответил, чужой текст не показывается вовсе:
+ * иначе описание приезжает английским и через секунду подменяется русским
+ * прямо под глазами. Отказ источника это не останавливает — ждать тогда
+ * нечего, и латиница остаётся единственным описанием.
+ */
 function rawDesc(): string {
+  if (ruWait.value) return ''
   if (ruPerson.value?.description) return ruPerson.value.description
   return (
     (current.value.kind === 'character'
@@ -253,9 +277,19 @@ async function beginWorkNames(mine: number, list: readonly StaffWork[]): Promise
  */
 async function beginRussian(mine: number, target: PersonTarget): Promise<void> {
   if (translateAllowed()) {
-    const card = await getRussianPersonFull(target.kind, target)
+    // Ответ раскладывается по двум признакам: саму карточку можно показать
+    // и при недоезде (имя могло остаться от списка ролей), а вот «ждать больше
+    // нечего» и «надо повторить» — разные вещи.
+    const answer = await askRussianPersonFull(target.kind, target)
     if (!alive || mine !== run) return
-    if (card) ruPerson.value = card
+
+    ruWait.value = false
+    ruFailed.value = answer.state === 'fail'
+    // Карточка при недоезде бывает частичной: имя есть, описания нет.
+    // Такой ответ не подменяет полный, добытый раньше.
+    if (answer.person && !(ruPerson.value && !ruPerson.value.partial)) {
+      ruPerson.value = answer.person
+    }
   }
 
   if (settings.translateStaff) {
@@ -285,13 +319,21 @@ async function load(target: PersonTarget): Promise<void> {
   ruVoices.clear()
   expanded.value = false
   busy.value = true
+  cardFailed.value = false
+  ruFailed.value = false
+  // Ждать ли русского: вопрос уйдёт сразу, но при выключенном переводе
+  // ждать нечего, и описание показывается как пришло.
+  ruWait.value = translateAllowed()
   box.value?.scrollTo({ top: 0 })
 
   // Известное с прошлого показа подставляется сразу, сеть не ждётся.
   ruPerson.value = translateAllowed() ? peekRussianPerson(target.kind, target.personId) : null
 
   if (target.kind === 'character') {
-    charCard.value = await fetchCharacterCard(target.personId)
+    const ask = await fetchCharacterCard(target.personId)
+    if (!alive || mine !== run) return
+    charCard.value = ask.card
+    cardFailed.value = ask.state === 'fail'
   } else {
     // Полка работ идёт своим доходом: карточка её не ждёт, а без работ она живая.
     void fetchStaffWorks(target.personId)
@@ -308,12 +350,30 @@ async function load(target: PersonTarget): Promise<void> {
         Logger('WARN', 'Карточка персоны: работы не загрузились', e)
       })
 
-    staffCard.value = await fetchStaffCard(target.personId)
+    const ask = await fetchStaffCard(target.personId)
+    if (!alive || mine !== run) return
+    staffCard.value = ask.card
+    cardFailed.value = ask.state === 'fail'
   }
   if (!alive || mine !== run) return
   busy.value = false
 
-  void beginRussian(mine, target)
+  void beginRussian(mine, target).catch((e) => {
+    // Недоезд по русскому описанию — не повод оставлять окно в ожидании:
+    // описание разблокируется здесь, иначе пустая полоса висела бы до
+    // закрытия окна.
+    if (!alive || mine !== run) return
+    ruWait.value = false
+    ruFailed.value = true
+    Logger('WARN', 'Карточка персоны: русское описание не доехало', e)
+  })
+}
+
+/** Повтор всего показа: и карточки с сервера, и русского прохода. */
+function retry(): void {
+  void load(current.value).catch((e) => {
+    Logger('WARN', 'Карточка персоны: повтор не удался', e)
+  })
 }
 
 /** Переход к сэйю в том же окне: второй слой затемнения не нужен. */
@@ -469,6 +529,23 @@ onBeforeUnmount(() => {
 
         <!-- Описание -->
         <template v-else>
+          <!-- Пока русский источник не ответил, вместо описания стоит
+               заглушка: чужой текст, который через секунду подменится
+               русским, читать хуже, чем пустую полосу. -->
+          <span v-if="ruWait" class="am-skeleton am-ps-skel" />
+          <span v-if="ruWait" class="am-skeleton am-ps-skel am-ps-skel--short" />
+
+          <!-- Недоезд говорится прямо и лечится кнопкой: молчаливый постер
+               заставлял перезагружать всё окно. -->
+          <div v-if="cardFailed || ruFailed" class="am-ps-fail">
+            <p class="am-ps-fail__word">
+              {{
+                cardFailed ? 'Карточку загрузить не удалось.' : 'Русское описание не доехало.'
+              }}
+            </p>
+            <button class="am-btn am-btn--ghost" type="button" @click="retry">Повторить</button>
+          </div>
+
           <div
             v-if="rawDesc()"
             class="am-ps-desc"
@@ -1037,6 +1114,23 @@ onBeforeUnmount(() => {
 
 .am-ps-skel--short {
   width: 60%;
+}
+
+/* Недоезд карточки или русского описания: строка и кнопка повтора.
+   Рамка не рисуется — окно и так стоит на стекле, а лишняя граница делала
+   бы из служебной строки отдельную плитку. */
+.am-ps-fail {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 0 2px;
+}
+
+.am-ps-fail__word {
+  margin: 0;
+  font-size: 13px;
+  color: var(--am-dim);
 }
 
 /* Узкое окно: портрет и имена встают колонкой, иначе имена сжимает в нить. */

@@ -30,13 +30,15 @@
    Цвет текста поверх баннера не тематический: завеса под ним тёмная
    и в светлой теме. Объявлен один раз, дальше только var().
 
-   Поля шапки тоже живут переменными: описание справа съедает их
-   отрицательными отступами, и два независимых clamp() в разных правилах
-   расходились от любой правки одного из них. */
+   Поля и просвет шапки тоже живут переменными: описание справа съедает
+   поля отрицательными отступами, а просвет разделяет ту же пару, что
+   и половины, — и два независимых clamp() в разных правилах расходились
+   бы от любой правки одного из них. */
 .am-hero {
   --am-on-art: #eef3fb;
   --am-hero-pad-y: clamp(30px, 3.6vw, 56px);
   --am-hero-pad-x: clamp(20px, 2vw, 34px);
+  --am-hero-gap: clamp(18px, 2vw, 30px);
 
   position: relative;
   overflow: hidden;
@@ -82,9 +84,33 @@
 .am-hero__body {
   position: relative;
   display: flex;
-  gap: clamp(18px, 2vw, 30px);
+  gap: var(--am-hero-gap);
   align-items: center;
   padding: var(--am-hero-pad-y) var(--am-hero-pad-x);
+}
+
+/* Постер и текст — одной группой, потому что половину шапки занимают они
+   вдвоём. Порознь текст рос по содержимому: ряд пилюль не переносился,
+   а вытеснял описание в узкую полосу. */
+.am-hero__lead {
+  display: flex;
+  gap: var(--am-hero-gap);
+  align-items: center;
+  min-width: 0;
+}
+
+/* Половина задана левой стороне, а описание добирает остаток само
+   (flex: 1) — вместе с отрицательным полем справа, которым его стекло
+   доходит до края баннера. Считать половину от описания было бы нельзя:
+   его ширина и есть остаток, и она поехала бы вслед за содержимым слева.
+
+   Просвет вычтен из левой доли, а не прибавлен к правой: тогда описание
+   начинается ровно от середины баннера и занимает свою половину целиком.
+   Сжатия у группы нет — половина должна оставаться половиной. Ужимается
+   текст внутри неё (min-width: 0 у него), поэтому ряд студий при десятке
+   имён переносится, а не режет описание. */
+.am-hero--told .am-hero__lead {
+  flex: 0 0 calc(50% - var(--am-hero-gap));
 }
 
 /* Постер той же формы, что плитка в сетках: переход из списка в карточку
@@ -174,6 +200,27 @@
   backdrop-filter: blur(var(--am-blur)) saturate(1.1);
   -webkit-mask-image: linear-gradient(90deg, transparent 0%, #000 34%);
   mask-image: linear-gradient(90deg, transparent 0%, #000 34%);
+}
+
+/* Внутри описания разметка чужая: её рисует RichText, и стили у него
+   замкнуты на своём компоненте. Дотянуться до ссылки, спойлера или цитаты
+   поимённо можно только через :deep(), а это лезет в чужие внутренности
+   и повторяется для каждого класса. Перекрываем не классы, а переменные:
+   они наследуются вниз через границу компонента, и весь текст описания
+   разом перестаёт зависеть от темы.
+
+   Цвета те же, что у завеси над кадром: под текстом лежит размытая
+   фотография, и выбирает цвет не тема, а кадр. Светлые буквы по тёмной
+   завеси читаются на любом баннере, поэтому разбирать яркость картинки
+   отдельно не нужно — она уже погашена завесей и размытием. */
+.am-hero__note {
+  --am-text: var(--am-on-art);
+  --am-dim: color-mix(in srgb, var(--am-on-art) 76%, transparent);
+  --am-faint: color-mix(in srgb, var(--am-on-art) 58%, transparent);
+  --am-fill-1: color-mix(in srgb, var(--am-veil) 42%, transparent);
+  --am-fill-2: color-mix(in srgb, var(--am-veil) 34%, transparent);
+  --am-hover: color-mix(in srgb, var(--am-veil) 52%, transparent);
+  --am-line-soft: color-mix(in srgb, var(--am-on-art) 18%, transparent);
 }
 
 .am-hero__noteh {
@@ -377,75 +424,36 @@
   box-shadow: 0 0 10px rgb(var(--am-accent-rgb) / 0.7);
 }
 
-/* Доска карточки: описание, запись, оценки, музыка, франшиза и люди
-   раскладываются потоком, а не по именованным областям.
+/* Доска карточки: описание, кадры, франшиза и люди раскладываются
+   рядом, а не по именованным областям.
 
    Области обещали «красиво при любой ширине», а давали обратное:
    под коротким описанием оставался чёрный прогал в полэкрана, шаблон
    приходилось описывать заново на каждом рубеже ширины, а липкая колонка
-   записи внутри растянутой области наползала на музыку и франшизу.
+   записи внутри растянутой области наползала на соседей.
 
-   Колонки и высоты считает media-board.ts: он ставит число колонок
-   по ширине доски и переводит натуральную высоту каждой плитки в шаги
-   вертикальной сетки, а dense-поток закрывает оставшиеся дыры сам.
-   Правила ниже — состояние до первой перекладки: обычная сетка
-   с плитками в порядке разметки. */
+   Число колонок, порядок и потолки плиток живут в scoped-блоке
+   MediaScreen.vue: он читается рядом с разметкой, которая задаёт
+   набор плиток, и видит её классы. Здесь остаётся только общее
+   для доски — подложка, поля и обрезка строк. */
 .am-board {
   display: grid;
-  grid-auto-flow: row dense;
-  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
   gap: var(--am-gap);
-  align-items: start;
   margin-top: var(--am-gap);
-}
-
-/* Шаг вертикальной сетки приходит из скрипта вместе со span у плиток.
-   Без него строки остаются автоматическими: раскладка теряет плотность,
-   но не рассыпается. */
-.am-board--flow {
-  grid-auto-rows: var(--am-board-row, 8px);
-}
-
-/* Нижние плитки колонок скрипт тянет до общего низа доски, чтобы она
-   не кончалась лесенкой из разновысоких углов. Добор достаётся
-   содержимому, а не воздуху под ним: панель занимает всю выданную
-   высоту, а её блоки расходятся по ней.
-
-   Правила висят на --flow, а не на .am-board: без скрипта плитки
-   остаются ростом по содержимому, и растягивать их не во что. */
-.am-board--flow > *,
-.am-board--flow .am-about-box,
-.am-board--flow .am-mine,
-.am-board--flow .am-rates,
-.am-board--flow .am-tune,
-.am-board--flow .am-fran {
-  height: 100%;
-  min-height: 0;
-}
-
-/* Запись и оценки — списки строк с hairline: лишнюю высоту делят
-   между блоками, и строки просто становятся просторнее. Центровать
-   содержимое нельзя: заголовки панелей уехали бы с одной линии
-   с соседними. */
-.am-board--flow .am-mine,
-.am-board--flow .am-rates {
-  justify-content: space-between;
+  font-size: 12.5px;
+  color: var(--am-faint);
 }
 
 /* Обёртки логики сквозные: плиткой сетка считает саму панель. У половины
    тайтлов тем нет и виджет музыки не рисуется вовсе — пустая коробка
    не должна занимать место в потоке. */
-.am-split__main,
-.am-split__side,
-.am-board__tune {
+.am-split__main {
   display: contents;
 }
 
 .am-board > *,
-.am-board .am-tune,
-.am-board .am-about-box,
-.am-board .am-mine,
-.am-board .am-rates {
+.am-board .am-shots,
+.am-board .am-about-box {
   min-width: 0;
 }
 
@@ -466,6 +474,42 @@
   margin: 0;
   line-height: 1.65;
   color: color-mix(in srgb, var(--am-text) 88%, transparent);
+}
+
+/*
+ * В плитке описание идёт во всю её ширину.
+ *
+ * Плитка тянется на всю доску (`grid-column: 1 / -1`), а текст в ней
+ * держался 78 знаками — значит справа от столбика оставалась пустая
+ * полоса в половину плитки, а сама плитка вытягивалась вдвое выше,
+ * чем могла бы: тот же текст в один-два абзаца занимал впятеро больше
+ * строк. Длина строки теперь задаётся плиткой, а не нами: длиннее
+ * своей плитки строка всё равно не станет.
+ */
+.am-board .am-about {
+  max-width: none;
+}
+
+/* Ожидание описания. Пока русский источник не ответил, английский текст не
+   показывается, а пустое место читалось бы как «описания нет» — то есть
+   враньём. Три строки угадывают высоту: описание почти никогда не бывает
+   короче, и панель не дёргается, когда текст приезжает. */
+.am-about__hold {
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+  padding: 2px 0;
+}
+
+.am-about__hold-line {
+  height: 12px;
+  border-radius: var(--am-r-m);
+}
+
+/* Последняя строка короткая: ровный столбик из трёх полос читается
+   таблицей, а не текстом. */
+.am-about__hold-line--short {
+  width: 62%;
 }
 
 /* Справка хвостом описания сидит у низа панели, где бы ни кончился текст. */
@@ -504,182 +548,6 @@
   padding-top: 14px;
 }
 
-/* Запись — панель, а не воздух: без рамок свои цифры сливались
-   с общим фоном и терялись рядом с описанием. */
-.am-mine {
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-}
-
-.am-mine__head {
-  display: flex;
-  gap: 12px;
-  align-items: center;
-  justify-content: space-between;
-}
-
-.am-mine__head .am-h3 {
-  margin: 0;
-}
-
-.am-mine__edit {
-  min-height: 30px;
-  padding: 0 13px;
-  font: inherit;
-  font-size: 12.5px;
-  font-weight: 600;
-  color: var(--am-dim);
-  cursor: pointer;
-  background: var(--am-fill-1);
-  border: 1px solid var(--am-line-soft);
-  border-radius: var(--am-r-cap);
-  transition:
-    color var(--am-fast) var(--am-ease),
-    background-color var(--am-fast) var(--am-ease),
-    border-color var(--am-fast) var(--am-ease);
-}
-
-.am-mine__edit:hover {
-  color: var(--am-accent);
-  background: var(--am-fill-2);
-  border-color: rgb(var(--am-accent-rgb) / 0.5);
-}
-
-/* Тайтл не в списках: говорим прямо, а не показываем пустую панель. */
-.am-mine__none {
-  margin: 0;
-  font-size: 13px;
-  color: var(--am-faint);
-}
-
-.am-mine__prow {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  margin-bottom: 8px;
-}
-
-.am-mine__pname {
-  font-size: 12.5px;
-  color: var(--am-faint);
-}
-
-.am-mine__pval {
-  font-size: 13px;
-  font-weight: 650;
-  font-variant-numeric: tabular-nums;
-}
-
-/* Полоса записи плотнее общей: здесь она главный счётчик, а не фон. */
-.am-mine__line {
-  display: block;
-  height: 6px;
-}
-
-/* Факты строками с hairline: коробки плиток давали шум «коробок в коробке». */
-.am-mine__rows {
-  margin: 0;
-}
-
-.am-mine__row {
-  display: flex;
-  gap: 12px;
-  align-items: center;
-  justify-content: space-between;
-  padding: 9px 2px;
-  border-top: 1px solid var(--am-line-soft);
-}
-
-.am-mine__rname {
-  font-size: 13px;
-  color: var(--am-faint);
-}
-
-.am-mine__rval {
-  margin: 0;
-  font-size: 13.5px;
-  font-weight: 600;
-}
-
-/* Комментарий выделен полосой сбоку: это чужой текст, а не наша подпись. */
-.am-mine__note {
-  margin: 0;
-  padding: 10px 14px;
-  font-size: 13.5px;
-  line-height: 1.5;
-  color: color-mix(in srgb, var(--am-text) 88%, transparent);
-  white-space: pre-line;
-  background: var(--am-fill-1);
-  border-left: 2px solid var(--am-accent);
-  border-radius: 0 var(--am-r-m) var(--am-r-m) 0;
-}
-
-/* Расхождение с сервером — точка предупреждения: молчание читалось
-   потерей данных. */
-.am-mine__drift {
-  display: flex;
-  gap: 8px;
-  align-items: center;
-  margin: 0;
-  font-size: 12.5px;
-  color: var(--am-warn);
-}
-
-.am-mine__drift::before {
-  flex: none;
-  width: 6px;
-  height: 6px;
-  content: '';
-  background: var(--am-warn);
-  border-radius: var(--am-r-cap);
-}
-
-/* Оценки площадок табличкой в колонке: четырём пилюлям в герое они шумели,
-   а столбиком цифры сравниваются глазом. */
-.am-rates {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
-
-.am-rates .am-h3 {
-  margin: 0;
-}
-
-.am-rates__list {
-  display: flex;
-  flex-direction: column;
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-
-.am-rates__row {
-  display: flex;
-  gap: 12px;
-  align-items: center;
-  justify-content: space-between;
-  padding: 8px 2px;
-  border-top: 1px solid var(--am-line-soft);
-}
-
-.am-rates__row:first-child {
-  border-top: 0;
-}
-
-.am-rates__src {
-  font-size: 13px;
-  color: var(--am-faint);
-}
-
-.am-rates__val {
-  font-size: 13.5px;
-  font-weight: 650;
-  color: var(--am-warn);
-  font-variant-numeric: tabular-nums;
-}
-
 /* Франшиза — хронология строками. Полка больших постеров здесь
    не работала: три тайтла съедали полэкрана, а год, название и метки
    под каждым постером вставали лесенкой. */
@@ -693,28 +561,20 @@
 /* Хронология прокручивается внутри плитки, а не растёт вместе с ней:
    у франшизы на три десятка частей плитка без потолка вытягивала доску
    на несколько экранов. Потолок высоты держит плитку соразмерной
-   соседям при любой длине списка, остальное берёт на себя прокрутка.
+   соседям при любой длине списка, остальное берёт на себя прокрутка;
+   сам потолок задаёт scoped-блок MediaScreen.vue — он один знает,
+   кто стоит с хронологией в ряду.
    overscroll-behavior оставляет колесо внутри списка: иначе после
    последней строки страница улетала вниз. */
 .am-fran .am-rail {
   display: flex;
   flex-direction: column;
   gap: 2px;
-  max-height: clamp(280px, 34vh, 440px);
   padding: 0;
   overflow-x: hidden;
   overflow-y: auto;
   overscroll-behavior: contain;
   scrollbar-width: thin;
-}
-
-/* Когда плитку тянут до низа доски, потолок списка снимается: высоту
-   держит уже сама плитка, и хронология показывает больше строк
-   до прокрутки вместо пустой полосы под последней. */
-.am-board--flow .am-fran .am-rail {
-  flex: 1;
-  max-height: none;
-  min-height: 0;
 }
 
 .am-part {

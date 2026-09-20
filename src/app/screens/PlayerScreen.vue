@@ -63,6 +63,7 @@ import {
 
 import { Logger } from '@/utils/logger'
 
+import EmptyMark from '../components/EmptyMark.vue'
 import { currentRoute } from '../router'
 
 import { attachCast, type Cast, type CastState } from './player-cast'
@@ -86,13 +87,16 @@ import {
   toggleWindowFullscreen,
 } from './player-input'
 import {
+  finishSpot,
   flushWatchKeep,
   forgetSpot,
   peekShare,
   peekSpot,
   rememberSpot,
+  splitSpot,
   spotKey,
   whenWatchReady,
+  type WatchWhat,
 } from './player-keep'
 import { episodeLabel, usePlayer } from './player-view'
 
@@ -268,6 +272,23 @@ let cast: Cast | null = null
 
 /** Ключ места остановки того, что сейчас открыто. */
 let spot = ''
+
+/**
+ * Снимок для истории: что записать рядом с меткой.
+ *
+ * Ключ здесь главнее состояния экрана. Метку пишут и тогда, когда выбор уже
+ * уехал дальше, — при смене озвучки и при уходе с экрана, — а номер серии
+ * и озвучка берутся из самого ключа, так что строка истории всегда говорит
+ * о той серии, за которую её позвали. Подпись озвучки ищется по тому же
+ * ключу, а не по нынешнему выбору: иначе в историю уехало бы чужое имя.
+ */
+function aboutSpot(key: string): WatchWhat {
+  const parts = splitSpot(key)
+  const label =
+    parts === null ? '' : (voices.value.find((v) => v.key === parts.voiceKey)?.label ?? '')
+
+  return { title: mainTitle.value, cover: cover.value, voiceLabel: label }
+}
 
 /** Таймер тишины, после которого панель уезжает с кадра. */
 let calmTimer = 0
@@ -510,7 +531,9 @@ function start(url: string): void {
  */
 function stopFrame(): void {
   const el = videoEl.value
-  if (el !== null && spot !== '') rememberSpot(spot, Math.floor(el.currentTime), total.value)
+  if (el !== null && spot !== '') {
+    rememberSpot(spot, Math.floor(el.currentTime), total.value, aboutSpot(spot))
+  }
 
   playback?.close()
   spot = ''
@@ -654,7 +677,7 @@ function onTime(): void {
 
   at.value = now
   onProgress()
-  if (spot !== '') rememberSpot(spot, now, total.value)
+  if (spot !== '') rememberSpot(spot, now, total.value, aboutSpot(spot))
 }
 
 /** Длина у HLS приезжает позже кадра, и бесконечность тоже бывает. */
@@ -669,7 +692,9 @@ function onMeta(): void {
 
 /** Конец серии: следующая сама. Смотренное забывается: оно пройдено. */
 function onEnded(): void {
-  if (spot !== '') forgetSpot(spot)
+  // Метка уходит, а в истории серия встаёт целой: досмотренное не должно
+  // стоять там оборванным на предпоследней секунде.
+  if (spot !== '') finishSpot(spot, total.value, aboutSpot(spot))
   if (hasNext.value) nextEpisode()
 }
 
@@ -1185,7 +1210,9 @@ watch(wide, (on) => {
 onBeforeUnmount(() => {
   const el = videoEl.value
   if (el !== null) {
-    if (spot !== '') rememberSpot(spot, Math.floor(el.currentTime), total.value)
+    if (spot !== '') {
+      rememberSpot(spot, Math.floor(el.currentTime), total.value, aboutSpot(spot))
+    }
     el.removeEventListener('timeupdate', onTime)
     el.removeEventListener('ended', onEnded)
     el.removeEventListener('play', onPlay)
@@ -1226,7 +1253,7 @@ onBeforeUnmount(() => {
 <template>
   <section class="am-page">
     <div v-if="mediaId === 0" class="am-empty">
-      <span class="am-empty__mark" aria-hidden="true">⊛</span>
+      <span class="am-empty__mark"><EmptyMark name="question" /></span>
       <span>Смотреть нечего: в адресе нет номера аниме.</span>
       <span>Откройте карточку и нажмите «Смотреть».</span>
     </div>

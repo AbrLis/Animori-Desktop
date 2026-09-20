@@ -6,6 +6,7 @@
 //
 // AppManifest::commands порождает разрешения с именами в kebab-case:
 //   animori_reload            -> allow-animori-reload
+//   animori_restart           -> allow-animori-restart
 //   animori_toggle_fullscreen -> allow-animori-toggle-fullscreen
 //   animori_open_external     -> allow-animori-open-external
 //   animori_cast_panel        -> allow-animori-cast-panel
@@ -42,6 +43,11 @@
 
 const COMMANDS: &[&str] = &[
     "animori_reload",
+    // Перезапуск приложения. Параметров нет и быть не может: команда ничего
+    // не настраивает, а повторяет запуск с тем, что уже лежит в настройках.
+    // Нужна прокси: ключи запуска WebView2 читаются один раз, при создании
+    // первого окна, и перезагрузка страницы новый адрес до движка не донесёт.
+    "animori_restart",
     // Полноэкранный режим окна. Параметров нет: только переключение туда-обратно,
     // чтобы код в окне не мог запереть его в полном экране повторными вызовами.
     "animori_toggle_fullscreen",
@@ -85,6 +91,15 @@ const COMMANDS: &[&str] = &[
 ];
 
 fn main() {
+    // Иконка окна попадает в EXE ресурсом Windows: tauri-build пишет в .rc
+    // строку `32512 ICON "icons/icon.ico"`, а компилятор ресурсов кладёт
+    // картинку внутрь исполняемого файла. Сам build.rs от содержимого .ico
+    // не зависит ничем, и без этого объявления Cargo не перезапустит его:
+    // смена одной картинки оставляла бы в EXE прежний ресурс, а собралось бы
+    // всё остальное. Замечено живьём: рельс показал новую сакуру, а системная
+    // иконка осталась старой.
+    println!("cargo:rerun-if-changed=icons/icon.ico");
+
     tauri_build::try_build(
         tauri_build::Attributes::new()
             .app_manifest(tauri_build::AppManifest::new().commands(COMMANDS)),

@@ -4,7 +4,7 @@
 // дело документации, а не карточки настроек.
 //
 // РАСКЛАДКА
-// Панели собраны в три колонки-обёртки. Раньше они лежали прямо в сетке
+// Панели собраны в колонки-обёртки. Раньше они лежали прямо в сетке
 // и разводились по местам через grid-template-areas — и сетка ставила их
 // в общие строки: высокая панель облака держала строку, а под «Оформлением»
 // и «Импортом» до самого низа зияла пустота. Колонка-обёртка такого не умеет:
@@ -16,6 +16,11 @@
 //
 // Справа налево на фуллскрине: облачная копия, импорт со своими данными,
 // оформление со справкой.
+//
+// Прокси — единственная панель, которой столбец выбирает ширина окна: под
+// «Данными» на фуллскрине, под облачной копией на половине экрана. В разметке
+// она поэтому стоит последней, а не рядом с «Данными»: место ей назначает
+// сетка. Узел свой — components/ProxyBox.vue.
 //
 // Внутри панели данных тот же порядок: сначала числа, потом необратимое
 // одной строкой, потом выгрузка своим узлом. Пояснения убраны сознательно:
@@ -63,6 +68,8 @@ import {
 import { datasetStatus, initDatasetNames } from '@/core/dataset-names'
 import { clearCache, getDbStats } from '@/core/db'
 import { buildMalXml, malXmlFileName } from '@/core/mal-xml'
+import { adultByBirth } from '@/core/adult'
+import { forgetRecs } from '@/core/recs'
 import { saveSetting, settings } from '@/core/settings'
 
 import { APPEARANCES, appearance, setAppearance } from '../appearance'
@@ -77,6 +84,8 @@ import {
 } from '../auth/session'
 import BrandMark from '../components/BrandMark.vue'
 import CloudBox from '../components/CloudBox.vue'
+import DatePick from '../components/DatePick.vue'
+import ProxyBox from '../components/ProxyBox.vue'
 import { saveXmlFile } from '../save-file'
 
 const version = __ANIMORI_VERSION__
@@ -100,7 +109,7 @@ const system = systemName()
  * Адрес датасета названий. Ссылка осталась и после ухода на CC0-1.0, но
  * обязанностью быть перестала: атрибуции эта лицензия не требует вовсе,
  * а назвать единственный источник кириллицы — вежливость. Разбор —
- * в docs/DATA-PIPELINE.md, раздел «Права: CC0».
+ * в docs/DATA.md, раздел «Права: CC0».
  */
 const DATASET_URL = 'https://github.com/foulnike/animori-data'
 
@@ -108,6 +117,24 @@ const DATASET_URL = 'https://github.com/foulnike/animori-data'
 /// в WebView2 отбрасывается молча, без окна и без ошибки.
 function onDatasetLink(): void {
   void Bridge.shell.openExternal(DATASET_URL)
+}
+
+/**
+ * Адрес репозитория и просьба при нём.
+ *
+ * ПОЧЕМУ ЗДЕСЬ, А НЕ В ОКНЕ ПРИ ЗАПУСКЕ
+ *
+ * В «О программе» человек доходит сам, а значит ему не всё равно;
+ * окно с просьбой на старте читается вымогательством и отучает
+ * запускать программу вообще. Просьба одна, без восклицательных
+ * знаков и без «поддержите проект»: звезда значит «пригодилась»,
+ * issue значит «сломалось», и обе вещи делаются в одном месте —
+ * поэтому и просят о них одной строкой, а не двумя призывами.
+ */
+const REPO_URL = 'https://github.com/foulnike/Animori-Desktop'
+
+function onRepoLink(): void {
+  void Bridge.shell.openExternal(REPO_URL)
 }
 
 // Ошибки показываются рядом с кнопкой, а не глотаются: молчаливый catch
@@ -185,6 +212,18 @@ const STALE_DAYS = 30
  * общий объект настроек не реактивен, и v-model по его полю не дал бы ответа на клик.
  */
 const adult = ref(settings.showAdult)
+
+/**
+ * Открыт ли вопрос о возрасте. Взрослое включается не нажатием, а ответом
+ * на этот вопрос: до него тумблер стоит выключенным.
+ */
+const askingAge = ref(false)
+
+/** Дата рождения из календарика. Живёт только до ответа и никуда не пишется. */
+const birth = ref('')
+
+/** Слова отказа. Пустая строка — отказа нет. */
+const ageError = ref('')
 
 /**
  * Папка для выгрузок (пункт 3.3). Значение списывается один раз по той же
@@ -364,6 +403,16 @@ function lostText(done: ShikiPullResult): string {
 }
 
 /**
+ * Даты просмотра словами. Ноль здесь не поломка, а «просмотров не было»:
+ * у запланированного тайтла дат и не бывает, и говорить об этом надо так,
+ * чтобы человек не пошёл искать ошибку.
+ */
+function datesText(done: ShikiPullResult): string {
+  if (done.dated === 0) return ' Дат просмотра в журнале Шикимори не нашлось.'
+  return ` Даты просмотра перенесены в ${done.dated} записей.`
+}
+
+/**
  * Перенос списка с Шикимори по нику. Способы те же два, и вопрос тот же:
  * замена вычищает всё, включая перенесённое с AniList и добавленное руками.
  */
@@ -386,11 +435,13 @@ function onShikiPull(mode: PullMode): void {
       shikiNote.value =
         done.mode === 'replace'
           ? `Список замещён списком ${done.nick} с Шикимори: записей ${done.total}.` +
-            lostText(done)
+            lostText(done) +
+            datesText(done)
           : `Списки слиты: всего ${done.total}, новых ${done.added}, ` +
             `обновлено ${done.updated}, своих правок сохранено ${done.kept}, ` +
             `только здесь ${done.onlyHere}.` +
-            lostText(done)
+            lostText(done) +
+            datesText(done)
     } catch (e) {
       shikiError.value = describe(e)
     } finally {
@@ -488,12 +539,60 @@ function onExport(): void {
 /**
  * Переключение показа взрослого. Отбор живёт в core/adult.ts и читает ключ
  * в момент вопроса, поэтому перезапуска не нужно: следующий поиск уже другой.
+ * Одно исключение — полки витрины: их состав собран заранее и живёт весь
+ * сеанс, поэтому тумблер выбрасывает его вызовом `forgetRecs`. Без этого
+ * переключатель работал бы в одну сторону: отсеянное при выключенном показе
+ * не вернулось бы и после включения.
  *
  * Заметки об исходе нет: сам тумблер и есть ответ, а прежняя строка писалась
  * в панель другой колонки и читалась там как чужая.
+ *
+ * ВКЛЮЧЕНИЕ СПРАШИВАЕТ ДАТУ РОЖДЕНИЯ
+ *
+ * Проверка формальная: она никого не опознаёт и ничего не хранит. Дата
+ * не уходит ни в настройки, ни на склад — спрашивается заново каждый раз.
+ * Запоминать её ради одного нажатия было бы плохой сделкой, а «помнить,
+ * что уже спрашивали» превратило бы проверку в украшение.
+ *
+ * Тумблер встаёт в «включено» только после ответа. Нажатие его не включает:
+ * до ответа он выключен, и это не придирка — иначе тумблер показывал бы
+ * включённое там, где ключ ещё не записан.
  */
 function onAdult(): void {
-  void saveSetting('showAdult', 'set_adult', adult.value)
+  if (!adult.value) {
+    void saveSetting('showAdult', 'set_adult', false)
+    forgetRecs()
+    closeAge()
+    return
+  }
+
+  adult.value = false
+  birth.value = ''
+  ageError.value = ''
+  askingAge.value = true
+}
+
+/** Ответ календарика. Пустая дата — «стёрли», и это не ответ. */
+function onBirth(value: string): void {
+  birth.value = value
+  if (value === '') return
+
+  if (!adultByBirth(value)) {
+    ageError.value = 'В доступе отказано'
+    return
+  }
+
+  closeAge()
+  adult.value = true
+  void saveSetting('showAdult', 'set_adult', true)
+  forgetRecs()
+}
+
+/** Отказ от вопроса: тумблер остаётся выключенным, и это его настоящее состояние. */
+function closeAge(): void {
+  askingAge.value = false
+  birth.value = ''
+  ageError.value = ''
 }
 
 // Память сбрасывается только руками. Перезагрузка не делается сама:
@@ -899,6 +998,22 @@ onMounted(() => {
             <input v-model="adult" type="checkbox" class="am-switch__box" @change="onAdult" />
             <span class="am-switch__name">Показывать контент для взрослых (18+)</span>
           </label>
+
+          <!-- Вопрос о возрасте стоит под тумблером, а не отдельным окном:
+               он живёт ровно столько, сколько человек его видит, и уход
+               с экрана его закрывает. Поле даты своё, из разметки правки:
+               системное на тёмных темах выбивалось из стекла. -->
+          <div v-if="askingAge" class="am-age">
+            <p class="am-age__ask">Укажите ваш возраст</p>
+
+            <DatePick :value="birth" title="Дата рождения" @pick="onBirth" />
+
+            <p v-if="ageError" class="am-error">{{ ageError }}</p>
+
+            <button class="am-btn am-btn--soft am-age__back" type="button" @click="closeAge">
+              Отмена
+            </button>
+          </div>
         </div>
 
         <div class="am-panel am-box">
@@ -921,6 +1036,41 @@ onMounted(() => {
             </li>
           </ul>
 
+          <!-- Плашка репозитория. Стоит до мелкой печати, но это уже не
+               строка заметок, а приглашение: свой фон, своё сердце, и
+               нажимается вся плашка — ведёт в репозиторий. Почему именно
+               здесь и почему именно так — у REPO_URL в скрипте. -->
+          <button class="am-repo" type="button" @click="onRepoLink">
+            <svg class="am-repo__heart" viewBox="0 0 16 16" aria-hidden="true" focusable="false">
+              <!-- Градиент сердцу задан классами в стилях: stop-color
+                   через var() в атрибуте не читается, только как
+                   css-свойство. Оттенок берётся из темы, поэтому
+                   на всех трёх темах сердце своё. -->
+              <defs>
+                <linearGradient
+                  id="am-repo-heart"
+                  x1="2.4"
+                  y1="2.4"
+                  x2="13.6"
+                  y2="13.6"
+                  gradientUnits="userSpaceOnUse"
+                >
+                  <stop class="am-repo__stop" offset="0" />
+                  <stop class="am-repo__stop am-repo__stop--end" offset="1" />
+                </linearGradient>
+              </defs>
+              <path
+                fill="url(#am-repo-heart)"
+                d="M8 14.1S1.9 10.3 1.9 6.1C1.9 3.9 3.7 2.4 5.5 2.4 6.8 2.4 7.6 3.1 8 4c.4-.9 1.2-1.6 2.5-1.6 1.8 0 3.6 1.5 3.6 3.7 0 4.2-6.1 8-6.1 8Z"
+              />
+            </svg>
+
+            <span class="am-repo__text">
+              AniMori бесплатна, без рекламы и телеметрии. Понравилось приложение — поставьте
+              звездочку, сломалась — оставьте issue.
+            </span>
+          </button>
+
           <!-- Имя источника, лицензия и ссылка. Обязанностью строка быть
                перестала: CC0-1.0 атрибуции не требует, и это вежливость
                к единственному источнику кириллицы. Манами из цепочки убрана
@@ -941,6 +1091,18 @@ onMounted(() => {
             и запустите сборку кнопкой.
           </p>
         </div>
+      </div>
+
+      <!-- Прокси своим узлом: у панели своё состояние и свой разговор
+           с оболочкой, и экрану настроек о нём знать нечего.
+
+           Столбец ей выбирает ширина окна, и потому она лежит не рядом
+           с «Данными», а последней в разметке: на фуллскрине сетка ставит
+           её во второй столбец, под «Данные», а на половине экрана она
+           остаётся в своей половине ширины и оказывается под облачной
+           копией. Разбор — в settings-screen.css, у правил .am-set. -->
+      <div class="am-set__col am-set__col--proxy">
+        <ProxyBox />
       </div>
     </div>
   </section>

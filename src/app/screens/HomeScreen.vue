@@ -39,12 +39,12 @@ import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { emptyPick, pickIsSet, pickKey, type CatalogPick } from '@/api/anilist-catalog'
 import type { MediaBrief } from '@/api/anilist-media'
 import { setupVideoSources } from '@/api/video-sources'
-import { genreAllowed } from '@/core/adult'
+import { genreAllowed, keepAllowed } from '@/core/adult'
 import { initCollection } from '@/core/collection'
 import { selectEntries } from '@/core/collection-view'
 import {
   notOutYet,
-  partsOut,
+  partsCeiling,
   peekLook,
   rememberBrief,
   SOON_STATUS,
@@ -64,16 +64,32 @@ import { feedMore, hideRec, motifShelf, newFeed, packShelf, tasteShelf } from '@
 import type { SnapshotEntry } from '@/core/snapshot'
 import { Logger } from '@/utils/logger'
 
+import EmptyMark from '../components/EmptyMark.vue'
 import FilterSheet from '../components/FilterSheet.vue'
 import MediaTile from '../components/MediaTile.vue'
 import { formatWord, GENRE_CHOICES, genreWord, partsShort } from '../labels'
 import { navigate } from '../router'
+import SakuraMark from '../components/SakuraMark.vue'
 import { tagWord } from '../tag-words'
 import { toPlayAsk, toTileRow, type TileRow } from '../tile-row'
+import { OWN_STATUSES, useHomeCalendar, type CalendarScope } from './home-calendar'
 import { dropFeed, feedKeep, homePick } from './home-keep'
 
 /** Сколько постеров класть на свою полку. */
 const SHELF_SIZE = 14
+
+/** Области показа календаря: подписи, подсказки и порядок.
+ *
+ *  Второй пункт назван «Популярное», а не «Глобально», нарочно. Глобального
+ *  показа у AniList нет вовсе: выходы сортируются только по времени, а список
+ *  упирается в потолок в пять тысяч записей и на неделе, и на одних сутках.
+ *  «Всё, что выходит в мире» выгрузить нечем, и подпись, обещающая это,
+ *  врала бы при каждом открытии экрана. Здесь же — верхушка идущих
+ *  по популярности, и подсказка говорит об этом прямо. */
+const CALENDAR_SCOPES: ReadonlyArray<{ key: CalendarScope; title: string; hint: string }> = [
+  { key: 'mine', title: 'Моё', hint: 'Всё из списка, кроме брошенного' },
+  { key: 'popular', title: 'Популярное', hint: 'Выходы верхушки идущих за эту неделю' },
+]
 
 /** Скольким плиткам добирать русские названия и по скольку за заход. */
 const TITLE_DEPTH = 12
@@ -143,8 +159,32 @@ const feedRows = ref<TileRow[]>([])
 const feedBusy = ref(false)
 const feedDone = ref(false)
 
+/** Календарь выхода. Всё считает home-calendar, здесь только разметка. */
+const {
+  busy: calendarBusy,
+  failed: calendarFailed,
+  days: calendarDays,
+  shown: calendarDay,
+  span: calendarSpan,
+  scope: calendarScope,
+  hidden: calendarHidden,
+  hiddenDays: calendarHiddenDays,
+  pick: pickDay,
+  setScope: setCalendarScope,
+  load: loadCalendar,
+} = useHomeCalendar()
+
+/** Выходы показанного дня. Отдельным computed, а не выражением в разметке:
+    решать, рисовать ли полку, должен скрипт, а не шаблон. Потолка у списка
+    больше нет: полка постеров едет вбок и в высоту не растёт, поэтому прежние
+    «восемь строк и Ещё N» вместе с раскрытием дня отсюда ушли. */
+const dayRows = computed(() => calendarDay.value?.rows ?? [])
+
 /** Записи своей полки вне реактивности: плитки пересобираются после добора. */
 let ownEntries: SnapshotEntry[] = []
+
+/** Номера своих тайтлов для календаря: нужны ещё раз при смене области показа. */
+let calendarIds: number[] = []
 
 /** Приехавшие полки витрины и их порядок: плитки собираются на показ. */
 const staged = new Map<string, MediaBrief[]>()
@@ -285,7 +325,7 @@ function toRow(entry: SnapshotEntry): Row {
   const look = peekLook(entry.mediaId)
 
   // У идущего сезона итога может не быть вовсе: считаем по вышедшему.
-  const parts = partsOut(look)
+  const parts = partsCeiling(look)
   const done =
     parts !== null && parts > 0 && entry.progress > 0 ? Math.min(1, entry.progress / parts) : 0
 
@@ -314,9 +354,11 @@ function redrawOwn(): void {
   ownRows.value = ownEntries.map(toRow)
 }
 
-/** Пересобирает плитки ленты подбора из набранного. */
+/** Пересобирает плитки ленты подбора из набранного.
+    Взрослое отсеивается при отрисовке по той же причине, что и на полках:
+    набранное лента держит дольше, чем живёт настройка показа. */
 function drawFeed(): void {
-  feedRows.value = feedKeep.items.map(toTileRow)
+  feedRows.value = keepAllowed(feedKeep.items, (item) => item.isAdult).map(toTileRow)
 }
 
 /** Добирает обложки своей полки: снимок картинок не хранит. */
@@ -394,15 +436,30 @@ function loadOwnMarks(): void {
 
 /** Своя полка: продолжение просмотра и пересмотра. */
 function buildOwn(): void {
-  ownEntries = selectEntries(
-    { status: ['CURRENT', 'REPEATING'] },
+  // Взрослое отсеивается здесь, на входе: полка — те же свои записи, что
+  // и в списках, и отдельной политики для неё нет. Фильтр по месту, а не
+  // на выдаче `selectEntries`: скрытая запись не тянет ни обложку,
+  // ни имя, ни вопрос о доступности.
+  const watching = selectEntries(
+    { status: ['CURRENT', 'REPEATING'], hideAdult: true },
     { key: 'updated' },
-    { limit: SHELF_SIZE },
   )
+
+  ownEntries = watching.slice(0, SHELF_SIZE)
   redrawOwn()
   void fillLooks()
   void fillTitles()
   loadOwnMarks()
+
+  // Календарю нужны все свои тайтлы, а не четырнадцать на полке: полка
+  // обрезана по длине, а неделя — нет. И закладки шире, чем у полки: «Смотрю»
+  // отвечает на вопрос «что продолжу», а календарь — «что у меня выходит»,
+  // поэтому в него идут и планы, и отложенное. Брошенное не идёт: от него
+  // человек отказался. Разницу держит OWN_STATUSES в home-calendar.
+  //
+  // Номера запоминаются: они нужны ещё раз при смене области показа.
+  calendarIds = selectEntries({ status: [...OWN_STATUSES] }).map((entry) => entry.mediaId)
+  void loadCalendar(calendarIds)
 }
 
 /** Состав витрины. Порядок важен дважды: по нему полки стоят на экране
@@ -423,7 +480,11 @@ function shelfDefs(): ShelfDef[] {
 /** Собирает полки в показ: приехавшее встаёт на своё место в порядке состава.
     Аниме показывается ровно на одной полке: «тренд», «лучшее» и жанровые
     подборки у каталога пересекаются почти наполовину, и витрина читалась
-    одним и тем же рядом под разными заголовками. */
+    одним и тем же рядом под разными заголовками.
+
+    Взрослое отсеивается здесь, а не только при загрузке полки: состав полок
+    запоминается на сеанс, и отсев, сделанный при включённом показе, иначе
+    остался бы на экране и после выключения тумблера. */
 function publish(): void {
   const out: Shelf[] = []
   const seen = new Set<number>()
@@ -432,7 +493,9 @@ function publish(): void {
     const items = staged.get(def.key)
     if (items === undefined || items.length === 0) continue
 
-    const fresh = items.filter((brief) => !seen.has(brief.mediaId))
+    const fresh = keepAllowed(items, (brief) => brief.isAdult).filter(
+      (brief) => !seen.has(brief.mediaId),
+    )
     if (fresh.length < SHELF_MIN) continue
 
     for (const brief of fresh) seen.add(brief.mediaId)
@@ -853,6 +916,108 @@ watch(
 
     <p v-if="trouble" class="am-error">{{ trouble }}</p>
 
+    <!-- Календарь выхода стоит под шапкой и выше отбора: он отвечает
+         на вопрос, ради которого приложение открывают завтра, а не на
+         вопрос, что посмотреть сейчас. Полоса дней рисуется сразу —
+         дни это календарь, а не данные, и ждать их неоткуда. -->
+    <section v-if="calendarDays.length > 0" class="am-cal">
+      <div class="am-cal__bar">
+        <h2 class="am-h2">Выход серий</h2>
+
+        <div class="am-seg" role="group" aria-label="Чья неделя">
+          <button
+            v-for="item in CALENDAR_SCOPES"
+            :key="item.key"
+            v-tip="item.hint"
+            class="am-seg__btn"
+            :class="{ 'am-seg__btn--on': calendarScope === item.key }"
+            type="button"
+            :aria-pressed="calendarScope === item.key"
+            @click="setCalendarScope(item.key, calendarIds)"
+          >
+            {{ item.title }}
+          </button>
+        </div>
+
+        <span class="am-bar__gap" />
+        <span class="am-cal__span">{{ calendarSpan }}</span>
+      </div>
+
+      <div class="am-cal__strip" role="group" aria-label="Дни недели">
+        <button
+          v-for="day in calendarDays"
+          :key="day.key"
+          v-tip="day.title"
+          class="am-cal__day"
+          :class="{
+            'am-cal__day--on': day.key === calendarDay?.key,
+            'am-cal__day--today': day.today,
+            'am-cal__day--past': day.past,
+          }"
+          type="button"
+          :aria-label="day.title"
+          :aria-pressed="day.key === calendarDay?.key"
+          @click="pickDay(day.key)"
+        >
+          <span class="am-cal__word">{{ day.word }}</span>
+          <span class="am-cal__num">{{ day.num }}</span>
+          <span
+            class="am-cal__dot"
+            :class="{ 'am-cal__dot--on': day.rows.length > 0 }"
+            aria-hidden="true"
+          />
+        </button>
+      </div>
+
+      <p v-if="calendarBusy && (calendarDay?.rows.length ?? 0) === 0" class="am-cal__note">
+        Спрашиваю расписание…
+      </p>
+
+      <p v-else-if="calendarFailed" class="am-cal__note">Расписание не пришло — проверьте связь.</p>
+
+      <!-- День — полка постеров в один ряд с боковой прокруткой, а не список
+           строк. Число выходов теперь не влияет на высоту: в чужом показе
+           суббота даёт под два десятка серий, и строками они вытесняли полки
+           за нижний край окна. Час и номер серии ушли в подпись под названием:
+           постер говорит «что», подпись — «когда».
+
+           Метку доступности календарь добывает сам, всем днём разом, и потому
+           `v-seen` здесь нет: он для полок на сотню плиток, где спрашивать
+           про всё сразу незачем. -->
+      <ul v-else-if="dayRows.length > 0" class="am-rail am-cal__rail">
+        <MediaTile
+          v-for="row in dayRows"
+          :key="row.key"
+          :title="row.title"
+          :facts="row.facts"
+          :cover="row.cover"
+          :color="row.color"
+          :play="row.play"
+          @open="open(row.mediaId)"
+        />
+      </ul>
+
+      <!-- Пустой день — тоже пустое состояние, и знак у него тот же, что
+           у крупных: лист календаря. Знак встаёт в строку примечания,
+           поэтому кегль ему задан отдельно, см. .am-cal__mark.
+
+           День, где всё спрятал отбор, пустым не объявляется: «выходов нет»
+           было бы неправдой. Скрытое считается за неделю, а помнится по дням —
+           иначе отличить тишину от отбора нечем. -->
+      <p v-else-if="calendarHiddenDays.has(calendarDay?.key ?? 0)" class="am-cal__note">
+        В этот день выходы скрыты меткой 18+.
+      </p>
+
+      <p v-else class="am-cal__note am-cal__note--none">
+        <span class="am-cal__mark"><EmptyMark name="calendar" /></span>
+        <span>В этот день выходов нет.</span>
+      </p>
+
+      <p v-if="calendarHidden > 0" class="am-cal__note">
+        Скрыто с меткой 18+: {{ calendarHidden }} · показ взрослого включается в настройках
+      </p>
+    </section>
+
     <!-- Ряд отбора: кнопка меню, быстрые жанры одной лентой и сброс.
          Внутренний ряд нужен для центровки: сам прокрутчик шириной во всю
          страницу, а ряд — ровно по содержимому. -->
@@ -908,7 +1073,10 @@ watch(
            пока туда не прокрутят. -->
       <section v-if="ownRows.length > 0" class="am-shelf am-shelf--mine">
         <div class="am-bar">
-          <h2 class="am-h2">Продолжаю смотреть</h2>
+          <h2 class="am-h2 am-shelf__head">
+            <SakuraMark class="am-shelf__mine" />
+            Продолжаю смотреть
+          </h2>
           <span class="am-bar__gap" />
           <button class="am-btn am-btn--ghost" type="button" @click="toLists">К спискам</button>
         </div>
@@ -1001,7 +1169,7 @@ watch(
         </ul>
 
         <div v-else class="am-empty">
-          <span class="am-empty__mark" aria-hidden="true">✧</span>
+          <span class="am-empty__mark"><EmptyMark name="sieve" /></span>
           <span>По такому отбору ничего не нашлось.</span>
           <span>Снимите пару условий — подбор станет шире.</span>
 
@@ -1021,7 +1189,7 @@ watch(
         v-if="!recsPending && !feedShown && ownRows.length === 0 && recs.length === 0"
         class="am-empty"
       >
-        <span class="am-empty__mark" aria-hidden="true">✧</span>
+        <span class="am-empty__mark"><EmptyMark name="tray" /></span>
         <span>Свой список пуст, а каталог не ответил.</span>
         <span>Когда сеть вернётся, здесь появятся рекомендации.</span>
 
@@ -1115,6 +1283,158 @@ watch(
   display: flex;
   flex-wrap: wrap;
   gap: 10px;
+}
+
+/* Календарь выхода. Стекло то же, что у полосы отбора: обе стоят на одном
+   экране и обе — служебные полосы, а не содержимое витрины. */
+.am-cal {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px 14px 14px;
+  background: var(--am-glass);
+  border: 1px solid var(--am-line-soft);
+  border-radius: var(--am-r-xl);
+  box-shadow: inset 0 1px 0 var(--am-edge);
+  backdrop-filter: blur(var(--am-blur)) saturate(1.4);
+}
+
+/* Строки по центру, а не по базовой линии: в полосе теперь стоит
+   переключатель области показа, и по базовой линии он вставал бы
+   на одну линию с подписью недели, а не с заголовком. */
+.am-cal__bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+}
+
+.am-cal__span {
+  font-size: 12.5px;
+  color: var(--am-faint);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Полоса дней — сеткой, а не флексом: семь клеток разной ширины читались бы
+   рядом кнопок, а не календарём. */
+.am-cal__strip {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.am-cal__day {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  align-items: center;
+  padding: 7px 4px 6px;
+  font: inherit;
+  color: var(--am-dim);
+  cursor: pointer;
+  background: var(--am-fill-1);
+  border: 1px solid transparent;
+  border-radius: var(--am-r-m);
+  transition:
+    color var(--am-fast) var(--am-ease),
+    background-color var(--am-fast) var(--am-ease),
+    border-color var(--am-fast) var(--am-ease),
+    opacity var(--am-fast) var(--am-ease);
+}
+
+.am-cal__day:hover {
+  color: var(--am-text);
+  background: var(--am-hover);
+}
+
+/* Прошедший день тише будущего: вышедшее ждёт, а не случится. */
+.am-cal__day--past {
+  opacity: 0.62;
+}
+
+.am-cal__day--past:hover {
+  opacity: 1;
+}
+
+/* Сегодня отмечено всегда, даже когда выбран другой день: отойдя на пятницу,
+   человек иначе потерял бы, где он сам. */
+.am-cal__day--today .am-cal__num {
+  color: var(--am-accent);
+}
+
+/* Выбранный день возвращает себе полную силу: приглушённость прошедшего
+   иначе гасила бы и выбор, и выбранный понедельник выглядел бы бледнее
+   невыбранной среды — то есть ровно наоборот. Наведение на прошедший день
+   ведёт себя так же (см. выше). */
+.am-cal__day--on {
+  color: var(--am-text);
+  opacity: 1;
+  background: var(--am-hover);
+  border-color: rgb(var(--am-accent-rgb) / 0.45);
+}
+
+.am-cal__word {
+  font-size: 11px;
+  color: var(--am-faint);
+}
+
+.am-cal__num {
+  font-size: 17px;
+  font-weight: 650;
+  line-height: 1.05;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Точка под числом: есть ли в этот день выходы. Именно точка, а не число —
+   число пришлось бы читать, а по полосе водят глазом. Подробности даёт
+   подсказка, точное число — список под полосой. */
+.am-cal__dot {
+  width: 5px;
+  height: 5px;
+  border-radius: var(--am-r-cap);
+  background: transparent;
+}
+
+.am-cal__dot--on {
+  background: var(--am-accent);
+}
+
+/* Полка под полосой: отступы теснее общих. Внешние поля полки (14 сверху
+   и 16 снизу) рассчитаны на то, что она стоит сама по себе, а здесь её
+   обнимает стекло календаря — вложенные отступы давали бы двойной зазор.
+   Сверху десять, а не ноль: плитка под курсором приподнимается, и полоса
+   прокрутки обрезала бы ей макушку. */
+.am-cal__rail {
+  gap: 12px;
+  padding: 10px 4px 8px;
+}
+
+.am-cal__note {
+  margin: 0;
+  padding: 4px 2px;
+  font-size: 12.5px;
+  color: var(--am-faint);
+}
+
+/* Пустой день: знак и слова в одну строку. Остальные два примечания календаря
+   («Спрашиваю расписание…» и «Расписание не пришло») остаются простым текстом:
+   это ожидание и отказ, а не пустота, и знак у них был бы ложью. */
+.am-cal__note--none {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* Кегль знака. Сам знак берёт размер от кегля места (width: 1em), и здесь
+   это 16 вместо общих 34: в строке примечания крупный знак раздул бы её
+   втрое. Обёртка нужна ровно за этим — цвет знак наследует от примечания.
+   Шестнадцать, а не двенадцать с половиной: при кегле примечания штрих
+   выходил тоньше пикселя и знак выцветал. Высота строки от этого не растёт:
+   восемнадцать с половиной пикселей строки шрифта против шестнадцати
+   у знака. */
+.am-cal__mark {
+  flex: none;
+  font-size: 16px;
 }
 
 /* Ряд отбора: кнопка меню слева, лента жанров занимает остальное.
@@ -1240,12 +1560,22 @@ watch(
   align-items: center;
 }
 
-.am-shelf .am-h2::before {
-  width: 3px;
-  height: 15px;
-  content: '';
-  background: linear-gradient(180deg, var(--am-accent), var(--am-accent-2));
-  border-radius: var(--am-r-cap);
+.am-shelf .am-h2 {
+  /* Засечка перед заголовком жила как украшение. Смысла она не несла:
+     заголовок и так отличается от текста шрифтом, а сакура у своей полки
+     делает то же для одного конкретного случая. Убрана. */
+}
+
+.am-shelf--mine .am-h2 {
+  /* Сакура остаётся знаком «своё»: подробнее у самой сакуры ниже. */
+}
+
+.am-shelf__mine {
+  /* 1em рядом с кеглем 19 пикселей — сакура чуть ниже строки: её лепестки
+     выше букв на 0.4 пикселя, и вровень она смотрелась бы крупной. */
+  width: 14px;
+  height: 14px;
+  color: var(--am-sakura);
 }
 
 .am-rail {

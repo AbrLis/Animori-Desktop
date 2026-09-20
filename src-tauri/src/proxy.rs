@@ -38,12 +38,21 @@ const DEFAULT_BYPASS: &str = "localhost, 127.0.0.1";
 
 /// Applied значит лишь «движок получил адрес»: прокси, который принимает
 /// соединение, но не пускает наружу, TCP-щуп не отличит.
+///
+/// WindowUnsupported — не то же, что Unreachable, и разведены они нарочно:
+/// Unreachable значит «адрес молчит», а здесь адрес как раз ответил, просто
+/// передать его окну на этой платформе нечем. Одно слово на оба случая
+/// заставляло панель говорить «не ответил» про отвечающий адрес.
 #[derive(Clone, Copy, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub enum ProxyOutcome {
     Off,
     Invalid,
     Unreachable,
+    /// Собирается только вне Windows, поэтому на Windows предупреждение
+    /// «никогда не строится» снимается — приём тот же, что у WindowAuth ниже.
+    #[cfg_attr(windows, allow(dead_code))]
+    WindowUnsupported,
     Applied,
 }
 
@@ -378,8 +387,10 @@ fn decide(app: &AppHandle) -> ProxyStatus {
         log::warn!("Прокси для окна на этой платформе пока не поддержан — страница идёт напрямую");
 
         // Не Applied: адрес движку никто не отдавал, зелёной галочке взяться неоткуда.
+        // И не Unreachable: до этой ветки щуп уже достучался до адреса, а «не ответил»
+        // сказало бы про него неправду. Беда здесь не в адресе, а в платформе.
         ProxyStatus {
-            outcome: ProxyOutcome::Unreachable,
+            outcome: ProxyOutcome::WindowUnsupported,
             server: args.server,
             has_credentials: args.has_credentials,
             auth: ProxyAuth::None,
