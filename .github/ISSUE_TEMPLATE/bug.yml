@@ -1,27 +1,16 @@
 name: Что-то сломалось
-description: Ошибка в скрипте или в приложении для Windows
-labels: ["bug"]
+description: Ошибка в приложении
+labels: ['bug']
 body:
   - type: markdown
     attributes:
       value: |
         Спасибо, что нашли время на отчёт. Чем точнее заполнены поля, тем быстрее найдётся причина.
-  - type: dropdown
-    id: build
-    attributes:
-      label: Сборка
-      description: Скрипт и приложение работают по-разному, и часть возможностей есть только в одной из них.
-      options:
-        - Пользовательский скрипт (Tampermonkey)
-        - Приложение для Windows
-        - Не знаю
-    validations:
-      required: true
   - type: input
     id: version
     attributes:
-      label: Версия AniMori
-      description: У скрипта видна в менеджере скриптов, у приложения — в настройках, раздел «О программе».
+      label: Версия
+      description: Видна в настройках, раздел «О программе».
       placeholder: 3.0.0
     validations:
       required: true
@@ -29,16 +18,27 @@ body:
     id: environment
     attributes:
       label: Окружение
-      description: Для скрипта — браузер и менеджер скриптов, для приложения — версия Windows.
-      placeholder: Chrome 141 и Tampermonkey 5.3 либо Windows 11 23H2
+      description: Версия Windows и установлен ли WebView2.
+      placeholder: Windows 11 23H2
     validations:
       required: true
-  - type: input
-    id: page
+  - type: dropdown
+    id: screen
     attributes:
-      label: Где это видно
-      description: Для скрипта — адрес страницы AniList. Для приложения — название экрана: главная, списки, поиск, карточка, плеер, настройки.
-      placeholder: карточка тайтла либо https://anilist.co/anime/207141/
+      label: Экран
+      options:
+        - Главная
+        - Моё
+        - История
+        - Поиск
+        - Тайтл
+        - Студия
+        - Просмотр
+        - Настройки
+        - Журнал
+        - Другое
+    validations:
+      required: true
   - type: textarea
     id: steps
     attributes:
@@ -50,18 +50,18 @@ body:
         Ждал плеер, получил пустое окно.
     validations:
       required: true
-  - type: textarea
-    id: log
-    attributes:
-      label: Записи журнала
-      description: Для скрипта — Настройки, раздел отладки. В приложении журнал скрыт и в меню его нет — если записей нет, оставьте поле пустым: шагов достаточно.
-      render: text
   - type: input
     id: network
     attributes:
       label: Настройка сети
-      description: Только для приложения: включена ли настройка соединения.
+      description: Включена ли настройка соединения в настройках.
       placeholder: выключена
+  - type: textarea
+    id: log
+    attributes:
+      label: Записи журнала
+      description: Экран журнала открывается адресом окна #/log. Если записей нет, оставьте поле пустым.
+      render: text
   - type: checkboxes
     id: checks
     attributes:
@@ -71,4 +71,3 @@ body:
           required: true
         - label: Поиск по существующим issue ничего похожего не дал
           required: true
-        - label: Проверено с отключёнными другими расширениями (для скрипта)

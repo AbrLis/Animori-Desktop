@@ -1,8 +1,11 @@
 blank_issues_enabled: false
 contact_links:
-  - name: Вопрос по установке скрипта
-    url: https://greasyfork.org/ru/scripts/572948-animori-anilist-toolkit/feedback
-    about: Обсуждение на Greasy Fork — менеджер скриптов, автообновление, скрипт не запускается.
-  - name: Установка приложения и обновление
-    url: https://github.com/foulnike/AniMori-AniList-Toolkit/releases/latest
-    about: Последний выпуск: установщик, подпись и требования к системе.
+  - name: Установка и обновление
+    url: https://github.com/foulnike/Animori-Desktop/releases/latest
+    about: Последний выпуск — установщик, подпись и требования к системе.
+  - name: Название, описание или видео не те
+    url: https://github.com/foulnike/animori-data
+    about: Русские названия и описания собирает отдельный репозиторий.
+  - name: Устройство приложения
+    url: https://github.com/foulnike/Animori-Desktop/blob/app-3.0-dev/docs/README.md
+    about: Документация — интерфейс, данные, видео, хранение, сборка.
