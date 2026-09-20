@@ -462,10 +462,14 @@ describe('состояние недели', () => {
   })
 })
 
+// Срок выхода берётся от текущего мгновения, а не числом: показанным по
+// умолчанию днём стоит сегодняшний, и выход с записанной в тест датой
+// попадал бы в него ровно один день в году — дальше проверки падали бы
+// ни с того ни с сего. Часы тоже настоящие: на замороженных ограничитель
+// AniList ждёт свой промежуток бесконечно, а добор имён ходит тем же мостом.
 describe('имя выхода', () => {
   it('берёт название сервера, когда русского имени нет', async () => {
-    bridge.bridge.anilist.query = async () =>
-      schedule([airing(21, 1179, secs(at(2026, 8, 16, 19, 30)), 'One Piece')])
+    bridge.bridge.anilist.query = async () => schedule([airing(21, 1179, secs(Date.now()), 'One Piece')])
 
     const view = cal.useHomeCalendar()
     await view.load([21])
@@ -477,8 +481,7 @@ describe('имя выхода', () => {
     // Русское знание главнее: сервер отдаёт ромадзи, а человек читает русское.
     titles.rememberRussianName(21, 'Ван-Пис')
 
-    bridge.bridge.anilist.query = async () =>
-      schedule([airing(21, 1179, secs(at(2026, 8, 16, 19, 30)), 'One Piece')])
+    bridge.bridge.anilist.query = async () => schedule([airing(21, 1179, secs(Date.now()), 'One Piece')])
 
     const view = cal.useHomeCalendar()
     await view.load([21])
@@ -488,7 +491,7 @@ describe('имя выхода', () => {
 
   it('падает на номер тайтла, когда имени нет нигде', async () => {
     bridge.bridge.anilist.query = async () =>
-      schedule([airing(21, 1179, secs(at(2026, 8, 16, 19, 30)))])
+      schedule([airing(21, 1179, secs(Date.now()))])
 
     const view = cal.useHomeCalendar()
     await view.load([21])
@@ -662,7 +665,7 @@ describe('область показа', () => {
 
       asked.push('расписание')
       sent = variables
-      return schedule([airing(21, 5, secs(at(2026, 8, 16, 19, 30)), 'One Piece')])
+      return schedule([airing(21, 5, secs(Date.now()), 'One Piece')])
     }
 
     const view = cal.useHomeCalendar()
@@ -727,7 +730,7 @@ describe('область показа', () => {
     bridge.bridge.anilist.query = async (body: string) => {
       const { query } = JSON.parse(body) as { query: string }
       if (query.includes('RELEASING')) return ongoing([21])
-      return schedule([airing(21, 5, secs(at(2026, 8, 16, 19, 30)), 'One Piece')])
+      return schedule([airing(21, 5, secs(Date.now()), 'One Piece')])
     }
 
     const view = cal.useHomeCalendar()

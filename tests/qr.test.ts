@@ -100,12 +100,21 @@ describe('свой QR', () => {
       [size - 4, 3],
     ]
 
+    // Искатель — не узор выравнивания: у него тёмное ядро 3×3 целиком,
+    // потом светлое кольцо, потом внешнее тёмное и светлая кайма. У узора
+    // выравнивания тёмная только средняя клетка, и перепутать их легко:
+    // кольца там считаются в другую сторону.
     for (const [row, col] of eyes) {
       expect(dark[row][col]).toBe(true)
-      expect(dark[row - 1][col]).toBe(false)
-      expect(dark[row - 2][col]).toBe(true)
-      expect(dark[row][col - 2]).toBe(true)
-      expect(dark[row + 2][col + 2]).toBe(true)
+      expect(dark[row - 1][col]).toBe(true)
+      expect(dark[row - 1][col - 1]).toBe(true)
+
+      expect(dark[row - 2][col]).toBe(false)
+      expect(dark[row + 2][col + 2]).toBe(false)
+
+      expect(dark[row - 3][col]).toBe(true)
+      expect(dark[row][col - 3]).toBe(true)
+      expect(dark[row + 3][col + 3]).toBe(true)
     }
   })
 

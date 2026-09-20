@@ -1,6 +1,8 @@
 import { gzipSync } from 'node:zlib'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
+import type { DatasetIndex, DatasetIndexAnswer } from '@/api/dataset'
+
 import { installMockBridge, resetMockBridge } from './mocks/bridge-module'
 
 const INDEX_URL = 'https://github.com/foulnike/animori-data/releases/latest/download/index.json'
@@ -21,6 +23,19 @@ const validIndex = {
   ],
 }
 
+/**
+ * Опись или падение теста: остальным проверкам нужна разобранная опись.
+ *
+ * Вопрос об описи отвечает тремя исходами, и «нового нет» от «не доехало»
+ * здесь отличается именно для того, чтобы час следующей проверки не сдвигал
+ * сбой. Проверки поэтому смотрят на исход, а не на опись напрямую.
+ */
+function indexOf(answer: DatasetIndexAnswer): DatasetIndex {
+  if (answer.kind !== 'index') throw new Error(`опись не получена: ${answer.kind}`)
+
+  return answer.index
+}
+
 describe('dataset api', () => {
   beforeEach(() => {
     vi.clearAllMocks()
@@ -32,12 +47,15 @@ describe('dataset api', () => {
     mock.setHttpResponse(INDEX_URL, { text: JSON.stringify(validIndex) })
 
     const { fetchDatasetIndex: fetchIndex } = await import('@/api/dataset')
-    const index = await fetchIndex()
+    const answer = await fetchIndex()
     expect(mock.calls.http[0]?.url).toBe(INDEX_URL)
 
-    expect(index?.version).toBe(1)
-    expect(index?.builtAt).toBe(validIndex.builtAt)
-    expect(index?.files).toHaveLength(1)
+    expect(answer.kind).toBe('index')
+
+    const index = indexOf(answer)
+    expect(index.version).toBe(1)
+    expect(index.builtAt).toBe(validIndex.builtAt)
+    expect(index.files).toHaveLength(1)
   })
 
   it('отклоняет опись без даты сборки', async () => {
@@ -45,7 +63,9 @@ describe('dataset api', () => {
     mock.setHttpResponse(INDEX_URL, { text: JSON.stringify({ version: 1, files: [] }) })
 
     const { fetchDatasetIndex: fetchIndex } = await import('@/api/dataset')
-    await expect(fetchIndex()).resolves.toBeNull()
+    const answer = await fetchIndex()
+
+    expect(answer.kind).toBe('fail')
   })
 
   it('отклоняет файл описи без отпечатка', async () => {
@@ -58,7 +78,22 @@ describe('dataset api', () => {
     })
 
     const { fetchDatasetIndex: fetchIndex } = await import('@/api/dataset')
-    await expect(fetchIndex()).resolves.toBeNull()
+    const answer = await fetchIndex()
+
+    expect(answer.kind).toBe('fail')
+  })
+
+  it('на 304 отвечает «тот же выпуск», а не отказом', async () => {
+    // Выпуск выходит раз в неделю, и это самый частый ответ. Код 304 идёт
+    // с ложным `ok`, поэтому проверка в модуле стоит до него: переставь
+    // местами — и каждая проверка начнёт читаться как сбой связи.
+    const mock = installMockBridge()
+    mock.setHttpResponse(INDEX_URL, { status: 304, text: '' })
+
+    const { fetchDatasetIndex: fetchIndex } = await import('@/api/dataset')
+    const answer = await fetchIndex()
+
+    expect(answer.kind).toBe('same')
   })
 
   it('проверяет hash перед распаковкой', async () => {
@@ -69,8 +104,8 @@ describe('dataset api', () => {
     const { fetchDatasetIndex: fetchIndex, fetchDatasetPayload: fetchPayload } = await import(
       '@/api/dataset'
     )
-    const index = await fetchIndex()
-    const file = index?.files[0]
+    const index = indexOf(await fetchIndex())
+    const file = index.files[0]
     if (!file) throw new Error('нет файла датасета')
 
     await expect(fetchPayload({ ...file, sha256: 'bad' })).resolves.toBeNull()
