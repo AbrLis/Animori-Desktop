@@ -7,5 +7,5 @@ contact_links:
     url: https://github.com/foulnike/animori-data
     about: Русские названия и описания собирает отдельный репозиторий.
   - name: Устройство приложения
-    url: https://github.com/foulnike/Animori-Desktop/blob/app-3.0-dev/docs/README.md
+    url: https://github.com/foulnike/Animori-Desktop/blob/main/docs/README.md
     about: Документация — интерфейс, данные, видео, хранение, сборка.
