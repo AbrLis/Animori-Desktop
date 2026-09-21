@@ -1281,7 +1281,11 @@ onBeforeUnmount(() => {
             </div>
           </div>
 
-          <div class="am-play__stage" @dblclick="doFullscreen">
+          <!-- Двойного щелчка по кадру здесь нет нарочно: разворот и сворот
+               остались на кнопке и клавише, а по кадру человек щёлкает,
+               чтобы поставить паузу, и второй щелчок менял размер окна
+               вместо ожидаемого. -->
+          <div class="am-play__stage">
             <video ref="videoEl" class="am-play__frame" playsinline preload="metadata"></video>
 
             <button

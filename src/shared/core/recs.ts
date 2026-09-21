@@ -16,6 +16,13 @@
 // И ровно нужное: набранное сверх порции ждёт в остатке ленты, а не едет
 // в сетку случайным хвостом. Сетка раскладывает плитки по рядам, и лишние
 // три-пять штук оставляли нижний ряд недобранным всю ленту насквозь.
+//
+// ПОЛКА НЕ ПУСТЕЕТ ОТ «НЕ ИНТЕРЕСНО»
+// Отметка убирает одно аниме, а не полку: полка добирает следующее из
+// запаса той же выборки, а кончился запас — берёт следующую страницу.
+// Отбор показа — своё, скрытое, взрослое — применяется на выдаче, а не
+// при приезде страницы: иначе аниме, с которого сняли метку, не вернулось
+// бы на полку до перезапуска.
 
 import { Bridge } from '@/bridge'
 import type { MediaBrief } from '../api/anilist-media'
@@ -26,11 +33,10 @@ import {
   fetchShelf,
   fetchShelfPack,
   fetchTags,
+  type BriefPage,
   type CatalogPick,
   type CatalogTag,
-  type FeedPage,
   type PackKind,
-  type ShelfKind,
   type ShelfPack,
 } from '../api/anilist-catalog'
 import { Logger } from '../utils/logger'
@@ -44,10 +50,12 @@ const TASTE_DEPTH = 30
 /** Сколько жанров вкуса идёт в подбор: один шумит, четыре размывают. */
 const TASTE_GENRES = 2
 
-/** Сколько семян «по мотивам» опрашивается за запуск. */
+/** Сколько семян «по мотивам» опрашивается за круг: советы пары склеиваются. */
 const SEED_COUNT = 2
 
-/** Из скольких любимых выбираются семена: каждый запуск другая пара. */
+/** Сколько любимых идёт в семена: по паре на круг, каждый запуск в новом
+    порядке. Число кратно `SEED_COUNT`, иначе последний круг остался бы
+    без пары. */
 const SEED_POOL = 8
 
 /** Оценка, с которой запись считается любимой. */
@@ -56,6 +64,15 @@ const LOVED_SCORE = 8
 /** Сколько страниц берётся за один «Показать ещё». Потолок обязателен:
     узкий отбор вроде «меха до 1990» иначе уведёт в десятки запросов подряд. */
 const FEED_TRIES = 3
+
+/** Сколько страниц добирает полка за одну просьбу о наполнении. Запас
+    страницы закрывает отметки «не интересно» без сети, так что второй
+    заход нужен лишь когда подчистили и его. */
+const SHELF_TRIES = 2
+
+/** Сколько кругов семян «по мотивам» опрашивается, прежде чем полка
+    признаёт советы исчерпанными: каждый круг — новая пара любимых. */
+const SEED_ROUNDS = 4
 
 /** Ключ хранилища скрытого. Пользовательские данные, а не настройка. */
 const HIDE_KEY = 'am_recs_hidden'
@@ -66,9 +83,6 @@ const HIDE_LIMIT = 500
 /** Скрытые номера. Пустота до подъёма значит «ещё не читали». */
 let hidden: Set<number> | null = null
 
-/** Посчитанное за запуск: переключение вкладки не дёргает сеть снова. */
-const done = new Map<string, Promise<MediaBrief[]>>()
-
 /** Профиль вкуса запуска. null значит «ещё не считали», пустота — «считали, нету». */
 let taste: string[] | null = null
 
@@ -78,17 +92,26 @@ let packRun: Promise<ShelfPack> | null = null
 /** Справочник тэгов запуска: меню отбора открывают много раз за сеанс. */
 let tagsRun: Promise<CatalogTag[]> | null = null
 
+/** Полки витрины: по имени экран просит наполнение, а не ходит в сеть сам. */
+export type ShelfName = 'taste' | 'motif' | 'airing' | 'trending' | 'top'
+
 /**
- * Выбрасывает посчитанные полки. Зовётся при смене показа взрослого:
- * отбор `visible()` применяется в момент загрузки, а состав полок живёт
- * весь сеанс, — то есть без сброса тумблер работал бы в одну сторону.
- *
- * Пачка полок каталога (`packRun`) и профиль вкуса не трогаются: в них
- * лежат сырые ответы, и пересобрать отбор по ним можно без сети.
+ * Запас полки: сырые плитки взятых страниц. Отбор показа применяется
+ * на выдаче, поэтому запас не устаревает ни от отметки «не интересно»,
+ * ни от тумблера взрослого.
  */
-export function forgetRecs(): void {
-  done.clear()
+interface Stock {
+  raw: MediaBrief[]
+  /** Сколько страниц выборки уже взято. */
+  page: number
+  /** Каталог кончился: добирать нечего. */
+  over: boolean
+  /** Страница выборки по номеру. Номер идёт от единицы и растёт подряд. */
+  more: (page: number) => Promise<BriefPage>
 }
+
+/** Запасы полок этого запуска: одна полка — один запас на весь сеанс. */
+const stocks = new Map<ShelfName, Stock>()
 
 /** Поднимает список скрытого из хранилища один раз за запуск. */
 async function loadHidden(): Promise<Set<number>> {
@@ -119,6 +142,21 @@ export async function hideRec(mediaId: number): Promise<void> {
     await Bridge.storage.set(HIDE_KEY, list)
   } catch (e) {
     Logger('WARN', 'Рекомендации: скрытое не записалось', e)
+  }
+}
+
+/**
+ * Снимает метку «не интересно» со всех аниме. Зовётся при очистке памяти:
+ * отметка лежит в том же хранилище, что и настройки, и одной очисткой
+ * кэша названий её не снять.
+ */
+export async function clearHidden(): Promise<void> {
+  hidden = new Set()
+
+  try {
+    await Bridge.storage.set(HIDE_KEY, [])
+  } catch (e) {
+    Logger('WARN', 'Рекомендации: скрытое не снялось', e)
   }
 }
 
@@ -155,18 +193,28 @@ async function tasteGenres(): Promise<string[]> {
   return genres
 }
 
-/** Семена «по мотивам»: пара из любимых, каждый запуск другая. */
-function pickSeeds(): number[] {
+/**
+ * Любимые, из которых берутся семена «по мотивам». Порядок случаен и
+ * запоминается на запуск: полка спрашивает семена парами, и каждая
+ * следующая пара обязана быть новой, а не той же.
+ */
+let seedPool: number[] | null = null
+
+function lovedIds(): number[] {
+  if (seedPool !== null) return seedPool
+
   const loved = selectEntries(
     { onlyRated: true, minScore: LOVED_SCORE },
     { key: 'score' },
     { limit: SEED_POOL },
   )
-  return loved
+
+  seedPool = loved
     .slice()
     .sort(() => Math.random() - 0.5)
-    .slice(0, SEED_COUNT)
     .map((entry) => entry.mediaId)
+
+  return seedPool
 }
 
 /** Что не показываем: своё, скрытое и взрослое при выключенном показе. */
@@ -180,16 +228,6 @@ async function visible(briefs: MediaBrief[]): Promise<MediaBrief[]> {
   ).slice()
 }
 
-/** Полка через кэш запуска: ключ зовёт одну и ту же загрузку лишь раз. */
-function cached(key: string, load: () => Promise<MediaBrief[]>): Promise<MediaBrief[]> {
-  const known = done.get(key)
-  if (known !== undefined) return known
-
-  const promise = load()
-  done.set(key, promise)
-  return promise
-}
-
 /**
  * Пачка полок каталога одним запросом. Провал сбрасывает обещание: витрина
  * пересобирается при возврате на главную, и после обрыва сети вторая попытка
@@ -201,76 +239,151 @@ function loadPack(): Promise<ShelfPack> {
   packRun = fetchShelfPack().catch((e: unknown) => {
     Logger('WARN', 'Рекомендации: пачка полок не доехала', e)
     packRun = null
-    return { airing: [], trending: [], top: [] }
+    return emptyPack()
   })
 
   return packRun
 }
 
-/** Одна полка из пачки с применённым отбором показа. */
-export function packShelf(kind: PackKind): Promise<MediaBrief[]> {
-  return cached(`pack:${kind}`, async () => visible((await loadPack())[kind]))
+/** Пачка, в которой ни одна полка не встанет. */
+function emptyPack(): ShelfPack {
+  return {
+    airing: { items: [], hasNext: false },
+    trending: { items: [], hasNext: false },
+    top: { items: [], hasNext: false },
+  }
 }
 
-/** Полка каталога с применённым отбором. Отказ сети — пустая полка. */
-export function recShelf(kind: ShelfKind, genres?: string[]): Promise<MediaBrief[]> {
-  return cached(`${kind}:${(genres ?? []).join(',')}`, async () => {
-    try {
-      return await visible(await fetchShelf(kind, genres))
-    } catch (e) {
-      Logger('WARN', `Рекомендации: полка «${kind}» не доехала`, e)
-      return []
-    }
-  })
+/** Запас полки каталога: первая страница едет общей пачкой, глубокая одна. */
+function catalogStock(kind: PackKind): Stock {
+  return {
+    raw: [],
+    page: 0,
+    over: false,
+    async more(page) {
+      if (page === 1) return (await loadPack())[kind]
+      return await fetchShelf(kind, undefined, page)
+    },
+  }
 }
 
-/** Подбор «под ваш вкус» по любимым жанрам. Без оценок 8+ полки нет. */
-export function tasteShelf(): Promise<MediaBrief[]> {
-  return cached('taste', async () => {
-    const genres = await tasteGenres()
-    if (genres.length === 0) return []
-    return recShelf('genre', genres)
-  })
+/** Запас подбора «под ваш вкус». Без оценок 8+ добирать нечего. */
+function tasteStock(): Stock {
+  return {
+    raw: [],
+    page: 0,
+    over: false,
+    async more(page) {
+      const genres = await tasteGenres()
+      if (genres.length === 0) return { items: [], hasNext: false }
+      return await fetchShelf('genre', genres, page)
+    },
+  }
 }
 
 /**
- * Советы «по мотивам»: повторы склеиваются суммой весов.
+ * Запас советов «по мотивам»: повторы склеиваются суммой весов.
  *
- * Семена спрашиваются разом: друг от друга они не зависят, а очередью
- * и темпом ведает клиент AniList. Отказ одного семени не роняет полку:
- * советы второго сами по себе уже полка.
+ * Каждый круг — новая пара семян: у одного тайтла советов набирается
+ * немного, и полка, опустевшая после отметок, берёт следующую пару,
+ * а не признаёт тему закрытой. Внутри круга семена спрашиваются разом:
+ * друг от друга они не зависят, а очередью и темпом ведает клиент AniList.
  */
-export function motifShelf(): Promise<MediaBrief[]> {
-  return cached('motif', async () => {
-    const seeds = pickSeeds()
-    if (seeds.length === 0) return []
+function motifStock(): Stock {
+  return {
+    raw: [],
+    page: 0,
+    over: false,
+    async more(page) {
+      const seeds = lovedIds().slice((page - 1) * SEED_COUNT, page * SEED_COUNT)
+      if (seeds.length === 0) return { items: [], hasNext: false }
 
-    const packs = await Promise.all(
-      seeds.map(async (seed) => {
-        try {
-          return await fetchRecsFor(seed)
-        } catch (e) {
-          Logger('WARN', `Рекомендации: советы для ${seed} не доехали`, e)
-          return []
+      const packs = await Promise.all(
+        seeds.map(async (seed) => {
+          try {
+            return await fetchRecsFor(seed)
+          } catch (e) {
+            Logger('WARN', `Рекомендации: советы для ${seed} не доехали`, e)
+            return []
+          }
+        }),
+      )
+
+      const weight = new Map<number, { brief: MediaBrief; rating: number }>()
+      for (const recs of packs) {
+        for (const rec of recs) {
+          const known = weight.get(rec.brief.mediaId)
+          if (known !== undefined) known.rating += rec.rating
+          else weight.set(rec.brief.mediaId, { brief: rec.brief, rating: rec.rating })
         }
-      }),
-    )
-
-    const weight = new Map<number, { brief: MediaBrief; rating: number }>()
-    for (const recs of packs) {
-      for (const rec of recs) {
-        const known = weight.get(rec.brief.mediaId)
-        if (known !== undefined) known.rating += rec.rating
-        else weight.set(rec.brief.mediaId, { brief: rec.brief, rating: rec.rating })
       }
+
+      return {
+        items: Array.from(weight.values())
+          .sort((a, b) => b.rating - a.rating)
+          .map((rec) => rec.brief),
+        hasNext: page < SEED_ROUNDS,
+      }
+    },
+  }
+}
+
+/** Запас полки запуска: создаётся один раз, дальше только пополняется. */
+function stockOf(name: ShelfName): Stock {
+  const known = stocks.get(name)
+  if (known !== undefined) return known
+
+  const stock =
+    name === 'motif' ? motifStock() : name === 'taste' ? tasteStock() : catalogStock(name)
+
+  stocks.set(name, stock)
+  return stock
+}
+
+/** Берёт в запас следующую страницу. false — добрать не удалось. */
+async function grow(stock: Stock): Promise<boolean> {
+  if (stock.over) return false
+
+  const page = stock.page + 1
+
+  try {
+    const got = await stock.more(page)
+    stock.page = page
+    if (!got.hasNext) stock.over = true
+
+    const known = new Set(stock.raw.map((brief) => brief.mediaId))
+    for (const brief of got.items) {
+      if (known.has(brief.mediaId)) continue
+      known.add(brief.mediaId)
+      stock.raw.push(brief)
     }
 
-    return visible(
-      Array.from(weight.values())
-        .sort((a, b) => b.rating - a.rating)
-        .map((rec) => rec.brief),
-    )
-  })
+    return got.items.length > 0
+  } catch (e) {
+    // Страница не засчитана: следующий добор возьмёт её же.
+    Logger('WARN', 'Рекомендации: полку добрать не вышло', e)
+    return false
+  }
+}
+
+/**
+ * Полка витрины: ровно `want` плиток, сколько бы хозяин ни отметил
+ * «не интересно».
+ *
+ * Меньше `want` отдаётся лишь когда выборка кончилась: у «лучшего» и
+ * «в тренде» страниц тысячи, и четырнадцать отметок не пустят полку,
+ * а доберут её следующей страницей того же отбора.
+ */
+export async function shelfFill(name: ShelfName, want: number): Promise<MediaBrief[]> {
+  const stock = stockOf(name)
+
+  let out = await visible(stock.raw)
+  for (let attempt = 0; out.length < want && attempt < SHELF_TRIES; attempt++) {
+    if (!(await grow(stock))) break
+    out = await visible(stock.raw)
+  }
+
+  return out.slice(0, want)
 }
 
 /**
@@ -329,7 +442,7 @@ export async function feedMore(run: FeedRun, want: number): Promise<MediaBrief[]
   for (let attempt = 0; attempt < FEED_TRIES && !run.over && out.length < want; attempt++) {
     const page = run.page + 1
 
-    let reply: FeedPage
+    let reply: BriefPage
     try {
       reply = await fetchFeed(run.pick, page)
     } catch (e) {

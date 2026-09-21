@@ -11,7 +11,7 @@ body:
     attributes:
       label: Версия
       description: Видна в настройках, раздел «О программе».
-      placeholder: 3.0.0
+      placeholder: 3.0.1
     validations:
       required: true
   - type: input
@@ -31,7 +31,7 @@ body:
         - Моё
         - История
         - Поиск
-        - Тайтл
+        - Аниме
         - Студия
         - Просмотр
         - Настройки

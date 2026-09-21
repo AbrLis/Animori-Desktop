@@ -4,11 +4,17 @@
 // Статистика с главной убрана: сводке найдётся своё место отдельно.
 //
 // ТРИ ПОЛКИ КАТАЛОГА ЕДУТ ОДНИМ ЗАПРОСОМ
-// «Сейчас выходит», «В тренде» и «Лучшее за всё время» берутся через
-// packShelf: у AniList в одном запросе можно спросить несколько страниц под
-// разными именами. Раньше это были три очереди к ограничителю подряд, и
-// нижние полки приезжали заметно позже верхних — это и читалось
+// «Сейчас выходит», «В тренде» и «Лучшее за всё время» приходят пачкой:
+// у AniList в одном запросе можно спросить несколько страниц под разными
+// именами. Раньше это были три очереди к ограничителю подряд, и нижние
+// полки приезжали заметно позже верхних — это и читалось
 // «последовательной загрузкой».
+//
+// ПОЛКА НЕ ПУСТЕЕТ ОТ «НЕ ИНТЕРЕСНО»
+// Отметка убирает плитку, а не полку: экран просит у ядра ровно четырнадцать
+// плиток, а ядро добирает их из запаса той же выборки, беря следующую
+// страницу, когда запас кончился. Полка пропадает только тогда, когда
+// выборка исчерпана вовсе.
 //
 // ОТБОР ПРЯЧЕТ КАРУСЕЛИ, А НЕ РЕЖЕТ ИХ ЧИСЛО
 // Пока отбор пуст, экран — витрина из пяти полок. Как только выбран хотя бы
@@ -60,7 +66,7 @@ import {
   type PlayAsk,
   type PlayState,
 } from '@/core/playable'
-import { feedMore, hideRec, motifShelf, newFeed, packShelf, tasteShelf } from '@/core/recs'
+import { feedMore, hideRec, newFeed, shelfFill, type ShelfName } from '@/core/recs'
 import type { SnapshotEntry } from '@/core/snapshot'
 import { Logger } from '@/utils/logger'
 
@@ -70,13 +76,60 @@ import MediaTile from '../components/MediaTile.vue'
 import { formatWord, GENRE_CHOICES, genreWord, partsShort } from '../labels'
 import { navigate } from '../router'
 import SakuraMark from '../components/SakuraMark.vue'
+import { SAKURA_ROSETTE, SAKURA_ROSETTE_BOX } from '../sakura'
+import { splashLine } from '../splash'
 import { tagWord } from '../tag-words'
 import { toPlayAsk, toTileRow, type TileRow } from '../tile-row'
+import { sprayGrains, type Grain, type KeepOut } from './home-spray'
 import { OWN_STATUSES, useHomeCalendar, type CalendarScope } from './home-calendar'
 import { dropFeed, feedKeep, homePick } from './home-keep'
 
-/** Сколько постеров класть на свою полку. */
+/** Сколько постеров класть на полку: и на свою, и на полку витрины. */
 const SHELF_SIZE = 14
+
+// ПЛАШКА ПРИВЕТСТВИЯ: ОДНА ФРАЗА И РОССЫПЬ
+// Заголовка у плашки нет: на ней ровно одна строка из реестра, и
+// «С возвращением» — рядовая фраза того же реестра, а не постоянная
+// подпись. Фраза выбирается на запуск, а не на приход на экран: экран
+// монтируется заново при всяком переходе, и без этого строка менялась
+// бы на глазах.
+const splash = splashLine()
+
+const heyPlate = ref<HTMLElement | null>(null)
+const heyText = ref<HTMLElement | null>(null)
+const heyRose = ref<HTMLElement | null>(null)
+const grains = ref<Grain[]>([])
+
+// Россыпь пересчитывается по размеру плашки: её ширина меняется вместе
+// с окном, а высота — вместе с числом строк фразы. Прежний размер
+// запоминается, иначе расчёт пошёл бы на каждый кадр перетаскивания.
+let heyWide = 0
+let heyHigh = 0
+let sprayEye: ResizeObserver | null = null
+
+function shutOf(node: HTMLElement, box: DOMRect): KeepOut {
+  const own = node.getBoundingClientRect()
+  return { x: own.left - box.left, y: own.top - box.top, w: own.width, h: own.height }
+}
+
+function layoutSpray(): void {
+  const plate = heyPlate.value
+  if (plate === null) return
+
+  const wide = plate.clientWidth
+  const high = plate.clientHeight
+  if (wide <= 0 || high <= 0) return
+  if (wide === heyWide && high === heyHigh) return
+  heyWide = wide
+  heyHigh = high
+
+  const box = plate.getBoundingClientRect()
+  const shut: KeepOut[] = []
+  if (heyText.value !== null) shut.push(shutOf(heyText.value, box))
+  if (heyRose.value !== null) shut.push(shutOf(heyRose.value, box))
+
+  grains.value = sprayGrains(wide, high, shut)
+}
 
 /** Области показа календаря: подписи, подсказки и порядок.
  *
@@ -134,11 +187,10 @@ interface Shelf {
   rows: TileRow[]
 }
 
-/** Описание полки витрины: что грузить и как назвать. */
+/** Описание полки витрины: имя для ядра рекомендаций и заголовок. */
 interface ShelfDef {
-  key: string
+  key: ShelfName
   title: string
-  load: () => Promise<MediaBrief[]>
 }
 
 /** Условие отбора в строке под шапкой: нажатие снимает именно его. */
@@ -187,8 +239,11 @@ let ownEntries: SnapshotEntry[] = []
 let calendarIds: number[] = []
 
 /** Приехавшие полки витрины и их порядок: плитки собираются на показ. */
-const staged = new Map<string, MediaBrief[]>()
+const staged = new Map<ShelfName, MediaBrief[]>()
 let activeDefs: ShelfDef[] = []
+
+/** Номера доборов полки: свежий ответ перекрывает прежний. */
+const refillRun = new Map<ShelfName, number>()
 
 /** Номера идущих доборов: смена отбора гасит старую работу. */
 let lookRun = 0
@@ -469,11 +524,11 @@ function shelfDefs(): ShelfDef[] {
   if (picked.value) return []
 
   return [
-    { key: 'taste', title: 'Под ваш вкус', load: () => tasteShelf() },
-    { key: 'motif', title: 'По мотивам вашего списка', load: () => motifShelf() },
-    { key: 'airing', title: 'Сейчас выходит', load: () => packShelf('airing') },
-    { key: 'trending', title: 'В тренде', load: () => packShelf('trending') },
-    { key: 'top', title: 'Лучшее за всё время', load: () => packShelf('top') },
+    { key: 'taste', title: 'Под ваш вкус' },
+    { key: 'motif', title: 'По мотивам вашего списка' },
+    { key: 'airing', title: 'Сейчас выходит' },
+    { key: 'trending', title: 'В тренде' },
+    { key: 'top', title: 'Лучшее за всё время' },
   ]
 }
 
@@ -611,7 +666,7 @@ function onTileSeen(mediaId: number): void {
 }
 
 /** Добирает русские названия плиткам полки витрины. */
-async function warmRecTitles(mine: number, key: string): Promise<void> {
+async function warmRecTitles(mine: number, key: ShelfName): Promise<void> {
   const items = staged.get(key)
   if (items === undefined) return
 
@@ -641,7 +696,7 @@ async function warmRecTitles(mine: number, key: string): Promise<void> {
  * из которых видно от силы полтора ряда; остальное оплачивалось впустую
  * и упиралось в потолки захода, отчего метки и обрывались «десятком».
  */
-function primeShelfMarks(mine: number, key: string): void {
+function primeShelfMarks(mine: number, key: ShelfName): void {
   const items = staged.get(key)
   if (items === undefined || items.length === 0) return
 
@@ -658,7 +713,7 @@ function primeShelfMarks(mine: number, key: string): void {
 
 /** Добор одной полки: склад ставится сразу и не ждёт никого, а имена идут
     заходами. Имя важнее метки: без него плитку не узнать вовсе. */
-async function warmRecShelf(mine: number, key: string): Promise<void> {
+async function warmRecShelf(mine: number, key: ShelfName): Promise<void> {
   primeShelfMarks(mine, key)
   await warmRecTitles(mine, key)
 }
@@ -704,8 +759,7 @@ function loadRecs(): void {
   recsPending.value = activeDefs.length > 0
 
   const tasks = activeDefs.map((def) =>
-    def
-      .load()
+    shelfFill(def.key, SHELF_SIZE)
       .then((items) => {
         if (mine !== recsRun || items.length === 0) return
         staged.set(def.key, items)
@@ -775,21 +829,64 @@ function onMore(): void {
   void growFeed(feedRun)
 }
 
-/** Прячет аниме из витрины и ленты: из памяти сразу, в хранилище — вдогонку. */
+/**
+ * Добирает полку после отметки. Отметка убирает плитку, а не полку: ядро
+ * отдаёт следующую из запаса той же выборки, а кончился запас — берёт
+ * следующую страницу.
+ *
+ * Номер добора нужен потому, что отметки щёлкают подряд: прежний ответ
+ * собирался по списку скрытого без последней отметки и вернул бы
+ * отмеченное на полку, приехав позже свежего.
+ */
+function refill(mine: number, key: ShelfName): void {
+  const run = (refillRun.get(key) ?? 0) + 1
+  refillRun.set(key, run)
+
+  void shelfFill(key, SHELF_SIZE)
+    .then((items) => {
+      if (mine !== recsRun || refillRun.get(key) !== run || items.length === 0) return
+
+      staged.set(key, items)
+      publish()
+      void warmRecShelf(mine, key)
+    })
+    .catch((e) => {
+      Logger('WARN', `Главная: полка «${key}» не добралась`, e)
+    })
+}
+
+/**
+ * Прячет аниме из витрины и ленты: из памяти сразу, в хранилище — вдогонку.
+ *
+ * Запись в скрытое ждётся: добор полки читает тот же список, и без
+ * ожидания отмеченное приехало бы обратно.
+ */
 function hideOne(mediaId: number): void {
-  void hideRec(mediaId)
+  const mine = recsRun
 
-  for (const items of staged.values()) {
-    const at = items.findIndex((brief) => brief.mediaId === mediaId)
-    if (at >= 0) items.splice(at, 1)
-  }
-  publish()
+  void (async () => {
+    await hideRec(mediaId)
 
-  const inFeed = feedKeep.items.findIndex((brief) => brief.mediaId === mediaId)
-  if (inFeed >= 0) {
-    feedKeep.items.splice(inFeed, 1)
-    drawFeed()
-  }
+    const hit: ShelfName[] = []
+    for (const [key, items] of staged) {
+      const at = items.findIndex((brief) => brief.mediaId === mediaId)
+      if (at < 0) continue
+
+      items.splice(at, 1)
+      hit.push(key)
+    }
+
+    if (mine !== recsRun) return
+    publish()
+
+    const inFeed = feedKeep.items.findIndex((brief) => brief.mediaId === mediaId)
+    if (inFeed >= 0) {
+      feedKeep.items.splice(inFeed, 1)
+      drawFeed()
+    }
+
+    for (const key of hit) refill(mine, key)
+  })()
 }
 
 /** Чип жанра под шапкой: быстрый отбор без меню. */
@@ -828,6 +925,18 @@ function resetPick(): void {
   homePick.value = emptyPick()
 }
 
+/** Вертикальное колесо над лентой жанров сдвигает её горизонтально.
+ *  Без этого длинный ряд жанров читается как обрезанный, а не как
+ *  прокручиваемый: на десктопе вертикальный скролл над горизонтальной
+ *  полкой — привычный жест, и без него полка прячет свою суть. */
+function onGenreWheel(e: WheelEvent): void {
+  if (Math.abs(e.deltaY) <= Math.abs(e.deltaX)) return
+  const target = e.currentTarget as HTMLElement | null
+  if (!target) return
+  e.preventDefault()
+  target.scrollLeft += e.deltaY
+}
+
 /** Меню отдало готовый отбор целиком. */
 function onApply(pick: CatalogPick): void {
   homePick.value = pick
@@ -851,6 +960,15 @@ function toSettings(): void {
 }
 
 onMounted(() => {
+  // Россыпь считается по месту, а не по числу: её ставит наблюдатель,
+  // потому что ширина плашки меняется вместе с окном, а высота — вместе
+  // с числом строк фразы.
+  layoutSpray()
+  if (typeof ResizeObserver !== 'undefined' && heyPlate.value !== null) {
+    sprayEye = new ResizeObserver(() => layoutSpray())
+    sprayEye.observe(heyPlate.value)
+  }
+
   void (async () => {
     try {
       // Подъём снимка без сети: главная должна открываться и при лежащем API.
@@ -869,6 +987,8 @@ onMounted(() => {
 })
 
 onBeforeUnmount(() => {
+  sprayEye?.disconnect()
+  sprayEye = null
   lookRun++
   titleRun++
   playRun++
@@ -900,12 +1020,45 @@ watch(
 
 <template>
   <section class="am-page">
-    <div class="am-hey">
-      <span class="am-hey__blob am-hey__blob--a" aria-hidden="true" />
-      <span class="am-hey__blob am-hey__blob--b" aria-hidden="true" />
+    <div ref="heyPlate" class="am-hey">
+      <span class="am-hey__glow" aria-hidden="true" />
+      <span class="am-hey__beam" aria-hidden="true" />
+      <span ref="heyRose" class="am-hey__rose" aria-hidden="true">
+        <svg :viewBox="SAKURA_ROSETTE_BOX"><path :d="SAKURA_ROSETTE" /></svg>
+      </span>
 
-      <div class="am-hey__text">
-        <h2 class="am-hey__title">С возвращением</h2>
+      <!-- Россыпь: число цветков выходит из свободного места, поэтому
+           их расставляет расчёт, а не разметка. -->
+      <span class="am-hey__spray" aria-hidden="true">
+        <span
+          v-for="grain in grains"
+          :key="grain.key"
+          class="am-hey__grain"
+          :class="`am-hey__grain--${grain.depth}`"
+          :style="{
+            left: `${grain.left}px`,
+            top: `${grain.top}px`,
+            width: `${grain.size}px`,
+            height: `${grain.tall}px`,
+            '--am-hey-turn': `${grain.turn}deg`,
+            '--am-hey-rot': `${grain.rot}deg`,
+            '--am-hey-fx': `${grain.fx}px`,
+            '--am-hey-fy': `${grain.fy}px`,
+            '--am-hey-tx': `${grain.tx}px`,
+            '--am-hey-ty': `${grain.ty}px`,
+            '--am-hey-dur': `${grain.dur}s`,
+            '--am-hey-delay': `${grain.delay}s`,
+          }"
+        >
+          <svg :viewBox="SAKURA_ROSETTE_BOX"><path :d="SAKURA_ROSETTE" /></svg>
+        </span>
+      </span>
+
+      <div ref="heyText" class="am-hey__text">
+        <h2 class="am-hey__title">
+          <span class="am-hey__seed"><SakuraMark /></span>
+          <span>{{ splash }}</span>
+        </h2>
 
         <div class="am-hey__acts">
           <button class="am-btn am-btn--soft" type="button" @click="toLists">Мои списки</button>
@@ -1027,7 +1180,7 @@ watch(
         <span v-if="pickCount > 0" class="am-sift__num">{{ pickCount }}</span>
       </button>
 
-      <div class="am-choose">
+      <div class="am-choose" @wheel="onGenreWheel">
         <div class="am-choose__row">
           <button
             v-for="genre in genreList"
@@ -1202,12 +1355,7 @@ watch(
       </div>
     </template>
 
-    <FilterSheet
-      :open="sheetOpen"
-      :pick="homePick"
-      @close="sheetOpen = false"
-      @apply="onApply"
-    />
+    <FilterSheet :open="sheetOpen" :pick="homePick" @close="sheetOpen = false" @apply="onApply" />
   </section>
 </template>
 
@@ -1228,31 +1376,20 @@ watch(
   backdrop-filter: blur(var(--am-blur-strong)) saturate(1.5);
 }
 
-/* Две капли под стеклом: без них размывать нечего и панель выглядит
-   грязным серым прямоугольником. Форма текучая и медленно ездит. */
-.am-hey__blob {
+/* Капля под стеклом: без неё размывать нечего и панель выглядит грязным
+   серым прямоугольником. Форма текучая и медленно ездит. Второй капли
+   больше нет — её место занял луч. */
+.am-hey__glow {
   position: absolute;
   z-index: -1;
-  border-radius: var(--am-r-blob);
-  filter: blur(42px);
-  pointer-events: none;
-}
-
-.am-hey__blob--a {
-  top: -40%;
-  right: -6%;
-  width: 46%;
-  height: 210%;
-  background: rgb(var(--am-accent-2-rgb) / 0.34);
-  animation: am-hey-float var(--am-drift) var(--am-ease-soft) infinite alternate;
-}
-
-.am-hey__blob--b {
   bottom: -80%;
   left: 12%;
   width: 34%;
   height: 170%;
+  border-radius: var(--am-r-blob);
   background: rgb(var(--am-accent-rgb) / 0.3);
+  filter: blur(42px);
+  pointer-events: none;
   animation: am-hey-float calc(var(--am-drift) * 1.4) var(--am-ease-soft) infinite alternate-reverse;
 }
 
@@ -1265,6 +1402,100 @@ watch(
   }
 }
 
+/* Луч: диагональная полоса вместо второго пятна. Ездит медленно и едва
+   заметно — полоса собирает лист, а не спорит со строкой. */
+.am-hey__beam {
+  position: absolute;
+  z-index: -1;
+  inset: -30% -20%;
+  background: linear-gradient(
+    104deg,
+    transparent 34%,
+    rgb(var(--am-accent-rgb) / 0.16) 48%,
+    rgb(var(--am-accent-2-rgb) / 0.22) 56%,
+    transparent 70%
+  );
+  pointer-events: none;
+  animation: am-hey-sweep calc(var(--am-drift) * 1.2) var(--am-ease-soft) infinite alternate;
+}
+
+@keyframes am-hey-sweep {
+  from {
+    transform: translateX(-6%);
+  }
+  to {
+    transform: translateX(7%);
+  }
+}
+
+/* Крупная розетка в правом краю. Высота — в процентах от высоты плашки:
+   плашка широкая и низкая, и мерить знак её шириной нельзя — на широком
+   окне он вырос бы до трёх четвертей километра и целиком не влез.
+   Свес сверху и снизу ровный: лист режет знак по четверти с каждой
+   стороны, и розетка одинакова при любой ширине окна. */
+.am-hey__rose {
+  position: absolute;
+  z-index: -1;
+  top: -25%;
+  right: -4%;
+  height: 150%;
+  aspect-ratio: 34.2 / 38.2;
+  color: rgb(var(--am-accent-2-rgb) / 0.3);
+  pointer-events: none;
+}
+
+.am-hey__rose svg,
+.am-hey__grain svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+  fill: currentcolor;
+}
+
+/* Россыпь. Сами цветки ставит расчёт (screens/home-spray.ts): их число
+   выходит из свободного места, оттого здесь только глубины и движение. */
+.am-hey__spray {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+}
+
+.am-hey__grain {
+  position: absolute;
+  color: rgb(var(--am-accent-2-rgb));
+  animation: am-hey-drift var(--am-hey-dur) var(--am-ease-soft) var(--am-hey-delay) infinite
+    alternate;
+}
+
+/* Три глубины: крупные бледные сзади, мелкие плотные спереди. */
+.am-hey__grain--far {
+  opacity: 0.1;
+  filter: blur(2px);
+}
+
+.am-hey__grain--mid {
+  opacity: 0.18;
+}
+
+.am-hey__grain--near {
+  opacity: 0.26;
+}
+
+/* Цветок плывёт и покачивается. Поворот здесь не ради красоты: смещение
+   на десяток пикселей само по себе читается как шевеление пятна, а с
+   поворотом — как плывущий лепесток. */
+@keyframes am-hey-drift {
+  from {
+    transform: translate3d(var(--am-hey-fx), var(--am-hey-fy), 0)
+      rotate(calc(var(--am-hey-turn) - var(--am-hey-rot)));
+  }
+  to {
+    transform: translate3d(var(--am-hey-tx), var(--am-hey-ty), 0)
+      rotate(calc(var(--am-hey-turn) + var(--am-hey-rot)));
+  }
+}
+
 .am-hey__text {
   display: flex;
   flex-direction: column;
@@ -1272,11 +1503,25 @@ watch(
   max-width: 74ch;
 }
 
+/* Одна строка: случайная фраза реестра, а не постоянный заголовок. */
 .am-hey__title {
+  display: flex;
+  align-items: center;
+  gap: 12px;
   margin: 0;
   font-size: clamp(24px, 2.6vw, 34px);
   font-weight: 700;
   letter-spacing: -0.025em;
+  line-height: 1.2;
+}
+
+/* Знак в строке наследует цвет и размер: --am-sakura-size — свойство,
+   а не правило, поэтому оно доезжает и до знака внутри компонента. */
+.am-hey__seed {
+  flex: none;
+  display: flex;
+  --am-sakura-size: 0.62em;
+  color: rgb(var(--am-accent-2-rgb));
 }
 
 .am-hey__acts {
@@ -1462,20 +1707,45 @@ watch(
 
 /* Жанры одной лентой: восемнадцать чипов переносом занимали три строки
    и уводили первую полку за сгиб. Края растворяются маской: обрезанный
-   по краю чип честно говорит, что ряд прокручивается. */
+   по краю чип честно говорит, что ряд прокручивается. Маска теперь
+   начинается ровно от края, а не ест первые 18 пикселей — иначе «Экшен»
+   казался обрезанным даже когда лента не прокручена. Скроллбар
+   показывается тонкой полоской: его отсутствие прокрутку прятало
+   настолько, что лента выглядела мёртвой. */
 .am-choose {
   display: flex;
   flex: 1 1 auto;
   min-width: 0;
-  padding: 2px 0;
+  padding: 2px 0 4px;
   overflow-x: auto;
-  scrollbar-width: none;
-  mask-image: linear-gradient(90deg, transparent, #000 18px, #000 calc(100% - 28px), transparent);
+  scrollbar-width: thin;
+  scrollbar-color: var(--am-fg-dim) transparent;
+  mask-image: linear-gradient(90deg, #000, #000 calc(100% - 28px), transparent);
   overscroll-behavior-x: contain;
 }
 
 .am-choose::-webkit-scrollbar {
-  height: 0;
+  height: 4px;
+}
+
+.am-choose::-webkit-scrollbar-thumb {
+  background: var(--am-fg-dim);
+  border-radius: 2px;
+}
+
+.am-choose::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+/* Колесо мыши прокручивает ленту горизонтально: на десктопе вертикальный
+   скролл над жанрами — привычный жест, и без него лента читается как
+   обрезанная, а не прокручиваемая. */
+.am-choose {
+  scroll-snap-type: x proximity;
+}
+
+.am-choose__row > * {
+  scroll-snap-align: start;
 }
 
 /* Центровка автоотступами, а не justify-content: когда лента шире экрана,
@@ -1486,6 +1756,7 @@ watch(
   gap: 8px;
   width: max-content;
   margin-inline: auto;
+  flex-shrink: 0;
 }
 
 .am-choose .am-chip {

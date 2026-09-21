@@ -54,6 +54,7 @@
 import { onMounted, ref } from 'vue'
 
 import { Bridge } from '@/bridge'
+import { forgetCatalogMemory } from '@/api/anilist-catalog'
 import {
   eachEntry,
   entryCount,
@@ -69,7 +70,7 @@ import { datasetStatus, initDatasetNames } from '@/core/dataset-names'
 import { clearCache, getDbStats } from '@/core/db'
 import { buildMalXml, malXmlFileName } from '@/core/mal-xml'
 import { adultByBirth } from '@/core/adult'
-import { forgetRecs } from '@/core/recs'
+import { clearHidden } from '@/core/recs'
 import { saveSetting, settings } from '@/core/settings'
 
 import { APPEARANCES, appearance, setAppearance } from '../appearance'
@@ -87,6 +88,7 @@ import CloudBox from '../components/CloudBox.vue'
 import DatePick from '../components/DatePick.vue'
 import ProxyBox from '../components/ProxyBox.vue'
 import { saveXmlFile } from '../save-file'
+import { dropFeed } from './home-keep'
 
 const version = __ANIMORI_VERSION__
 
@@ -539,10 +541,8 @@ function onExport(): void {
 /**
  * Переключение показа взрослого. Отбор живёт в core/adult.ts и читает ключ
  * в момент вопроса, поэтому перезапуска не нужно: следующий поиск уже другой.
- * Одно исключение — полки витрины: их состав собран заранее и живёт весь
- * сеанс, поэтому тумблер выбрасывает его вызовом `forgetRecs`. Без этого
- * переключатель работал бы в одну сторону: отсеянное при выключенном показе
- * не вернулось бы и после включения.
+ * Полки витрины тому не помеха: запас полки держит сырые плитки, а отбор
+ * применяется на выдаче, и возврат на главную собирает полки заново.
  *
  * Заметки об исходе нет: сам тумблер и есть ответ, а прежняя строка писалась
  * в панель другой колонки и читалась там как чужая.
@@ -561,7 +561,6 @@ function onExport(): void {
 function onAdult(): void {
   if (!adult.value) {
     void saveSetting('showAdult', 'set_adult', false)
-    forgetRecs()
     closeAge()
     return
   }
@@ -585,7 +584,6 @@ function onBirth(value: string): void {
   closeAge()
   adult.value = true
   void saveSetting('showAdult', 'set_adult', true)
-  forgetRecs()
 }
 
 /** Отказ от вопроса: тумблер остаётся выключенным, и это его настоящее состояние. */
@@ -597,10 +595,18 @@ function closeAge(): void {
 
 // Память сбрасывается только руками. Перезагрузка не делается сама:
 // человек может быть в середине правок.
+//
+// Вместе со складом снимаются метки «не интересно»: они лежат в хранилище,
+// а не в базе, и иначе отмеченное не вернулось бы на полки никогда. Лента
+// подбора выбрасывается тоже: она помнит показанное, и без сброса вернула
+// бы вид до очистки.
 function onClear(): void {
   void guard(async () => {
     note.value = ''
     await clearCache()
+    forgetCatalogMemory()
+    await clearHidden()
+    dropFeed()
     cleared.value = true
     await readState()
     note.value = 'Память очищена. Названия и описания загрузятся заново.'
@@ -1066,8 +1072,9 @@ onMounted(() => {
             </svg>
 
             <span class="am-repo__text">
-              AniMori бесплатна, без рекламы и телеметрии. Понравилось приложение — поставьте
-              звездочку, сломалась — оставьте issue.
+              AniMori — бесплатное приложение, без рекламы и телеметрии.
+              Если вам понравилось — поставьте звездочку,
+              если что-то сломалось — оставьте issue в репозитории.
             </span>
           </button>
 

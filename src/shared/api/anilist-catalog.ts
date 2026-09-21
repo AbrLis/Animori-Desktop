@@ -60,8 +60,12 @@ import { anilistQuery } from './anilist'
 import type { MediaBrief } from './anilist-media'
 import { once } from './rate-limit'
 
-/** Сколько плиток просит полка: длинный ряд всё равно не листают до конца. */
-const SHELF_SIZE = 14
+/**
+ * Сколько плиток просит полка. Показ держит четырнадцать, остальное — запас
+ * на «не интересно»: отмеченное уходит из полки, и без запаса каждое
+ * нажатие отправляло бы за новой страницей.
+ */
+const SHELF_PAGE = 30
 
 /** Сколько советов просим у семени: после склейки повторов останется меньше. */
 const SEED_PAGE = 25
@@ -83,7 +87,7 @@ const FEED_SKIP_STATUS = 'NOT_YET_RELEASED'
  * Ключи склада. Цифра — поколение формы записи: сменится состав полей плитки,
  * сменится и цифра, и прежние записи просто перестанут находиться.
  */
-const SHELF_PREFIX = 'SHELF1_'
+const SHELF_PREFIX = 'SHELF2_'
 const TAGS_KEY = 'TAGS1_all'
 const GENRE_PREFIX = 'GENRE1_'
 const RECS_PREFIX = 'RECS1_'
@@ -110,7 +114,7 @@ let tagsMemory: CatalogTag[] | null = null
 const genreMemory = new Map<number, string[]>()
 
 /** Страницы ленты в памяти запуска вместе со временем добычи. */
-const feedMemory = new Map<string, { at: number; page: FeedPage }>()
+const feedMemory = new Map<string, { at: number; page: BriefPage }>()
 
 // Поля плитки без записи хозяина: свои метки витрина ставит по памяти (3.14).
 // Вид записи спрашивается не ради показа, а ради отбора: в советах сервера
@@ -163,8 +167,11 @@ function shelfQuery(kind: ShelfKind): string {
   if (kind === 'airing') extra = ', $season: MediaSeason, $seasonYear: Int'
   if (kind === 'genre') extra = ', $genres: [String]'
 
-  return `query ($perPage: Int!${extra}) {
-  Page(page: 1, perPage: $perPage) {
+  return `query ($page: Int!, $perPage: Int!${extra}) {
+  Page(page: $page, perPage: $perPage) {
+    pageInfo {
+      hasNextPage
+    }
     media(type: ANIME, ${SHELF_WHERE[kind]}) {
 ${BRIEF_FIELDS}
     }
@@ -178,16 +185,25 @@ const PACK_QUERY = `${BRIEF_FRAGMENT}
 
 query ($perPage: Int!, $season: MediaSeason, $seasonYear: Int) {
   airing: Page(page: 1, perPage: $perPage) {
+    pageInfo {
+      hasNextPage
+    }
     media(type: ANIME, season: $season, seasonYear: $seasonYear, sort: [POPULARITY_DESC]) {
       ...Brief
     }
   }
   trending: Page(page: 1, perPage: $perPage) {
+    pageInfo {
+      hasNextPage
+    }
     media(type: ANIME, sort: [TRENDING_DESC]) {
       ...Brief
     }
   }
   top: Page(page: 1, perPage: $perPage) {
+    pageInfo {
+      hasNextPage
+    }
     media(type: ANIME, sort: [SCORE_DESC]) {
       ...Brief
     }
@@ -298,7 +314,7 @@ export interface ServerRec {
 export type PackKind = 'airing' | 'trending' | 'top'
 
 /** Пачка полок каталога. Пустая доля значит «эта полка не встанет». */
-export type ShelfPack = Record<PackKind, MediaBrief[]>
+export type ShelfPack = Record<PackKind, BriefPage>
 
 const PACK_KINDS: readonly PackKind[] = ['airing', 'trending', 'top']
 
@@ -332,8 +348,9 @@ export interface CatalogPick {
   sort: FeedSort
 }
 
-/** Страница ленты: плитки и признак продолжения. */
-export interface FeedPage {
+/** Страница плиток: приехавшее и признак продолжения. Одна форма и у ленты
+    подбора, и у полки витрины: и там, и там добор идёт страницами. */
+export interface BriefPage {
   items: MediaBrief[]
   hasNext: boolean
 }
@@ -444,10 +461,10 @@ function shelfKey(kind: ShelfKind, genres?: string[]): string {
 }
 
 /** Полка со склада, если она там есть и не просрочена. */
-async function readShelf(kind: ShelfKind, genres?: string[]): Promise<MediaBrief[] | null> {
+async function readShelf(kind: ShelfKind, genres?: string[]): Promise<BriefPage | null> {
   const key = shelfKey(kind, genres)
-  const stored = await dbGet<MediaCacheRecord<MediaBrief[]>>('mediaCache', key)
-  if (!stored || !Array.isArray(stored.data) || stored.data.length === 0) return null
+  const stored = await dbGet<MediaCacheRecord<BriefPage>>('mediaCache', key)
+  if (!stored || !Array.isArray(stored.data?.items) || stored.data.items.length === 0) return null
   if (!isFresh(key, stored.ts, SHELF_LIFE[kind])) return null
 
   return stored.data
@@ -457,15 +474,15 @@ async function readShelf(kind: ShelfKind, genres?: string[]): Promise<MediaBrief
  * Кладёт полку на склад. Пустая не пишется: полка не встала из-за отказа,
  * и запоминать этот отказ на шесть часов было бы худшим из решений.
  */
-async function writeShelf(kind: ShelfKind, items: MediaBrief[], genres?: string[]): Promise<void> {
-  if (items.length === 0) return
+async function writeShelf(kind: ShelfKind, page: BriefPage, genres?: string[]): Promise<void> {
+  if (page.items.length === 0) return
 
-  await dbSet('mediaCache', { key: shelfKey(kind, genres), data: items, ts: Date.now() })
+  await dbSet('mediaCache', { key: shelfKey(kind, genres), data: page, ts: Date.now() })
 }
 
-/** Сетевой поход за одной полкой. */
-async function loadShelf(kind: ShelfKind, genres?: string[]): Promise<MediaBrief[]> {
-  const vars: Record<string, unknown> = { perPage: SHELF_SIZE }
+/** Сетевой поход за страницей полки. */
+async function loadShelf(kind: ShelfKind, page: number, genres?: string[]): Promise<BriefPage> {
+  const vars: Record<string, unknown> = { page, perPage: SHELF_PAGE }
   if (kind === 'airing') Object.assign(vars, currentSeason())
   if (kind === 'genre') vars.genres = genres
 
@@ -473,30 +490,46 @@ async function loadShelf(kind: ShelfKind, genres?: string[]): Promise<MediaBrief
   const media = reply.data?.Page?.media
   if (!Array.isArray(media)) {
     Logger('WARN', `Витрина «${kind}»: сервер ответил пустотой`, reply.errors)
-    return []
+    return { items: [], hasNext: false }
   }
 
   const items = toBriefs(media)
-  Logger('API', `Витрина «${kind}»: пришло ${items.length}`)
+  const hasNext = reply.data?.Page?.pageInfo?.hasNextPage === true
+  Logger('API', `Витрина «${kind}»: страница ${page}, пришло ${items.length}`)
 
-  void writeShelf(kind, items, genres).catch((e) => {
-    Logger('WARN', `Витрина «${kind}»: на склад не легла`, e)
-  })
+  // Глубокая страница нужна один раз — когда полку подчистили
+  // «не интересно» — и на склад не идёт.
+  if (page === 1) {
+    void writeShelf(kind, { items, hasNext }, genres).catch((e) => {
+      Logger('WARN', `Витрина «${kind}»: на склад не легла`, e)
+    })
+  }
 
-  return items
+  return { items, hasNext }
 }
 
 /**
- * Полка каталога. Склад, затем сеть; одинаковые вопросы склеиваются.
- * Отказ — пустой массив: полка просто не встанет.
+ * Страница полки каталога. Склад, затем сеть; одинаковые вопросы склеиваются.
+ * Отказ — пустая страница без продолжения: полка просто не встанет.
+ *
+ * Первая страница живёт на складе по сроку своего вида, глубокая в нём
+ * не нуждается: её спрашивают единожды, добирая полку после отметок.
  */
-export async function fetchShelf(kind: ShelfKind, genres?: string[]): Promise<MediaBrief[]> {
-  if (kind === 'genre' && (genres === undefined || genres.length === 0)) return []
+export async function fetchShelf(
+  kind: ShelfKind,
+  genres?: string[],
+  page = 1,
+): Promise<BriefPage> {
+  if (kind === 'genre' && (genres === undefined || genres.length === 0)) {
+    return { items: [], hasNext: false }
+  }
 
-  const stored = await readShelf(kind, genres)
-  if (stored) return stored
+  if (page === 1) {
+    const stored = await readShelf(kind, genres)
+    if (stored) return stored
+  }
 
-  return await once(shelfKey(kind, genres), () => loadShelf(kind, genres))
+  return await once(`${shelfKey(kind, genres)}|${page}`, () => loadShelf(kind, page, genres))
 }
 
 /** Пачка со склада — только целиком: неполная витрина хуже свежей. */
@@ -514,23 +547,30 @@ async function readPack(): Promise<ShelfPack | null> {
 
 /** Сетевой поход за пачкой и запись всех трёх полок на склад. */
 async function loadPack(): Promise<ShelfPack> {
-  const vars: Record<string, unknown> = { perPage: SHELF_SIZE, ...currentSeason() }
+  const vars: Record<string, unknown> = { perPage: SHELF_PAGE, ...currentSeason() }
   const reply = await anilistQuery<PackReply>(PACK_QUERY, vars)
 
-  const pack: ShelfPack = { airing: [], trending: [], top: [] }
+  const pack: ShelfPack = {
+    airing: { items: [], hasNext: false },
+    trending: { items: [], hasNext: false },
+    top: { items: [], hasNext: false },
+  }
+
   for (const kind of PACK_KINDS) {
-    const media = reply.data?.[kind]?.media
+    const page = reply.data?.[kind]
+    const media = page?.media
     if (!Array.isArray(media)) {
       Logger('WARN', `Витрина «${kind}»: сервер ответил пустотой`, reply.errors)
       continue
     }
-    pack[kind] = toBriefs(media)
+
+    pack[kind] = { items: toBriefs(media), hasNext: page?.pageInfo?.hasNextPage === true }
   }
 
   Logger(
     'API',
-    `Витрина пачкой: сезон ${pack.airing.length}, тренд ${pack.trending.length}, ` +
-      `лучшее ${pack.top.length}`,
+    `Витрина пачкой: сезон ${pack.airing.items.length}, тренд ${pack.trending.items.length}, ` +
+      `лучшее ${pack.top.items.length}`,
   )
 
   void Promise.all(PACK_KINDS.map((kind) => writeShelf(kind, pack[kind]))).catch((e) => {
@@ -627,7 +667,7 @@ query (${decls.join(', ')}) {
 }
 
 /** Кладёт страницу ленты в память запуска, придерживая её размер. */
-function rememberFeed(key: string, page: FeedPage): void {
+function rememberFeed(key: string, page: BriefPage): void {
   if (page.items.length === 0) return
 
   // Map помнит порядок вставки, поэтому старейший ключ — первый.
@@ -640,7 +680,7 @@ function rememberFeed(key: string, page: FeedPage): void {
 }
 
 /** Сетевой поход за страницей ленты. */
-async function loadFeed(pick: CatalogPick, page: number, key: string): Promise<FeedPage> {
+async function loadFeed(pick: CatalogPick, page: number, key: string): Promise<BriefPage> {
   const { query, vars } = feedQuery(pick, page)
 
   const reply = await anilistQuery<ShelfReply>(query, vars)
@@ -654,7 +694,7 @@ async function loadFeed(pick: CatalogPick, page: number, key: string): Promise<F
   const hasNext = reply.data?.Page?.pageInfo?.hasNextPage === true
   Logger('API', `Лента подбора: страница ${page}, пришло ${items.length}`)
 
-  const result: FeedPage = { items, hasNext }
+  const result: BriefPage = { items, hasNext }
   rememberFeed(key, result)
   return result
 }
@@ -669,7 +709,7 @@ async function loadFeed(pick: CatalogPick, page: number, key: string): Promise<F
  * никто не спросит. Четверти часа хватает на то, ради чего это делается —
  * «ушёл на карточку, вернулся, листаю дальше» без повторной загрузки.
  */
-export async function fetchFeed(pick: CatalogPick, page: number): Promise<FeedPage> {
+export async function fetchFeed(pick: CatalogPick, page: number): Promise<BriefPage> {
   const key = `${pickKey(pick)}|${page}`
 
   const memo = feedMemory.get(key)

@@ -93,7 +93,7 @@ function onReload(): void {
           type="button"
           @click="onPick(item.name, $event)"
         >
-          <span class="am-side__icon" aria-hidden="true">{{ item.icon }}</span>
+          <span class="am-side__icon" :class="`am-side__icon--${item.name}`" aria-hidden="true">{{ item.icon }}</span>
           <span class="am-side__text">{{ item.title }}</span>
         </button>
       </nav>
@@ -221,13 +221,16 @@ function onReload(): void {
   padding: 2px 6px 6px;
 }
 
-/* Здесь только размер и ореол: сам знак и его темы живут в AppMark.vue. */
+/* Здесь только размер и ореол: сам знак и его темы живут в AppMark.vue.
+
+   Ореол без сдвига: со сдвигом вниз он читался свечением из-под знака,
+   а не вокруг него, и центр свечения не совпадал с центром эмблемы. */
 .am-side__logo {
   flex: none;
   width: 34px;
   height: 34px;
   border-radius: 12px;
-  box-shadow: 0 8px 22px rgb(var(--am-accent-rgb) / 0.35);
+  box-shadow: 0 0 22px rgb(var(--am-accent-rgb) / 0.35);
 }
 
 /* На AMOLED ореол убирается: знак там сам тёмный, и свечение вокруг него
@@ -347,6 +350,14 @@ function onReload(): void {
   height: 18px;
   font-size: 16px;
   line-height: 18px;
+}
+
+/* Лупа в системных шрифтах рисуется мельче соседних знаков — глиф узкий
+   и сидит в оптическом центре мелко. Слегка увеличиваем кегль и ровняем
+   по базовой линии, чтобы пять значков читались одной величиной. */
+.am-side__icon--search {
+  font-size: 18px;
+  line-height: 16px;
 }
 
 .am-side__foot {
