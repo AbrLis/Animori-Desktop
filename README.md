@@ -96,28 +96,14 @@ npm test               # проверки с подменой моста, обо
 
 `npm run tauri:build` подписывает пакет обновления, поэтому ждёт переменные окружения `TAURI_SIGNING_PRIVATE_KEY` и `TAURI_SIGNING_PRIVATE_KEY_PASSWORD`. Свою пару ключей делает `npm run tauri signer generate`.
 
-#### Linux
-
-Системные зависимости Tauri 2 + WebKitGTK 4.1:
-
-- Debian/Ubuntu: `libwebkit2gtk-4.1-dev build-essential curl wget file libxdo-dev libssl-dev libayatana-appindicator3-dev librsvg2-dev`
-- Arch/CachyOS: `webkit2gtk-4.1 gtk3 libayatana-appindicator librsvg xdotool`
-
-Сборка и установщик:
+**Linux.** Нужны те же Node.js и окружение Rust/Tauri плюс системные зависимости WebKitGTK 4.1: для Debian/Ubuntu — `libwebkit2gtk-4.1-dev build-essential curl wget file libxdo-dev libssl-dev libayatana-appindicator3-dev librsvg2-dev`, для Arch/CachyOS — `webkit2gtk-4.1 gtk3 libayatana-appindicator librsvg xdotool`.
 
 ```bash
 npm install
 npm run tauri:build    # установщик → src-tauri/target/release/bundle/deb/
 ```
 
-Запуск на Wayland-сессии — нативно, без XWayland:
-
-```bash
-GDK_BACKEND=wayland ./src-tauri/target/release/animori
-```
-
-- На проприетарном NVIDIA приложение само отключает explicit sync в `run()` (воркэраунд WebKit bug [324551](https://bugs.webkit.org/show_bug.cgi?id=324551)), отдельные переменные не нужны.
-- Если GPU-композитинг недоступен (старый драйвер, нестандартный стек) — фолбэк `WEBKIT_DISABLE_DMABUF_RENDERER=1` (CPU-путь, медленнее, но работает везде).
+Запуск на Wayland-сессии — нативно, без XWayland: `GDK_BACKEND=wayland ./src-tauri/target/release/animori`. На проприетарном NVIDIA приложение само отключает explicit sync в `run()` — воркэраунд [WebKit bug 324551](https://bugs.webkit.org/show_bug.cgi?id=324551), отдельные переменные не нужны; если GPU-композитинг недоступен, фолбэк `WEBKIT_DISABLE_DMABUF_RENDERER=1` — путь по CPU, медленнее, но работает везде.
 
 Исходники разложены по слоям: `src/shared/` — ядро (API, данные, кэш, мост), `src/app/` — экраны, компоненты и роутер, `src-tauri/` — оболочка на Rust. Ядро про оболочку не знает ничего: `npm run typecheck:shared` проверяет это отдельной сборкой, где каталога `src/app` не существует, и падает на любой стрелке из ядра в надстройку.
 
