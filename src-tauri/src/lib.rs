@@ -199,6 +199,14 @@ fn animori_cast_panel(app: AppHandle) -> Result<(), String> {
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    // WebKitGTK bug 324551: на NVIDIA EGL включает explicit sync
+    // (wp_linux_drm_syncobj) на toplevel-поверхности, но коммитит буфер без
+    // acquire point, и композитор убивает клиента (Error 71). Воркэраунд —
+    // отключить explicit sync в драйвере. Переменная no-op на mesa (AMD/Intel).
+    // Ставится ДО создания первого окна: EGL инициализируется вместе с WebView.
+    #[cfg(target_os = "linux")]
+    std::env::set_var("__NV_DISABLE_EXPLICIT_SYNC", "1");
+
     tauri::Builder::default()
         .plugin(tauri_plugin_clipboard_manager::init())
         .manage(anilist::AniListClientState::default())
