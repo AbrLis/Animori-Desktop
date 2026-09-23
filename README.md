@@ -103,7 +103,7 @@ npm install
 npm run tauri:build    # установщик → src-tauri/target/release/bundle/deb/
 ```
 
-Запуск на Wayland-сессии — нативно, без XWayland: `GDK_BACKEND=wayland ./src-tauri/target/release/animori`. На проприетарном NVIDIA приложение само отключает explicit sync в `run()` — воркэраунд [WebKit bug 324551](https://bugs.webkit.org/show_bug.cgi?id=324551), отдельные переменные не нужны; если GPU-композитинг недоступен, фолбэк `WEBKIT_DISABLE_DMABUF_RENDERER=1` — путь по CPU, медленнее, но работает везде.
+Запуск на Wayland-сессии — нативно: приложение само выбирает wayland-бэкенд GTK, когда доступен `WAYLAND_DISPLAY` (X11-сессии не трогает). На проприетарном NVIDIA оно же отключает explicit sync в `run()` — воркэраунд [WebKit bug 324551](https://bugs.webkit.org/show_bug.cgi?id=324551), отдельные переменные не нужны; если GPU-композитинг недоступен, фолбэк `WEBKIT_DISABLE_DMABUF_RENDERER=1` — путь по CPU, медленнее, но работает везде.
 
 Исходники разложены по слоям: `src/shared/` — ядро (API, данные, кэш, мост), `src/app/` — экраны, компоненты и роутер, `src-tauri/` — оболочка на Rust. Ядро про оболочку не знает ничего: `npm run typecheck:shared` проверяет это отдельной сборкой, где каталога `src/app` не существует, и падает на любой стрелке из ядра в надстройку.
 

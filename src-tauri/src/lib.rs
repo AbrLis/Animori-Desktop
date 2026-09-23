@@ -205,7 +205,15 @@ pub fn run() {
     // отключить explicit sync в драйвере. Переменная no-op на mesa (AMD/Intel).
     // Ставится ДО создания первого окна: EGL инициализируется вместе с WebView.
     #[cfg(target_os = "linux")]
-    std::env::set_var("__NV_DISABLE_EXPLICIT_SYNC", "1");
+    {
+        std::env::set_var("__NV_DISABLE_EXPLICIT_SYNC", "1");
+
+        // Wayland-сессия: GTK3 без этого предпочитает XWayland. Включаем
+        // wayland-бэкенд только когда дисплей реально доступен — X11 не трогаем.
+        if std::env::var("WAYLAND_DISPLAY").is_ok() {
+            std::env::set_var("GDK_BACKEND", "wayland");
+        }
+    }
 
     tauri::Builder::default()
         .plugin(tauri_plugin_clipboard_manager::init())
