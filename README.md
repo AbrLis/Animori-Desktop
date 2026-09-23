@@ -98,6 +98,29 @@ npm test               # тесты с заглушкой вместо мост�
 
 `npm run tauri:build` подписывает пакет обновления, поэтому ему нужны переменные окружения `TAURI_SIGNING_PRIVATE_KEY` и `TAURI_SIGNING_PRIVATE_KEY_PASSWORD`. Свою пару ключей можно создать командой `npm run tauri signer generate`.
 
+#### Linux
+
+Системные зависимости Tauri 2 + WebKitGTK 4.1:
+
+- Debian/Ubuntu: `libwebkit2gtk-4.1-dev build-essential curl wget file libxdo-dev libssl-dev libayatana-appindicator3-dev librsvg2-dev`
+- Arch/CachyOS: `webkit2gtk-4.1 gtk3 libayatana-appindicator librsvg xdotool`
+
+Сборка и установщик:
+
+```bash
+npm install
+npm run tauri:build    # установщик → src-tauri/target/release/bundle/deb/
+```
+
+Запуск на Wayland-сессии — нативно, без XWayland:
+
+```bash
+GDK_BACKEND=wayland ./src-tauri/target/release/animori
+```
+
+- На проприетарном NVIDIA приложение само отключает explicit sync в `run()` (воркэраунд WebKit bug [324551](https://bugs.webkit.org/show_bug.cgi?id=324551)), отдельные переменные не нужны.
+- Если GPU-композитинг недоступен (старый драйвер, нестандартный стек) — фолбэк `WEBKIT_DISABLE_DMABUF_RENDERER=1` (CPU-путь, медленнее, но работает везде).
+
 Код разделён на слои: `src/shared/` — ядро (API, данные, кэш, мост к платформе), `src/app/` — экраны, компоненты и роутер, `src-tauri/` — нативная часть на Rust. Ядро ничего не знает об остальном приложении. Это проверяет `npm run typecheck:shared`: он собирает ядро без каталога `src/app` и падает, если ядро что-то импортирует оттуда.
 
 ## Выпуск
