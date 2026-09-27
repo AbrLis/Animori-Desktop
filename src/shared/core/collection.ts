@@ -32,6 +32,11 @@ export type EntryLook = {
   romaji: string | null
   english: string | null
   isAdult: boolean
+  /** Вид, год, число серий и длина серии: карточка знает их сразу, без ответа списка. */
+  format?: string | null
+  seasonYear?: number | null
+  episodes?: number | null
+  duration?: number | null
 }
 
 /**
@@ -125,7 +130,7 @@ function collectSnapshot(): UserSnapshot {
   }
 }
 
-/** Запись из ответа сервера в форму снимка (вид тайтла и тома снимок 6-й версии не хранит). */
+/** Запись из ответа сервера в форму снимка (томов снимок не хранит — ушли с мангой). */
 function fromServer(raw: RawListEntry): SnapshotEntry {
   return {
     mediaId: raw.mediaId,
@@ -141,6 +146,10 @@ function fromServer(raw: RawListEntry): SnapshotEntry {
     isAdult: raw.isAdult,
     romaji: raw.romaji,
     english: raw.english,
+    format: raw.format ?? null,
+    seasonYear: raw.seasonYear ?? null,
+    episodes: raw.episodes ?? null,
+    duration: raw.duration ?? null,
   }
 }
 
@@ -160,6 +169,10 @@ export function blankEntry(mediaId: number, when: number, look?: EntryLook): Sna
     isAdult: look?.isAdult ?? false,
     romaji: look?.romaji ?? null,
     english: look?.english ?? null,
+    format: look?.format ?? null,
+    seasonYear: look?.seasonYear ?? null,
+    episodes: look?.episodes ?? null,
+    duration: look?.duration ?? null,
   }
 }
 
@@ -214,12 +227,17 @@ function mergeFromServer(raw: RawListEntry[]): PullResult {
 
     if (mine.updatedAt > fresh.updatedAt) {
       // Спор выиграла наша правка, но пустоты дополняем: номер MAL нужен для выгрузки в XML,
-      // даты приезжают только с Шикимори. Свою дату, поставленную руками, не затираем.
+      // даты приезжают только с Шикимори, а вид, год, серии и длина — со списка. Свою дату,
+      // поставленную руками, не затираем.
       if (mine.malId === null) mine.malId = fresh.malId
       if (mine.romaji === null) mine.romaji = fresh.romaji
       if (mine.english === null) mine.english = fresh.english
       if (mine.startedAt === null) mine.startedAt = fresh.startedAt
       if (mine.completedAt === null) mine.completedAt = fresh.completedAt
+      if (mine.format == null) mine.format = fresh.format ?? null
+      if (mine.seasonYear == null) mine.seasonYear = fresh.seasonYear ?? null
+      if (mine.episodes == null) mine.episodes = fresh.episodes ?? null
+      if (mine.duration == null) mine.duration = fresh.duration ?? null
       kept++
       continue
     }
@@ -453,6 +471,10 @@ export function editEntry(
   if (known && look) {
     if (entry.romaji === null) entry.romaji = look.romaji
     if (entry.english === null) entry.english = look.english
+    if (entry.format == null) entry.format = look.format ?? null
+    if (entry.seasonYear == null) entry.seasonYear = look.seasonYear ?? null
+    if (entry.episodes == null) entry.episodes = look.episodes ?? null
+    if (entry.duration == null) entry.duration = look.duration ?? null
   }
 
   if (kind === 'status' && typeof value === 'string') entry.status = value

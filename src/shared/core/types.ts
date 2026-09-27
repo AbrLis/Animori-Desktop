@@ -132,7 +132,12 @@ export interface ShikiMedia {
 /**
  * Имена сторов кэша; `shikiCache` — устаревший псевдоним `mediaCache` ради ветки script, db.ts переводит сам.
  */
-export type CacheStoreName = 'mediaCache' | 'shikiCache' | 'malCache' | 'franchiseCache'
+export type CacheStoreName =
+  | 'mediaCache'
+  | 'shikiCache'
+  | 'malCache'
+  | 'franchiseCache'
+  | 'posterCache'
 
 /**
  * Запись `mediaCache` (keyPath 'key'): карточки тайтлов и людей, темы; различаются префикс и `data`.
@@ -167,7 +172,24 @@ export interface FranchiseCacheRecord {
   shape?: number
 }
 
-export type CacheRecord = MediaCacheRecord | MalCacheRecord | FranchiseCacheRecord
+/**
+ * Запись в `posterCache` (keyPath 'id'): сам постер тайтла, а не его адрес.
+ * До седьмой версии схемы в MediaLook лежала только ссылка на CDN, и без сети сетка оставалась пустой.
+ */
+export interface PosterCacheRecord {
+  id: number
+  /** Тело картинки как пришло с CDN: локальный адрес собирается из него на лету (core/posters.ts). */
+  blob: Blob
+  /** Размер в байтах. Нужен счёту места и вытеснению по старению — без него потолок не проверить. */
+  bytes: number
+  ts: number
+}
+
+export type CacheRecord =
+  | MediaCacheRecord
+  | MalCacheRecord
+  | FranchiseCacheRecord
+  | PosterCacheRecord
 
 /**
  * Снимок БД для инспектора: поле на каждый вид записи — показанный ноль иначе не отличить от забытого счётчика.
@@ -191,6 +213,8 @@ export interface DbStats {
   noRussianNames: number
   /** Обложки, цвета и счёт частей: префикс LOOK3_ (core/media-looks.ts). */
   looks: number
+  /** Сами постеры, а не их адреса: стор posterCache (core/posters.ts). */
+  posters: number
   /** Оценки площадок: префикс RATE1_ (core/ratings.ts). */
   ratings: number
   /**

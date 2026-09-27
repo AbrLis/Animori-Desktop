@@ -73,10 +73,20 @@ const DB_MIGRATIONS: Record<number, Migration> = {
       Logger('ERROR', 'Миграция БД: перенос кэша не удался', cursorReq.error)
     }
   },
+
+  /**
+   * Седьмая версия: склад постеров. Обложка в MediaLook — это ссылка на CDN, и без сети сетка
+   * оставалась пустой. Теперь тело картинки лежит рядом, а облик отдаёт локальный адрес.
+   * Переливать нечего: новый стор, и до него постеров на диске просто не было.
+   */
+  7: (db) => {
+    if (!db.objectStoreNames.contains('posterCache'))
+      db.createObjectStore('posterCache', { keyPath: 'id' })
+  },
 }
 
-/** Сторы, которые реально лежат в базе после шестой версии схемы. */
-type PhysicalStore = 'mediaCache' | 'malCache' | 'franchiseCache'
+/** Сторы, которые реально лежат в базе после седьмой версии схемы. */
+type PhysicalStore = 'mediaCache' | 'malCache' | 'franchiseCache' | 'posterCache'
 
 /** Старое имя shikiCache — псевдоним mediaCache: вызовов dbGet/dbSet по приложению десятки. */
 function physicalStore(store: CacheStoreName): PhysicalStore {
@@ -295,6 +305,56 @@ export async function dbSet(store: CacheStoreName, data: CacheRecord): Promise<v
   }
 }
 
+/**
+ * Удаляет запись по ключу. Отсутствие ключа — не ошибка: удалять нечего, и повтор кнопки
+ * «очистить» должен оставаться безопасным. Стор `posterCache` без этого не умеет худеть.
+ */
+export async function dbDelete(store: CacheStoreName, key: IDBValidKey): Promise<void> {
+  const name = physicalStore(store)
+  try {
+    const db = await openDB()
+    if (!db) return
+
+    return await new Promise<void>((resolve) => {
+      const tx = db.transaction(name, 'readwrite')
+      tx.objectStore(name).delete(key)
+      tx.oncomplete = () => resolve()
+      tx.onerror = () => {
+        Logger('ERROR', `Ошибка удаления DB (${name})`, key)
+        resolve()
+      }
+      tx.onabort = () => resolve()
+    })
+  } catch (e) {
+    Logger('ERROR', `Сбой dbDelete (${name})`, e)
+  }
+}
+
+/** Очищает стор целиком. Ошибки не бросает: сброс кэша не должен падать из-за одного стора. */
+export async function dbClearStore(store: CacheStoreName): Promise<void> {
+  const name = physicalStore(store)
+  try {
+    const db = await openDB()
+    if (!db) return
+
+    return await new Promise<void>((resolve) => {
+      const tx = db.transaction(name, 'readwrite')
+      tx.objectStore(name).clear()
+      tx.oncomplete = () => {
+        Logger('DB', `Стор ${name} очищен`)
+        resolve()
+      }
+      tx.onerror = () => {
+        Logger('ERROR', `Ошибка очистки стора (${name})`)
+        resolve()
+      }
+      tx.onabort = () => resolve()
+    })
+  } catch (e) {
+    Logger('ERROR', `Сбой dbClearStore (${name})`, e)
+  }
+}
+
 /** Потолок ожидания удаления базы: зависшее соседнее соединение не должно держать кнопку настроек вечно. */
 const DB_DROP_TIMEOUT_MS = 7000
 
@@ -410,10 +470,14 @@ export async function getDbStats(): Promise<DbStats | DbStatsError> {
     }
 
     return await new Promise<DbStats | DbStatsError>((resolve) => {
-      const tx = db.transaction(['mediaCache', 'malCache', 'franchiseCache'], 'readonly')
+      const tx = db.transaction(
+        ['mediaCache', 'malCache', 'franchiseCache', 'posterCache'],
+        'readonly',
+      )
       const mediaStore = tx.objectStore('mediaCache')
       const malStore = tx.objectStore('malCache')
       const franchiseStore = tx.objectStore('franchiseCache')
+      const posterStore = tx.objectStore('posterCache')
 
       const stats: DbStats = {
         media: 0,
@@ -423,6 +487,7 @@ export async function getDbStats(): Promise<DbStats | DbStatsError> {
         russianTitles: 0,
         noRussianNames: 0,
         looks: 0,
+        posters: 0,
         ratings: 0,
         playable: 0,
         anilibertyLinks: 0,
@@ -432,6 +497,12 @@ export async function getDbStats(): Promise<DbStats | DbStatsError> {
         other: 0,
         totalCacheRecords: 0,
         estimatedSize,
+      }
+
+      // Постеры лежат отдельным стором и не входят в totalCacheRecords: там счёт по префиксам mediaCache.
+      const posterReq = posterStore.count()
+      posterReq.onsuccess = () => {
+        stats.posters = posterReq.result
       }
 
       const malReq = malStore.count()

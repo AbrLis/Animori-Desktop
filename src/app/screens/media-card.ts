@@ -25,9 +25,11 @@ import {
   type PlayState,
 } from '@/core/playable'
 import { getTitleRatings, type TitleRatings } from '@/core/ratings'
+import { localCover } from '@/core/posters'
 import { studioLogos } from '@/core/studio-logos'
 import { Logger } from '@/utils/logger'
 
+import { watchCovers } from '../covers'
 import { formatWord, statusWord } from '../labels'
 import { mediaLinks, type MediaLink } from '../media-links'
 import { navigate } from '../router'
@@ -92,6 +94,8 @@ export interface MediaCardView {
   listLabel: ComputedRef<string>
   mainTitle: ComputedRef<string>
   heroStyle: ComputedRef<{ backgroundImage: string }>
+  /** Обложка героя: свой постер, когда он сохранён, иначе адрес с сервера. */
+  heroCover: ComputedRef<string | null>
   donePart: ComputedRef<string>
   progressText: ComputedRef<string>
   about: ComputedRef<string>
@@ -222,6 +226,10 @@ export function useMediaCard(mediaId: Ref<number>): MediaCardView {
       romaji: found.romaji,
       english: found.english,
       isAdult: found.isAdult,
+      format: found.format,
+      seasonYear: found.seasonYear,
+      episodes: found.episodes,
+      duration: found.duration,
     }
   })
 
@@ -283,6 +291,21 @@ export function useMediaCard(mediaId: Ref<number>): MediaCardView {
 
     const tone = card.value?.color ?? '#1b2534'
     return { backgroundImage: `linear-gradient(120deg, ${tone}, #0b1018)` }
+  })
+
+  /**
+   * Обложка героя: свой постер, если он лежит на диске, иначе адрес с сервера.
+   * Карточка открыта по прямой ссылке и облик у неё может не быть поднят, поэтому
+   * спрашиваем склад напрямую — он и есть источник правды о том, что сохранено.
+   */
+  const heroCover = computed<string | null>(() => {
+    // Зависимость от склада: приехавший постер обязан сменить адрес под собой.
+    watchCovers()
+
+    const local = localCover(mediaId.value)
+    if (local !== null) return local
+
+    return card.value?.cover ?? null
   })
 
   /** Есть ли запись в списке: без неё панель — одна кнопка добавления. */
@@ -801,6 +824,7 @@ export function useMediaCard(mediaId: Ref<number>): MediaCardView {
     listLabel,
     mainTitle,
     heroStyle,
+  heroCover,
     donePart,
     progressText,
     about,

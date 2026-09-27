@@ -35,6 +35,14 @@ export interface RawListEntry {
   romaji: string | null
   /** Английское название. У многих тайтлов отсутствует. */
   english: string | null
+  /** Вид тайтла словом (TV, MOVIE…): его же показывает баннер карточки. */
+  format: string | null
+  /** Год выпуска. */
+  seasonYear: number | null
+  /** Всего серий; null — сервер не знает (анонс или неполный выпуск). */
+  episodes: number | null
+  /** Длина серии в минутах; у фильма — длина фильма. Статистика считает по ней часы. */
+  duration: number | null
 }
 
 const VIEWER_QUERY = `query {
@@ -46,7 +54,8 @@ const VIEWER_QUERY = `query {
 
 /**
  * Шкала оценки задана в запросе, иначе запись приходила бы то как 85, то как 8.5. Вид вписан словом: без условия
- * пришла бы и манга. Названия, взрослость и номер MAL берутся здесь же — отдельный запрос был бы вторым обходом.
+ * пришла бы и манга. Названия, взрослость, номер MAL и сведения для баннера карточки (вид, год, число серий и
+ * длина серии) берутся здесь же — отдельный запрос был бы вторым обходом.
  */
 const LIST_QUERY = `query ($userId: Int) {
   MediaListCollection(userId: $userId, type: ANIME) {
@@ -72,6 +81,10 @@ const LIST_QUERY = `query ($userId: Int) {
         media {
           idMal
           isAdult
+          format
+          seasonYear
+          episodes
+          duration
           title {
             romaji
             english
@@ -147,6 +160,17 @@ function readText(value: unknown): string | null {
   return typeof value === 'string' && value.trim() !== '' ? value : null
 }
 
+/** Положительное число или null: ноль и мусор сервера — «нет значения», а не год или длина. */
+function readCount(value: unknown): number | null {
+  return typeof value === 'number' && Number.isFinite(value) && value > 0 ? value : null
+}
+
+/** Поле вложенного media; нет media — нет поля. */
+function mediaField(media: unknown, key: string): unknown {
+  if (typeof media !== 'object' || media === null) return undefined
+  return (media as Record<string, unknown>)[key]
+}
+
 /** Годна ли запись списка: без номера тайтла её ни показать, ни слить с правкой. */
 function toEntry(value: unknown): RawListEntry | null {
   if (typeof value !== 'object' || value === null) return null
@@ -169,6 +193,10 @@ function toEntry(value: unknown): RawListEntry | null {
     isAdult: readAdult(raw.media),
     romaji: readTitle(raw.media, 'romaji'),
     english: readTitle(raw.media, 'english'),
+    format: readText(mediaField(raw.media, 'format')),
+    seasonYear: readCount(mediaField(raw.media, 'seasonYear')),
+    episodes: readCount(mediaField(raw.media, 'episodes')),
+    duration: readCount(mediaField(raw.media, 'duration')),
   }
 }
 

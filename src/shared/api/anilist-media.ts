@@ -147,6 +147,7 @@ const SEARCH_QUERY = `query ($word: String!, $page: Int!, $perPage: Int!) {
       format
       status
       episodes
+      duration
       seasonYear
       averageScore
       isAdult
@@ -186,6 +187,7 @@ const STUDIO_QUERY = `query ($id: Int!, $page: Int!, $perPage: Int!) {
         format
         status
         episodes
+        duration
         seasonYear
         averageScore
         isAdult
@@ -234,6 +236,7 @@ interface BriefReply {
   format?: string | null
   status?: string | null
   episodes?: number | null
+  duration?: number | null
   seasonYear?: number | null
   averageScore?: number | null
   isAdult?: boolean | null
@@ -369,6 +372,8 @@ export interface MediaBrief {
   episodes: number | null
   /** Глав у аниме не бывает: всегда null. */
   chapters: number | null
+  /** Длина серии в минутах; у фильма — длина фильма. Из неё сводка считает часы. */
+  duration: number | null
   seasonYear: number | null
   averageScore: number | null
   isAdult: boolean
@@ -688,6 +693,7 @@ function briefOrNull(item: BriefReply | null | undefined): MediaBrief | null {
     status: textOrNull(item.status),
     episodes: countOrNull(item.episodes),
     chapters: null,
+    duration: countOrNull(item.duration),
     seasonYear: countOrNull(item.seasonYear),
     averageScore: countOrNull(item.averageScore),
     isAdult: item.isAdult === true,

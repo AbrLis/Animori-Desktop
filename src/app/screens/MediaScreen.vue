@@ -59,6 +59,7 @@ const {
   listLabel,
   mainTitle,
   heroStyle,
+  heroCover,
   about,
   aboutWait,
   aboutLinks,
@@ -148,9 +149,9 @@ watch(mediaId, () => {
                    картинкой и читаются её подписью, а не рядом пилюль у названия. -->
               <div class="am-hero__stack">
                 <img
-                  v-if="card.cover"
+                  v-if="heroCover"
                   class="am-hero__cover"
-                  :src="card.cover"
+                  :src="heroCover"
                   :alt="mainTitle"
                   decoding="async"
                 />

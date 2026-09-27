@@ -8,6 +8,7 @@ import { peekRussianName, prefetchRussianNames } from '@/core/media-title'
 import { Logger } from '@/utils/logger'
 
 import EmptyMark from '../components/EmptyMark.vue'
+import { watchCovers } from '../covers'
 import { navigate } from '../router'
 
 import {
@@ -163,6 +164,8 @@ function dayTitle(start: number): string {
 
 /** Запись истории в строку показа. Обложка и имя добираются со склада. */
 function toLine(row: WatchRow): Line {
+  // Появление постеров — тоже повод перерисовать строку: иначе плитка останется с адресом CDN.
+  watchCovers()
   const look = peekLook(row.mediaId)
   const parts = [`Серия ${row.episode}`]
 

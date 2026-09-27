@@ -17,6 +17,7 @@ import {
 } from '@/core/playable'
 import { Logger } from '@/utils/logger'
 
+import { watchCovers } from '../covers'
 import { statusList } from '../labels'
 
 /** Подписи дней коротко. У JS неделя идёт с воскресенья, поэтому порядок свой. */
@@ -171,6 +172,8 @@ function factsOf(episode: number, time: string, aired: boolean): string {
 
 /** Выход сервера в строку календаря. */
 function toRow(entry: AiringEntry, at: number): WeekRow {
+  // Появление постеров — тоже повод перерисовать строку: иначе плитка останется с адресом CDN.
+  watchCovers()
   const look = peekLook(entry.mediaId)
   const time = hourText(at)
   const aired = at <= Date.now()

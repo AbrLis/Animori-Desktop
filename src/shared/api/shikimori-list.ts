@@ -260,6 +260,11 @@ export async function importShikiList(nick: string): Promise<ShikiImport> {
       isAdult: brief.isAdult,
       romaji: brief.romaji,
       english: brief.english,
+      // Вид, год и число серий выписка несёт с собой; длины серии у Шикимори в закладках нет.
+      format: brief.format ?? null,
+      seasonYear: brief.seasonYear ?? null,
+      episodes: brief.episodes ?? null,
+      duration: null,
     })
   }
 

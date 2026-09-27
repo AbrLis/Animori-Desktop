@@ -20,6 +20,7 @@ import {
 } from '@/core/collection'
 import { datasetStatus, initDatasetNames } from '@/core/dataset-names'
 import { clearCache, getDbStats } from '@/core/db'
+import { forgetCoverMemory, posterStats } from '@/core/posters'
 import { buildMalXml, malXmlFileName, parseMalXml } from '@/core/mal-xml'
 import { adultByBirth } from '@/core/adult'
 import { clearHidden } from '@/core/recs'
@@ -132,6 +133,9 @@ const askingMal = ref(false)
 const listCount = ref(0)
 const usedSize = ref('')
 
+/** Постеры на диске: счёт и место. Пусто, пока склад пуст — иначе строка про ноль занимает место. */
+const posterText = ref('')
+
 /** Состояние датасета названий строкой: журнала нет, видно хотя бы здесь. */
 const datasetText = ref('')
 
@@ -184,6 +188,13 @@ async function readState(): Promise<void> {
 
   const got = await getDbStats()
   usedSize.value = 'error' in got ? '' : got.estimatedSize
+
+  // Своё место постеров видно и по общему счёту, но там оно вперемешку с остальным складом.
+  const posters = await posterStats()
+  posterText.value =
+    posters.count > 0
+      ? `${posters.count.toLocaleString('ru-RU')} · ${(posters.bytes / 1024 / 1024).toFixed(1)} МБ`
+      : ''
 
   // Датасет поднимается тем же общим обещанием, что и на старте:
   // второй цены чтения здесь нет.
@@ -516,11 +527,13 @@ function onClear(): void {
     note.value = ''
     await clearCache()
     forgetCatalogMemory()
+    // Постеры лежат в удалённой базе, а их адреса — в памяти окна: без отзыва висят мёртвые ссылки.
+    forgetCoverMemory()
     await clearHidden()
     dropFeed()
     cleared.value = true
     await readState()
-    note.value = 'Память очищена. Названия и описания загрузятся заново.'
+    note.value = 'Память очищена. Названия, описания и постеры загрузятся заново.'
   })
 }
 
@@ -879,6 +892,10 @@ onBeforeUnmount(() => {
             <li v-if="usedSize" class="am-fact">
               <span class="am-fact__name">Занято на диске</span>
               <span class="am-fact__value">{{ usedSize }}</span>
+            </li>
+            <li v-if="posterText" class="am-fact">
+              <span class="am-fact__name">Постеров сохранено</span>
+              <span class="am-fact__value">{{ posterText }}</span>
             </li>
           </ul>
 

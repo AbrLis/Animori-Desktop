@@ -68,6 +68,11 @@ export async function importMalList(xml: string): Promise<MalImport> {
       isAdult: brief.isAdult,
       romaji: brief.romaji,
       english: brief.english,
+      // Вид, год и число серий выписка несёт с собой; длины серии в ней нет — она у AniList.
+      format: brief.format ?? null,
+      seasonYear: brief.seasonYear ?? null,
+      episodes: brief.episodes ?? null,
+      duration: null,
     })
   }
 

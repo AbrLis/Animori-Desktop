@@ -35,10 +35,11 @@ import EmptyMark from '../components/EmptyMark.vue'
 import EntrySheet from '../components/EntrySheet.vue'
 import FilterSheet from '../components/FilterSheet.vue'
 import MediaTile from '../components/MediaTile.vue'
+import { watchCovers } from '../covers'
 import { formatWord, GENRE_CHOICES, genreWord, partsShort } from '../labels'
 import { navigate } from '../router'
 import SakuraMark from '../components/SakuraMark.vue'
-import { SAKURA_ROSETTE, SAKURA_ROSETTE_BOX } from '../sakura'
+import { SAKURA_ROSETTE, SAKURA_ROSETTE_ASPECT, SAKURA_ROSETTE_BOX } from '../sakura'
 import { splashLine } from '../splash'
 import { tagWord } from '../tag-words'
 import { toPlayAsk, toTileRow, type TileRow } from '../tile-row'
@@ -49,8 +50,11 @@ import { dropFeed, feedKeep, homePick } from './home-keep'
 /** Сколько постеров класть на полку: и на свою, и на полку витрины. */
 const SHELF_SIZE = 14
 
-// Плашка приветствия: одна случайная фраза реестра, выбирается на запуск, иначе менялась бы на глазах.
+// Плашка приветствия: фраза запуска — из колоды, круг которой лежит в хранилище (см. splash.ts).
 const splash = splashLine()
+
+// Пропорция розетки для CSS: кадр задан в sakura.ts, и число нельзя расходиться с ним тут.
+const ROSE_ASPECT = SAKURA_ROSETTE_ASPECT
 
 const heyPlate = ref<HTMLElement | null>(null)
 const heyText = ref<HTMLElement | null>(null)
@@ -349,6 +353,8 @@ function playAskOf(entry: SnapshotEntry): PlayAsk {
 
 /** Строчка ряда с полки своего списка. */
 function toRow(entry: SnapshotEntry): Row {
+  // Появление постеров — тоже повод перерисовать строку: иначе плитка останется с адресом CDN.
+  watchCovers()
   const look = peekLook(entry.mediaId)
 
   // У идущего сезона итога может не быть вовсе: считаем по вышедшему.
@@ -874,16 +880,34 @@ function closeEdit(): void {
   editId.value = 0
 }
 
-/** Облик для новой записи: имя и метка 18+ берутся у своей записи или у брифа каталога. */
+/** Облик для новой записи: имя и метка 18+ берутся у своей записи или у брифа каталога; сведения
+ *  для баннера (вид, год, серии) — там же, длина серии у брифа нет. */
 function lookOf(mediaId: number): EntryLook | undefined {
   const own = getEntry(mediaId)
-  if (own !== undefined) return { romaji: own.romaji, english: own.english, isAdult: own.isAdult }
+  if (own !== undefined) {
+    return {
+      romaji: own.romaji,
+      english: own.english,
+      isAdult: own.isAdult,
+      format: own.format,
+      seasonYear: own.seasonYear,
+      episodes: own.episodes,
+      duration: own.duration,
+    }
+  }
 
   const known = [...staged.values()].flat().find((brief) => brief.mediaId === mediaId)
   const brief = known ?? feedKeep.items.find((item) => item.mediaId === mediaId)
   if (brief === undefined) return undefined
 
-  return { romaji: brief.romaji, english: brief.english, isAdult: brief.isAdult }
+  return {
+    romaji: brief.romaji,
+    english: brief.english,
+    isAdult: brief.isAdult,
+    format: brief.format,
+    seasonYear: brief.seasonYear,
+    episodes: brief.episodes,
+  }
 }
 
 /** Пересборка показов после правки: метки плиток и состав своей полки. Календарь не трогаем. */
@@ -1429,7 +1453,7 @@ watch(
   top: -25%;
   right: -4%;
   height: 150%;
-  aspect-ratio: 34.2 / 38.2;
+  aspect-ratio: v-bind(ROSE_ASPECT);
   color: rgb(var(--am-accent-2-rgb) / 0.3);
   pointer-events: none;
 }

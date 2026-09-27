@@ -121,7 +121,16 @@ function onReload(): void {
           type="button"
           @click="onPick(item.name, $event)"
         >
-          <span class="am-side__icon" :class="`am-side__icon--${item.name}`" aria-hidden="true">{{ item.icon }}</span>
+          <span v-if="item.icon === 'stats'" class="am-side__icon am-side__icon--stats" aria-hidden="true">
+            <!-- Столбики нарисованы, а не набраны знаком: готового глифа «диаграмма» нет, а ◔ от ◷
+                 истории отличался одной залитой четвертью и в 18 px читался как тот же круг. -->
+            <svg class="am-side__mark" viewBox="0 0 20 20" fill="none">
+              <path d="M4 16V9.5M10 16V4M16 16v-9.5" />
+            </svg>
+          </span>
+          <span v-else class="am-side__icon" :class="`am-side__icon--${item.name}`" aria-hidden="true">{{
+            item.icon
+          }}</span>
           <span class="am-side__text">{{ item.title }}</span>
         </button>
       </nav>
@@ -353,6 +362,30 @@ function onReload(): void {
 .am-side__icon--search {
   font-size: 18px;
   line-height: 16px;
+}
+
+/* Рисованный знак статистики живёт в том же квадрате 18×18, но заметно меньше него самого:
+   наборный глиф в кегле 16 px занимает лишь часть квадрата, а полотно 18 px залило бы рамку
+   целиком и знак выглядел бы крупнее соседей. Обводка non-scaling: уменьшая полотно, держим
+   толщину линии в 2 px, иначе на светлой теме штрих сел бы в фон. */
+.am-side__icon--stats {
+  display: grid;
+  place-items: center;
+  width: 18px;
+  height: 18px;
+}
+
+.am-side__mark {
+  width: 14px;
+  height: 14px;
+  overflow: visible;
+}
+
+.am-side__mark path {
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  vector-effect: non-scaling-stroke;
 }
 
 .am-side__foot {

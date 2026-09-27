@@ -11,7 +11,8 @@ const SNAPSHOT_KEY = 'AM_SNAPSHOT'
 const SNAPSHOT_FILE = 'animori-snapshot.json'
 
 // Версия снимка: поднимать при любом изменении формы SnapshotEntry; миграций нет — старый снимок выбрасывается.
-// 6 — убраны тип и тома (манги нет); malId добавлен без поднятия версии — поле необязательное.
+// 6 — убраны тип и тома (манги нет); malId добавлен без поднятия версии — поле необязательное. Так же, без
+// поднятия, добавлены вид, год, число серий и длина серии: старый снимок читается, нормализация даёт null.
 export const SNAPSHOT_VERSION = 6
 
 /** Задержка записи: прокрутка меняет снимок десятками правок в секунду, писать на каждую — дороже отрисовки. */
@@ -43,6 +44,15 @@ export interface SnapshotEntry {
    */
   romaji: string | null
   english: string | null
+  /**
+   * Вид тайтла (TV, MOVIE…), год выпуска, число серий и длина серии в минутах: приезжают со списком AniList
+   * одним оптом — их же показывает баннер карточки. Необязательные, как malId: старый снимок читается,
+   * а пустоту даёт нормализация.
+   */
+  format?: string | null
+  seasonYear?: number | null
+  episodes?: number | null
+  duration?: number | null
 }
 
 /**
@@ -90,6 +100,11 @@ function dateText(value: unknown): string | null {
   return typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value) ? value : null
 }
 
+/** Положительное число или null: ноль и мусор из файла — «нет значения». */
+function countOrNull(value: unknown): number | null {
+  return typeof value === 'number' && Number.isFinite(value) && value > 0 ? value : null
+}
+
 /**
  * Приводит прочитанную запись к нынешней форме; поля перечислены явно: что не переписано здесь, на диск не попадёт.
  */
@@ -111,6 +126,10 @@ function normalizeEntry(entry: SnapshotEntry): SnapshotEntry {
     isAdult: entry.isAdult === true,
     romaji: text(entry.romaji),
     english: text(entry.english),
+    format: text(entry.format),
+    seasonYear: countOrNull(entry.seasonYear),
+    episodes: countOrNull(entry.episodes),
+    duration: countOrNull(entry.duration),
   }
 }
 

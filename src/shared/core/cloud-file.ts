@@ -68,6 +68,11 @@ function dateText(value: unknown): string | null {
   return typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value) ? value : null
 }
 
+/** Положительное число или null: ноль и мусор — «нет значения». */
+function countOrNull(value: unknown): number | null {
+  return typeof value === 'number' && Number.isFinite(value) && value > 0 ? value : null
+}
+
 /** Метка устройства: одна строка без краёв и без простыни. */
 function device(value: unknown): string {
   if (typeof value !== 'string') return ''
@@ -103,6 +108,10 @@ function cloudEntry(entry: SnapshotEntry): SnapshotEntry {
     isAdult: entry.isAdult === true,
     romaji: text(entry.romaji),
     english: text(entry.english),
+    format: text(entry.format),
+    seasonYear: countOrNull(entry.seasonYear),
+    episodes: countOrNull(entry.episodes),
+    duration: countOrNull(entry.duration),
   }
 }
 

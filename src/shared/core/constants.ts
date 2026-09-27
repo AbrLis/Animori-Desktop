@@ -15,5 +15,5 @@ export const CACHE_TIME = Number.POSITIVE_INFINITY
 
 // IndexedDB
 export const DB_NAME = 'AniMoriSuperDB'
-/** Версия схемы: 6-я переносит склад карточек shikiCache → mediaCache (миграция в core/db.ts). */
-export const DB_VERSION = 6
+/** Версия схемы: 6-я переносит склад карточек shikiCache → mediaCache, 7-я заводит склад постеров. */
+export const DB_VERSION = 7

@@ -3,12 +3,15 @@
 
 import { CACHE_TIME } from './constants'
 import { dbGet, dbGetMany, dbSet } from './db'
+import { localCover } from './posters'
 import { fetchBriefsByIds } from '../api/anilist-lookup'
 import type { MediaBrief } from '../api/anilist-media'
 import { Logger } from '../utils/logger'
 import type { MediaCacheRecord } from './types'
 
-/** Префикс ключа склада; цифра — версия формы (3-я добавила статус выпуска, хранение бессрочное). */
+/** Префикс ключа склада; цифра — версия формы (3-я добавила статус выпуска, хранение бессрочное).
+ *  Новые поля версию не поднимают: их отсутствие видно, и запись дозабирается; переделка склада
+ *  обошлась бы в сотни запросов ради одного числа. */
 const KEY_PREFIX = 'LOOK3_'
 
 /** По скольку тайтлов спрашиваем за раз: потолок страницы у AniList. */
@@ -27,6 +30,8 @@ export interface MediaLook {
   format: string | null
   seasonYear: number | null
   episodes: number | null
+  /** Длина серии в минутах; у фильма — длина фильма. Сводка часов считает по ней. */
+  duration: number | null
   averageScore: number | null
   romaji: string | null
   english: string | null
@@ -121,6 +126,16 @@ async function writeCache(mediaId: number, look: MediaLook): Promise<void> {
   await dbSet('mediaCache', { key: cacheKey(mediaId), data: look, ts: Date.now() })
 }
 
+/**
+ * Собран ли облик целиком, чтобы больше не идти в сеть. Два случая ведут к сети: у онгоинга знание
+ * стареет (окно живёт днями) и у записи, сделанной до появления длины серии, поля нет вовсе. Ответ
+ * сервера «не знаю» — это null, и он собран: иначе сводка спрашивала бы один тайтл до бесконечности.
+ */
+function lookComplete(look: MediaLook | null): boolean {
+  if (look === null) return true
+  return !airedOut(look) && look.duration !== undefined
+}
+
 /** Выписка сервера в облик: из ответа берётся только видимое глазу. */
 function fromBrief(brief: MediaBrief): MediaLook {
   return {
@@ -129,6 +144,7 @@ function fromBrief(brief: MediaBrief): MediaLook {
     format: brief.format,
     seasonYear: brief.seasonYear,
     episodes: brief.episodes,
+    duration: brief.duration,
     averageScore: brief.averageScore,
     romaji: brief.romaji,
     english: brief.english,
@@ -138,9 +154,22 @@ function fromBrief(brief: MediaBrief): MediaLook {
   }
 }
 
-/** Что известно прямо сейчас, без ожидания. Разметка ждать не умеет. */
+/**
+ * Что известно прямо сейчас, без ожидания. Разметка ждать не умеет.
+ *
+ * Обложка отдаётся локальной, если постер лежит на диске: без сети ссылка на CDN не рисуется,
+ * и сетка оставалась бы пустой. Подстановка здесь — единственный шов на все экраны сразу, поэтому
+ * ни плитка, ни строки списка о складе постеров не знают.
+ */
 export function peekLook(mediaId: number): MediaLook | null {
-  return memory.get(mediaId) ?? null
+  // null в памяти значит «сервер тайтла не знает» — наружу это то же отсутствие, что и «ещё не знаем».
+  const look = memory.get(mediaId) ?? null
+  if (look === null) return null
+
+  const cover = localCover(mediaId)
+  if (cover === null || look.cover === cover) return look
+
+  return { ...look, cover }
 }
 
 /**
@@ -152,8 +181,8 @@ export function lookKnown(mediaId: number): boolean {
 }
 
 /**
- * Поднимает облики со склада пачкой и без сети: сводке нужен формат всех записей списка сразу,
- * а не только тех, что человек пролистал. Чего на складе нет, остаётся неизвестным — за это
+ * Поднимает облики со склада пачкой и без сети: сводке нужны вид и длина серии всех записей списка
+ * сразу, а не только тех, что человек пролистал. Чего на складе нет, остаётся неизвестным — за это
  * отвечает warmLooks. Отказ склада не запоминается: со следующего захода его спросят снова.
  */
 export async function hydrateLooks(mediaIds: readonly number[]): Promise<number> {
@@ -232,8 +261,8 @@ async function warmLooksImpl(mediaIds: number[]): Promise<number> {
     mediaIds.map(async (mediaId) => {
       const known = memory.get(mediaId)
 
-      // У онгоинга знание запуска тоже устаревает: окно живёт днями.
-      if (known !== undefined && !(known !== null && airedOut(known))) return
+      // Не догоданный облик (см. lookComplete) идёт в сеть: склад своего ответа не даст.
+      if (known !== undefined && lookComplete(known)) return
 
       try {
         const cached = await readCache(mediaId)
@@ -247,9 +276,7 @@ async function warmLooksImpl(mediaIds: number[]): Promise<number> {
 
   for (const mediaId of mediaIds) {
     const known = memory.get(mediaId)
-    if (!memory.has(mediaId) || (known !== undefined && known !== null && airedOut(known))) {
-      unknown.push(mediaId)
-    }
+    if (!memory.has(mediaId) || (known !== undefined && !lookComplete(known))) unknown.push(mediaId)
   }
 
   if (unknown.length === 0) return 0

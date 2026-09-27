@@ -10,7 +10,8 @@ import {
   totalProgress,
   type EntryFilter,
 } from '@/core/collection-view'
-import { peekLook } from '@/core/media-looks'
+import { peekLook, type MediaLook } from '@/core/media-looks'
+import type { SnapshotEntry } from '@/core/snapshot'
 
 import { formatWord, statusList, statusWord } from '../labels'
 
@@ -20,17 +21,10 @@ import { formatWord, statusList, statusWord } from '../labels'
  */
 const VIEW: EntryFilter = { hideAdult: true }
 
-/**
- * Минут на серию для перевода в дни. Длительности серии в наших данных нет: списки живут выписками
- * AniList, а `duration` там не приходит — спрашивать её значило бы по запросу на каждый тайтл.
- * Поэтому дни — договорённость, и экран обязан назвать её вслух, а не выдавать за подсчёт.
- */
-export const MINUTES_PER_EPISODE = 24
+/** Сколько лет рисуется столбиками: без потолка. Ряд уезжает за край по горизонтали, и список
+ *  с пятнадцатью годами никого не лишает — обрезанный ряд молчал бы об отброшенных годах. */
 
-/** Сколько лет рисуется столбиками: хвост истории в десяток лет и так редок. */
-const YEARS_LIMIT = 10
-
-/** Ключ формата, которого нет в кэше обликов: тайтл ещё не открывали. */
+/** Ключ формата, которого нет ни в памяти списка, ни в складе обликов: аниме ещё не добрано. */
 const FORMAT_UNKNOWN = 'UNKNOWN'
 
 /**
@@ -55,8 +49,62 @@ export interface ScoreBar {
   share: number
 }
 
-/** Столбик одного года: тайтлы, серии, часы и средняя оценка за год. */
+/** Счётчик месяца: те же числа, что у года, только месячным шагом. */
+interface Accum {
+  titles: number
+  episodes: number
+  minutes: number
+  sum: number
+  rated: number
+}
+
+function blankAccum(): Accum {
+  return { titles: 0, episodes: 0, minutes: 0, sum: 0, rated: 0 }
+}
+
+function addAccum(into: Accum, from: Accum): void {
+  into.titles += from.titles
+  into.episodes += from.episodes
+  into.minutes += from.minutes
+  into.sum += from.sum
+  into.rated += from.rated
+}
+
+function round1(value: number): number {
+  return Math.round(value * 10) / 10
+}
+
+function round2(value: number): number {
+  return Math.round(value * 100) / 100
+}
+
+/** Столбик одного месяца внутри года. */
+export interface MonthBar {
+  /** Номер месяца, 1..12. */
+  month: number
+  titles: number
+  episodes: number
+  hours: number
+  meanScore: number
+}
+
+/** Столбик одного года: аниме, серии, часы и средняя оценка за год. */
 export interface YearBar {
+  year: number
+  titles: number
+  episodes: number
+  hours: number
+  meanScore: number
+  share: number
+  /** Завершения по месяцам года, по возрастанию месяца; пустых месяцев в списке нет. */
+  months: MonthBar[]
+}
+
+/**
+ * Столбик года выпуска: что просмотрено из аниме, вышедших в этом году. Считаются записи с
+ * просмотром, а не весь список: «просмотрено аниме 2015 года» про то, что человек досмотрел.
+ */
+export interface ReleaseBar {
   year: number
   titles: number
   episodes: number
@@ -69,6 +117,8 @@ export interface YearBar {
 export interface StatsSummary {
   /** Записей в списке после отбора показа. */
   titles: number
+  /** Из них просмотренных: начата хоть одна серия. Держит вторую вкладку кольца по видам. */
+  titlesWatched: number
   /** Сколько записей спрятал тумблер 18+: молчаливое расхождение со списком читается потерей данных. */
   hidden: number
   /** Записей с оценкой. */
@@ -78,39 +128,68 @@ export interface StatsSummary {
   /** Просмотрено серий. */
   episodes: number
   hours: number
-  /** Эквивалент в днях — по MINUTES_PER_EPISODE. */
+  /**
+   * Просмотрено серий у аниме без известной длины: они не входят в часы, и без этого числа
+   * недобор выглядел бы полным счётом. Пользователь сам решит, устраивает ли его «меньше, чем правда».
+   */
+  episodesNoLength: number
+  /** Эквивалент в днях — по сумме минут; серии без известной длины в сумму не входят. */
   days: number
   completed: number
   running: number
   statuses: PieSlice[]
   formats: PieSlice[]
+  /** То же кольцо, но по просмотренному: у каждой вкладки свой знаменатель. */
+  formatsWatched: PieSlice[]
   scores: ScoreBar[]
   years: YearBar[]
+  /**
+   * Просмотрено по году выпуска аниме. Ось другая, чем у `years`: там «когда досмотрели»,
+   * здесь «когда вышло» — сортировка кота одна, а год разный.
+   */
+  releases: ReleaseBar[]
+  /** Просмотрено серий у аниме без известного года выпуска: в гистограмму они не попадают. */
+  episodesNoYear: number
 }
 
 /** Пустая сводка: её же показывает экран, пока снимок поднимается с диска. */
 export function emptyStats(): StatsSummary {
   return {
     titles: 0,
+    titlesWatched: 0,
     hidden: 0,
     rated: 0,
     meanScore: 0,
     episodes: 0,
     hours: 0,
+    episodesNoLength: 0,
     days: 0,
     completed: 0,
     running: 0,
     statuses: [],
     formats: [],
+    formatsWatched: [],
     scores: [],
     years: [],
+    releases: [],
+    episodesNoYear: 0,
   }
 }
 
-/** Часы и дни по числу серий: округление до десятых — третий знак всё равно не читается. */
-export function watchTime(episodes: number): { hours: number; days: number } {
-  const hours = (episodes * MINUTES_PER_EPISODE) / 60
+/** Часы и дни по сумме просмотренных минут: округление до десятых — третий знак всё равно не читается. */
+export function watchTime(minutes: number): { hours: number; days: number } {
+  const hours = minutes / 60
   return { hours: Math.round(hours * 10) / 10, days: Math.round((hours / 24) * 10) / 10 }
+}
+
+/**
+ * Длина серии записи в минутах; без известной длины — ноль. Недобор честнее выдумки: часы, сложенные
+ * из придуманных минут, нельзя назвать подсчётом. Длина живёт в двух местах — в записи списка и в
+ * складе обликов; записью первую, складом вторую. У фильма длина стоит на единицу продукта.
+ */
+export function episodeMinutes(entry: SnapshotEntry, look?: MediaLook | null): number {
+  const known = entry.duration ?? look?.duration ?? null
+  return known !== null && known > 0 ? known : 0
 }
 
 /** Число с разрядами: «12 345». Разряды ставим сами, чтобы формат не зависел от локали движка. */
@@ -287,13 +366,15 @@ export interface LegendSplit<T> {
   tail: LegendTail | null
 }
 
-/** Легенда кольца: три крупнейших сектора и хвост одной строкой — полная занимала полкарточки. */
+/** Легенда кольца: три крупнейших сектора в порядке убывания и хвост одной строкой — полная занимала полкарточки. */
 export function splitLegend<T extends { count: number; share: number }>(
   slices: readonly T[],
   limit = 3,
 ): LegendSplit<T> {
-  const head = slices.slice(0, limit)
-  const rest = slices.slice(limit)
+  // Порядок кольца задают закладки, порядок легенды — размер: три крупнейших сектора по убыванию.
+  const ordered = [...slices].sort((a, b) => b.count - a.count)
+  const head = ordered.slice(0, limit)
+  const rest = ordered.slice(limit)
   if (rest.length === 0) return { head: [...head], tail: null }
 
   let count = 0
@@ -306,15 +387,48 @@ export function splitLegend<T extends { count: number; share: number }>(
   return { head: [...head], tail: { parts: rest.length, count, share } }
 }
 
-/** Год из даты снимка ГГГГ-ММ-ДД; всё прочее, включая пустоту, — «года нет». */
-function yearOf(date: string | null): number | null {
+/**
+ * Кольцо по видам: крупные сверху, а незнакомый вид уходит в конец отдельной долей. Вид лежит в
+ * памяти списка и на складе обликов, а у части аниме его нет вовсе.
+ */
+function formatSlices(counts: ReadonlyMap<string, number>, total: number): PieSlice[] {
+  const keys = [...counts.keys()].sort((a, b) => {
+    if (a === FORMAT_UNKNOWN) return 1
+    if (b === FORMAT_UNKNOWN) return -1
+    const byCount = (counts.get(b) ?? 0) - (counts.get(a) ?? 0)
+    return byCount !== 0 ? byCount : a < b ? -1 : 1
+  })
+  const totals = keys.map((key) => counts.get(key) ?? 0)
+  const shares = sharesOf(totals, total)
+
+  let offset = 0
+  return keys.map((key, at) => {
+    const slice: PieSlice = {
+      key,
+      title: key === FORMAT_UNKNOWN ? 'Неизвестно' : (formatWord(key) ?? key),
+      count: totals[at] ?? 0,
+      share: shares[at] ?? 0,
+      offset,
+    }
+    offset += slice.share
+    return slice
+  })
+}
+
+/** Год и месяц из даты снимка ГГГГ-ММ-ДД; всё прочее, включая пустоту, — «даты нет». */
+function dateParts(date: string | null): { year: number; month: number } | null {
   if (typeof date !== 'string') return null
 
-  const hit = /^(\d{4})-\d{2}-\d{2}$/.exec(date)
+  const hit = /^(\d{4})-(\d{2})-\d{2}$/.exec(date)
   if (hit === null) return null
 
   const year = Number(hit[1])
-  return year >= 1900 && year <= 2200 ? year : null
+  if (year < 1900 || year > 2200) return null
+
+  const month = Number(hit[2])
+  if (month < 1 || month > 12) return null
+
+  return { year, month }
 }
 
 /**
@@ -326,38 +440,96 @@ export function buildStats(): StatsSummary {
 
   /** Гистограмма оценок по возрастанию: индекс — оценка минус один. */
   const scoreCounts = new Array<number>(10).fill(0)
-  const yearTitles = new Map<number, number>()
-  const yearEpisodes = new Map<number, number>()
-  const yearScores = new Map<number, { sum: number; rated: number }>()
+  const yearMonths = new Map<number, Map<number, Accum>>()
+  const yearReleases = new Map<number, Accum>()
   const formatCounts = new Map<string, number>()
+  const watchedFormatCounts = new Map<string, number>()
+  let watchedMinutes = 0
 
   for (const entry of eachEntry()) {
     if (!matchesEntry(entry, VIEW)) continue
 
     summary.titles += 1
 
-    // Облик читается один раз на запись: формат живёт в том же кэше, что обложка и части.
+    // Облик читается один раз на запись: он несёт и вид, и длину серии, которой в записи может не быть.
     const look = peekLook(entry.mediaId)
-    const format = look?.format ?? ''
+
+    // Своя длина у каждой серии; без неё серия в часы не идёт — недобор вместо выдумки.
+    const perEpisode = episodeMinutes(entry, look)
+    const minutes = entry.progress * perEpisode
+    watchedMinutes += minutes
+    // Считаем именно серии, а не записи: одно аниме без длины недооценивает счёт сразу на десятки.
+    if (perEpisode === 0 && entry.progress > 0) summary.episodesNoLength += entry.progress
+
+    const format = entry.format ?? look?.format ?? ''
     const formatKey = format === '' ? FORMAT_UNKNOWN : format
     formatCounts.set(formatKey, (formatCounts.get(formatKey) ?? 0) + 1)
 
+    // Просмотренное для второй вкладки кольца: начал хоть одну серию — уже смотрел. Тот же признак,
+    // что у метрики «Просмотрено аниме», иначе два ряда на экране считались бы по-разному.
+    if (entry.progress > 0) {
+      summary.titlesWatched += 1
+      watchedFormatCounts.set(formatKey, (watchedFormatCounts.get(formatKey) ?? 0) + 1)
+    }
+
     if (entry.score10 > 0) {
       summary.rated += 1
-      const at = Math.min(10, Math.floor(entry.score10)) - 1
+
+      // Дробная оценка идёт в ближайший целый столбик, а не вниз: при шаге в пол-балла отбрасывание
+      // вниз сдвинуло бы весь ряд оценок на пол-оценки ниже правды, и столбик 9 не содержал бы
+      // вовсе девяток с половиной. Округление к ближайшему ошибки не копит.
+      const at = Math.min(10, Math.round(entry.score10)) - 1
       if (at >= 0) scoreCounts[at] = (scoreCounts[at] ?? 0) + 1
     }
 
-    const year = yearOf(entry.completedAt)
-    if (year !== null) {
-      yearTitles.set(year, (yearTitles.get(year) ?? 0) + 1)
-      yearEpisodes.set(year, (yearEpisodes.get(year) ?? 0) + entry.progress)
+    const when = dateParts(entry.completedAt)
+    if (when !== null) {
+      // Год собирается из месяцев, а не наоборот: месячная разбивка нужна для раскрытия года,
+      // а лишние числа в снимке разошлись бы с суммой года на единицу.
+      let months = yearMonths.get(when.year)
+      if (months === undefined) {
+        months = new Map<number, Accum>()
+        yearMonths.set(when.year, months)
+      }
+
+      let bucket = months.get(when.month)
+      if (bucket === undefined) {
+        bucket = blankAccum()
+        months.set(when.month, bucket)
+      }
+
+      bucket.titles += 1
+      bucket.episodes += entry.progress
+      bucket.minutes += minutes
 
       if (entry.score10 > 0) {
-        const acc = yearScores.get(year) ?? { sum: 0, rated: 0 }
-        acc.sum += entry.score10
-        acc.rated += 1
-        yearScores.set(year, acc)
+        bucket.sum += entry.score10
+        bucket.rated += 1
+      }
+    }
+
+    // Год выпуска — ось второй гистограммы. Берём из записи, а из склада только как запасной: год
+    // приезжает со списком, и облик, собранный до этого поля, мог его не знать.
+    const released = entry.seasonYear ?? look?.seasonYear ?? null
+    if (entry.progress > 0) {
+      if (released !== null && released > 1900 && released <= 2200) {
+        let bucket = yearReleases.get(released)
+        if (bucket === undefined) {
+          bucket = blankAccum()
+          yearReleases.set(released, bucket)
+        }
+
+        bucket.titles += 1
+        bucket.episodes += entry.progress
+        bucket.minutes += minutes
+
+        if (entry.score10 > 0) {
+          bucket.sum += entry.score10
+          bucket.rated += 1
+        }
+      } else {
+        // Года выпуска нет — в гистограмму такая запись не попадёт, и молчать об этом нельзя.
+        summary.episodesNoYear += entry.progress
       }
     }
   }
@@ -367,7 +539,7 @@ export function buildStats(): StatsSummary {
   summary.meanScore = averageScore(VIEW)
   summary.hidden = Math.max(0, entryCount() - summary.titles)
 
-  const time = watchTime(summary.episodes)
+  const time = watchTime(watchedMinutes)
   summary.hours = time.hours
   summary.days = time.days
 
@@ -395,28 +567,10 @@ export function buildStats(): StatsSummary {
     })
     .filter((slice) => slice.count > 0)
 
-  // Форматы: облик лежит в кэше и есть не у каждого тайтла — незнакомое уходит в конец отдельной долей.
-  const formatKeys = [...formatCounts.keys()].sort((a, b) => {
-    if (a === FORMAT_UNKNOWN) return 1
-    if (b === FORMAT_UNKNOWN) return -1
-    const byCount = (formatCounts.get(b) ?? 0) - (formatCounts.get(a) ?? 0)
-    return byCount !== 0 ? byCount : a < b ? -1 : 1
-  })
-  const formatTotals = formatKeys.map((key) => formatCounts.get(key) ?? 0)
-  const formatShares = sharesOf(formatTotals, summary.titles)
-
-  let formatOffset = 0
-  summary.formats = formatKeys.map((key, at) => {
-    const slice: PieSlice = {
-      key,
-      title: key === FORMAT_UNKNOWN ? 'Неизвестно' : (formatWord(key) ?? key),
-      count: formatTotals[at] ?? 0,
-      share: formatShares[at] ?? 0,
-      offset: formatOffset,
-    }
-    formatOffset += slice.share
-    return slice
-  })
+  // Форматы строим дважды: по просмотренному и по всему списку. Доли у каждого свои — от своего
+  // знаменателя, иначе «Неизвестно» одной вкладки испортило бы другой.
+  summary.formatsWatched = formatSlices(watchedFormatCounts, summary.titlesWatched)
+  summary.formats = formatSlices(formatCounts, summary.titles)
 
   const scoreShares = heightsOf(scoreCounts)
   summary.scores = scoreCounts.map((count, at) => ({
@@ -425,24 +579,51 @@ export function buildStats(): StatsSummary {
     share: scoreShares[at] ?? 0,
   }))
 
-  const years = [...yearTitles.keys()].sort((a, b) => a - b).slice(-YEARS_LIMIT)
-  const episodeCounts = years.map((year) => yearEpisodes.get(year) ?? 0)
-  const yearShares = heightsOf(episodeCounts)
+  // Года просмотра: все, что есть. Потолок здесь означал бы тихую потерю данных, а ряд и так уезжает
+  // за край по горизонтали, когда лет много.
+  const years = [...yearMonths.keys()].sort((a, b) => a - b)
+  const yearTotals = years.map((year) => {
+    const total = blankAccum()
+    for (const bucket of yearMonths.get(year)?.values() ?? []) addAccum(total, bucket)
+    return total
+  })
+  const yearShares = heightsOf(yearTotals.map((total) => total.episodes))
   summary.years = years.map((year, at) => {
-    const titles = yearTitles.get(year) ?? 0
-    const episodes = episodeCounts[at] ?? 0
-    const hours = Math.round(((episodes * MINUTES_PER_EPISODE) / 60) * 10) / 10
-    const scoreAcc = yearScores.get(year)
-    const meanScore =
-      scoreAcc && scoreAcc.rated > 0 ? Math.round((scoreAcc.sum / scoreAcc.rated) * 100) / 100 : 0
+    const total = yearTotals[at] ?? blankAccum()
+    const months = [...(yearMonths.get(year) ?? new Map<number, Accum>())]
+      .sort((a, b) => a[0] - b[0])
+      .map(([month, bucket]) => ({
+        month,
+        titles: bucket.titles,
+        episodes: bucket.episodes,
+        hours: round1(bucket.minutes / 60),
+        meanScore: bucket.rated > 0 ? round2(bucket.sum / bucket.rated) : 0,
+      }))
 
     return {
       year,
-      titles,
-      episodes,
-      hours,
-      meanScore,
+      titles: total.titles,
+      episodes: total.episodes,
+      hours: round1(total.minutes / 60),
+      meanScore: total.rated > 0 ? round2(total.sum / total.rated) : 0,
       share: yearShares[at] ?? 0,
+      months,
+    }
+  })
+
+  // Годы выпуска: только те, где что-то смотрели, и с потолком — иначе столбики стали бы в ниточку.
+  const releasedYears = [...yearReleases.keys()].sort((a, b) => a - b)
+  const releaseShare = heightsOf(releasedYears.map((year) => yearReleases.get(year)?.episodes ?? 0))
+  summary.releases = releasedYears.map((year, at) => {
+    const bucket = yearReleases.get(year) ?? blankAccum()
+
+    return {
+      year,
+      titles: bucket.titles,
+      episodes: bucket.episodes,
+      hours: round1(bucket.minutes / 60),
+      meanScore: bucket.rated > 0 ? round2(bucket.sum / bucket.rated) : 0,
+      share: releaseShare[at] ?? 0,
     }
   })
 
@@ -450,15 +631,23 @@ export function buildStats(): StatsSummary {
 }
 
 /**
- * Номера записей показа, чей формат ещё не пришёл. Сеть — забота экрана, а отбор показа один на всю
+ * Номера записей показа, которым не хватает вида, длины серии или года выпуска: их добирает экран
+ * со сводкой, и все поля приезжают одним обликом. Сеть — забота экрана, а отбор показа один на всю
  * сводку: со своим отбором сюда попадали бы записи, которых нет ни в кольце, ни в числах.
  */
-export function formatlessIds(): number[] {
+export function looklessIds(): number[] {
   const ids: number[] = []
 
   for (const entry of eachEntry()) {
     if (!matchesEntry(entry, VIEW)) continue
-    if (peekLook(entry.mediaId)?.format != null) continue
+
+    // И вид, и длина живут в двух местах: память списка (приехала с ним) и добранный склад обликов.
+    const look = peekLook(entry.mediaId)
+    const blindFormat = entry.format == null && look?.format == null
+    const blindDuration = (entry.duration ?? look?.duration) == null
+    const blindYear = entry.seasonYear == null && look?.seasonYear == null
+    if (!blindFormat && !blindDuration && !blindYear) continue
+
     ids.push(entry.mediaId)
   }
 

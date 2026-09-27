@@ -58,6 +58,7 @@ function brief(mediaId: number, cover: string | null, color: string | null): Med
     status: null,
     episodes: null,
     chapters: null,
+    duration: null,
     seasonYear: null,
     averageScore: null,
     isAdult: false,

@@ -22,6 +22,7 @@ function brief(mediaId: number): MediaBrief {
     status: null,
     episodes: null,
     chapters: null,
+    duration: null,
     seasonYear: null,
     averageScore: null,
     isAdult: false,

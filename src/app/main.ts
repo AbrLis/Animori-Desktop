@@ -5,9 +5,12 @@ import { createApp } from 'vue'
 import App from './App.vue'
 import { startAppearance } from './appearance'
 import { seen } from './see-tile'
+import { initSplash } from './splash'
 import { tip } from './tip'
-import { initCollection } from '@/core/collection'
+import { eachEntry, initCollection } from '@/core/collection'
 import { initDatasetNames, updateDatasetNamesInBackground } from '@/core/dataset-names'
+import { hydrateLooks, peekLook } from '@/core/media-looks'
+import { loadCoversFromStore, prefetchCovers, type CoverPair } from '@/core/posters'
 import { loadSettings } from '@/core/settings'
 import { installGlobalErrorHandlers } from '@/utils/logger'
 
@@ -25,9 +28,38 @@ function hideBoot(): void {
   document.getElementById('boot')?.remove()
 }
 
-/** Настройки — до первой отрисовки, коллекция — после монтирования (список односторонний), датасет фоном. */
+/**
+ * Обложки своей полки: сперва то, что уже лежит на диске, затем догрузка недостающего фоном.
+ * Первый шаг не требует сети вовсе — с выключенной сетью сетка встаёт с картинками сразу.
+ * Второй намеренно не ждётся: первый запуск тянет десятки мегабайт, и заставка столько не ждёт.
+ */
+async function warmListCovers(): Promise<void> {
+  await loadCoversFromStore()
+
+  const ids: number[] = []
+  for (const entry of eachEntry()) ids.push(entry.mediaId)
+  if (ids.length === 0) return
+
+  // Адреса обложек лежат в складе обликов, а не в снимке: без этого шага догружать было бы нечего.
+  await hydrateLooks(ids)
+
+  const pairs: CoverPair[] = []
+  for (const mediaId of ids) {
+    const url = peekLook(mediaId)?.cover
+    if (url) pairs.push({ mediaId, url })
+  }
+
+  if (pairs.length > 0) await prefetchCovers(pairs)
+}
+
+/**
+ * Настройки и надпись плашки — до первой отрисовки, коллекция — после монтирования
+ * (список односторонний), датасет фоном.
+ */
 async function start(): Promise<void> {
-  await loadSettings()
+  // Круг сплэшей читается и записывается здесь же: ход круга обязан лечь в хранилище ДО показа,
+  // иначе спам перезагрузки (F5) показывал бы одну и ту же надпись.
+  await Promise.all([loadSettings(), initSplash()])
 
   // Тема ставится до первой отрисовки и сразу после настроек: светлое окно,
   // темнеющее на глазах, читается как поломка, а не как выбор оформления.
@@ -56,6 +88,12 @@ async function start(): Promise<void> {
 
   void initDatasetNames()
   updateDatasetNamesInBackground()
+
+  // Постеры своей полки — после снимка и обликов, потому что адреса лежат там. Ошибка не роняет
+  // старт: без картинок приложение работает, просто сетка без сети останется пустой.
+  void warmListCovers().catch((e: unknown) => {
+    console.error('AniMori: постеры своей полки не поднялись', e)
+  })
 }
 
 void start()

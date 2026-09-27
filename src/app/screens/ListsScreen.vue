@@ -719,7 +719,11 @@ onBeforeUnmount(() => {
   padding-bottom: 2px;
   overflow-x: auto;
   scrollbar-width: none;
-  mask-image: linear-gradient(to right, transparent, #000 18px, #000 96%, transparent);
+  /* Затухание осталось только справа. Левая кромка маски съедала первые 18 px
+     ленты, а чипы стоят у самого края, и «Смотрю» выглядел обрезанным слева.
+     Слева о прокрутке говорит срез чипов: лента начинается в нуле, и в начале
+     подсказка и не нужна. */
+  mask-image: linear-gradient(to right, #000 92%, transparent);
 }
 
 .am-lists__tabs::-webkit-scrollbar {

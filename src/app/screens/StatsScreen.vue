@@ -1,10 +1,10 @@
 <script setup lang="ts">
 // Вкладка «Статистика»: сводка по своему списку и графики. Числа считает stats-count.ts по памяти
-// коллекции — ни запроса, ни ожидания; форматы приезжают из кэша обликов, и их добор экран ведёт сам,
-// чтобы человек не пролистывал ради кольца весь список.
+// коллекции — ни запроса, ни ожидания; вид и длина серии приходят в память вместе со списком, а чего
+// нет — экран ведёт добором по складу обликов, чтобы человек не пролистывал ради кольца весь список.
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 
-import { initCollection, watchCollection } from '@/core/collection'
+import { eachEntry, initCollection, watchCollection } from '@/core/collection'
 import { hydrateLooks, lookKnown, warmLooks } from '@/core/media-looks'
 
 import EmptyMark from '../components/EmptyMark.vue'
@@ -14,9 +14,8 @@ import {
   arcShift,
   buildStats,
   emptyStats,
-  formatlessIds,
   formatNumber,
-  MINUTES_PER_EPISODE,
+  looklessIds,
   pointsForBars,
   RING_TURN,
   sectorPath,
@@ -29,8 +28,34 @@ import {
 /** Сколько плиток-заглушек показать, пока снимок поднимается с диска: столько же, сколько настоящих. */
 const HOLD_TILES = 5
 
+/** Что показывает кольцо по видам: просмотренное или весь список. */
+type FormatScope = 'watched' | 'all'
+
+const FORMAT_SCOPES: ReadonlyArray<{ key: FormatScope; title: string; tip: string }> = [
+  { key: 'watched', title: 'Просмотренное', tip: 'Виды просмотренных аниме' },
+  { key: 'all', title: 'Всему списку', tip: 'Виды всего списка, включая планы' },
+]
+
 /** Сколько тайтлов спрашиваем у сети за раз: столько же везёт одна страница обликов. */
-const FORMAT_CHUNK = 50
+const LOOK_CHUNK = 50
+
+/**
+ * Ширина колонки гистограммы и промежуток между столбиками задаются одной цифрой: колонка чуть шире
+ * самого столбика, и зазор получается сам. Сетка колонки равная и без своего промежутка — на этом
+ * держится сплайн (X столбика = (i + 0.5) / n), и добавленный в CSS gap увел бы линию с краски.
+ */
+const PLOT_COL = 46
+
+/**
+ * Размеры ряда: ширина колонки и минимальная ширина всего ряда. Когда лет не влезает, ряд уезжает
+ * за край по горизонтали, а столбики остаются читаемыми — вместо того чтобы сжаться в нить.
+ */
+function plotStyle(count: number): Record<string, string> {
+  return {
+    '--am-stat-col': `${PLOT_COL}px`,
+    minWidth: count > 0 ? `calc(${count} * var(--am-stat-col))` : '0',
+  }
+}
 
 /** Вкладки метрики гистограммы «Год просмотра». */
 type YearMetric = 'titles' | 'hours' | 'score'
@@ -41,18 +66,38 @@ interface YearTabChoice {
 }
 
 const YEAR_TABS: YearTabChoice[] = [
-  { key: 'titles', title: 'Просмотрено тайтлов' },
+  { key: 'titles', title: 'Просмотрено аниме' },
   { key: 'hours', title: 'Просмотрено часов' },
   { key: 'score', title: 'Средняя оценка' },
+]
+
+/**
+ * Метрики у двух гистограмм свои: оси у них разные, и общий переключатель дёргал бы чужой ряд
+ * за спиной человека. Смотрит он «Год просмотра», «Год выпуска» живёт по своей надписи.
+ */
+const viewMetric = ref<YearMetric>('titles')
+const releaseMetric = ref<YearMetric>('titles')
+
+/** Короткие названия месяцев: в подписи под столбиком помещается только такое. */
+const MONTH_NAMES = [
+  'янв',
+  'фев',
+  'мар',
+  'апр',
+  'май',
+  'июн',
+  'июл',
+  'авг',
+  'сен',
+  'окт',
+  'ноя',
+  'дек',
 ]
 
 /** Идёт ли подъём снимка. До него чисел нет вовсе, и показывать нули значило бы врать. */
 const busy = ref(true)
 
 const stats = ref<StatsSummary>(emptyStats())
-
-/** Какую метрику рисует гистограмма года: выбор живёт только на время экрана. */
-const yearMetric = ref<YearMetric>('titles')
 
 /** Цвет дуги и точки легенды: закладка называет класс, а цвета живут в теме. */
 function sliceClass(key: string): string {
@@ -84,9 +129,14 @@ function sliceTip(slice: { title: string; count: number; share: number }): strin
   return `${slice.title}: ${formatNumber(slice.count)} · ${percent(slice.share)}`
 }
 
-/** Легенды колец: три крупнейших сектора и хвост одной строкой. */
+/** Легенды колец: три крупнейших сектора по убыванию и хвост одной строкой. */
 const statusLegend = computed(() => splitLegend(stats.value.statuses))
-const formatLegend = computed(() => splitLegend(stats.value.formats))
+
+/** Кольцо по видам живёт по выбранной вкладке: своя доля и свой знаменатель у каждой. */
+const formatSlices = computed(() =>
+  formatScope.value === 'watched' ? stats.value.formatsWatched : stats.value.formats,
+)
+const formatLegend = computed(() => splitLegend(formatSlices.value))
 
 /** Корень экрана: по его ширине считаются столбцы плиток. */
 const root = ref<HTMLElement | null>(null)
@@ -120,71 +170,72 @@ function restyleTiles(): void {
   tileCols.value = Math.max(1, Math.ceil(count / rows))
 }
 
-/** Сколько записей ещё без формата: столько же показывает доля «Неизвестно» в кольце. */
-const formatsLeft = computed(() => {
-  const unknown = stats.value.formats.find((slice) => slice.key === 'UNKNOWN')
-  return unknown?.count ?? 0
+/** Какая вкладка кольца по видам выбрана: выбор живёт только на время экрана. */
+const formatScope = ref<FormatScope>('watched')
+
+/** Сколько аниме попало в кольцо по видам: подпись под числом убрана, и кольцо читается легендой. */
+const formatsKnown = computed(() => {
+  const total = formatScope.value === 'watched' ? stats.value.titlesWatched : stats.value.titles
+  const unknown = formatSlices.value.find((slice) => slice.key === 'UNKNOWN')
+  return total - (unknown?.count ?? 0)
 })
 
-/** Сколько тайтлов попало в кольцо форматов: формат приходит из кэша обликов и остаётся у человека. */
-const formatsKnown = computed(() => stats.value.titles - formatsLeft.value)
-
-/** Идёт ли добор форматов: пока он идёт, кольцо достраивается само. */
-const formatsBusy = ref(false)
+/** Идёт ли добор обликов: пока он идёт, кольцо и часы достраиваются сами. */
+const looksBusy = ref(false)
 
 /** Номер добора: правка списка начинает свой, уход с экрана отменяет идущий. */
-let formatRun = 0
+let looksRun = 0
 
 /** Идущий добор и просьба повторить: правки списка сыплются подряд, второй проход сразу не нужен. */
-let formatsTask: Promise<void> | null = null
-let formatsAgain = false
+let looksTask: Promise<void> | null = null
+let looksAgain = false
 
 /**
- * Добор форматов: сперва склад — он лежит у человека и не стоит ни одного запроса, — потом сеть
- * пачками. Без склада первое открытие вкладки шло бы в сеть за каждым тайтлом списка; без сети
- * кольцо показывает то, что уже знает, и не пропадает.
+ * Добор обликов: сперва склад — он лежит у человека и не стоит ни одного запроса, — потом сеть
+ * пачками. Без склада первое открытие вкладки шло бы в сеть за каждым аниме списка; без сети
+ * кольцо и часы показывают то, что уже знают, и не пропадают. Вид и длина серии едут вместе.
  */
-function fillFormats(): void {
-  if (formatsTask !== null) {
-    formatsAgain = true
+function fillLooks(): void {
+  if (looksTask !== null) {
+    looksAgain = true
     return
   }
 
-  const run = (formatRun += 1)
-  const task = runFormats(run)
+  const run = (looksRun += 1)
+  const task = runLooks(run)
 
-  formatsTask = task
+  looksTask = task
   void task.finally(() => {
-    if (formatsTask !== task) return
+    if (looksTask !== task) return
 
-    formatsTask = null
-    formatsBusy.value = false
+    looksTask = null
+    looksBusy.value = false
 
-    if (!formatsAgain) return
-    formatsAgain = false
-    fillFormats()
+    if (!looksAgain) return
+    looksAgain = false
+    fillLooks()
   })
 }
 
-async function runFormats(run: number): Promise<void> {
+async function runLooks(run: number): Promise<void> {
   try {
-    const wanted = formatlessIds()
+    const wanted = looklessIds()
     if (wanted.length === 0) return
 
-    formatsBusy.value = true
+    looksBusy.value = true
 
     await hydrateLooks(wanted)
-    if (run !== formatRun) return
+    if (run !== looksRun) return
 
     stats.value = buildStats()
 
-    const rest = formatlessIds()
-    for (let from = 0; from < rest.length; from += FORMAT_CHUNK) {
-      if (run !== formatRun) return
+    const rest = looklessIds()
+    for (let from = 0; from < rest.length; from += LOOK_CHUNK) {
+      if (run !== looksRun) return
 
-      const chunk = rest.slice(from, from + FORMAT_CHUNK)
+      const chunk = rest.slice(from, from + LOOK_CHUNK)
       await warmLooks(chunk)
-      if (run !== formatRun) return
+      if (run !== looksRun) return
 
       stats.value = buildStats()
 
@@ -192,15 +243,49 @@ async function runFormats(run: number): Promise<void> {
       if (!chunk.some((mediaId) => lookKnown(mediaId))) break
     }
   } catch (e) {
-    // Отказ разметку не роняет: кольцо покажет то, что уже собрано.
-    console.error('AniMori: форматы не добрались', e)
+    // Отказ разметку не роняет: кольцо и часы покажут то, что уже собрано.
+    console.error('AniMori: облики не добрались', e)
   }
 }
 
-/** Сколько серий в среднем приходится на тайтл; пустой список — ноль, а не деление на ноль. */
+/** Сколько серий в среднем приходится на аниме; пустой список — ноль, а не деление на ноль. */
 const perTitle = computed(() => {
   const source = stats.value
   return source.titles > 0 ? source.episodes / source.titles : 0
+})
+
+/**
+ * Подсказка к плитке дней. Часы считаются по известной длине серии, а у части аниме её нет —
+ * такие серии в сумму не входят. Без этой оговорки «20,8 дня» читалось бы как полный счёт.
+ */
+const daysTip = computed(() => {
+  const left = stats.value.episodesNoLength
+  if (left === 0) return 'Часы посчитаны по длине каждой серии из данных AniList'
+
+  return `Не учтено ${formatNumber(left)} серий: у этих аниме AniList не знает длину серии. Часы оттого меньше правды.`
+})
+
+/**
+ * Подсказка к счёту серий. Наше число — сумма progress по списку, ровно та же величина, что и на сайте;
+ * расходятся они могут только по устаревшему снимку, и об этом стоит сказать словами.
+ */
+const episodesTip = computed(() => {
+  if (lastEdit.value === null) return 'Счёт по своему списку — та же величина, что у сайта'
+  return `Последняя правка в списке — ${lastEdit.value}. С тех пор на сайте могли досмотреть: число здесь устареет.`
+})
+
+/**
+ * Самая свежая метка правки в списке, по-русски. Пусто — меток нет вовсе (список собран вручную),
+ * и тогда сравнивать с сайтом нечего: подсказка об этом и говорит.
+ */
+const lastEdit = computed(() => {
+  let newest = 0
+  for (const entry of eachEntry()) if (entry.updatedAt > newest) newest = entry.updatedAt
+  if (newest <= 0) return null
+
+  const date = new Date(newest)
+  const month = MONTH_NAMES[date.getMonth() - 1] ?? String(date.getMonth())
+  return `${date.getDate()} ${month} ${date.getFullYear()}`
 })
 
 /** Данные колонок для гистограммы оценок (1–10). */
@@ -224,41 +309,132 @@ const scoreSpline = computed(() => {
   }
 })
 
-/** Данные колонок для гистограммы «Год просмотра» в зависимости от выбранной вкладки. */
-const yearChartBars = computed(() => {
-  const list = stats.value.years
+/**
+ * Колонки гистограммы «Год выпуска». Ось — год выхода аниме, а не год просмотра, поэтому ряд
+ * другой: сортировка кота может быть с восьмидесятых, а досмотрено всё в этом году.
+ */
+const releaseChartBars = computed(() => {
+  const list = stats.value.releases
   if (list.length === 0) return []
 
-  if (yearMetric.value === 'titles') {
+  if (releaseMetric.value === 'titles') {
     const top = Math.max(1, ...list.map((b) => b.titles))
     return list.map((b) => ({
-      key: b.year,
+      key: `r${b.year}`,
       label: String(b.year),
       valueText: b.titles > 0 ? formatNumber(b.titles) : '',
       share: b.titles / top,
-      hint: `${b.year}: тайтлов ${formatNumber(b.titles)}, серий ${formatNumber(b.episodes)}`,
+      hint: `${b.year} год: аниме ${formatNumber(b.titles)}, серий ${formatNumber(b.episodes)}`,
     }))
   }
 
-  if (yearMetric.value === 'hours') {
+  if (releaseMetric.value === 'hours') {
     const top = Math.max(1, ...list.map((b) => b.hours))
     return list.map((b) => ({
-      key: b.year,
+      key: `r${b.year}`,
       label: String(b.year),
       valueText:
         b.hours > 0 ? (b.hours < 10 ? `${decimalText(b.hours)} ч` : `${formatNumber(b.hours)} ч`) : '',
       share: b.hours / top,
-      hint: `${b.year}: ≈ ${decimalText(b.hours)} ч (серий: ${formatNumber(b.episodes)})`,
+      hint: `${b.year} год: ≈ ${decimalText(b.hours)} ч (серий: ${formatNumber(b.episodes)})`,
+    }))
+  }
+
+  return list.map((b) => ({
+    key: `r${b.year}`,
+    label: String(b.year),
+    valueText: b.meanScore > 0 ? scoreText(b.meanScore) : '—',
+    share: b.meanScore > 0 ? b.meanScore / 10 : 0,
+    hint: `${b.year} год: средняя оценка ${b.meanScore > 0 ? scoreText(b.meanScore) : 'нет'} (${formatNumber(b.titles)} аниме)`,
+  }))
+})
+
+/** Плавный график поверх столбиков по годам выпуска. */
+const releaseSpline = computed(() => {
+  const bars = releaseChartBars.value
+  if (bars.length < 2) return { line: '', area: '' }
+  const points = pointsForBars(bars)
+  return {
+    line: smoothPath(points),
+    area: smoothAreaPath(points, 1000),
+  }
+})
+
+/** Раскрытый год: ноль — весь ряд по годам, иначе месяцы этого года. */
+const drilledYear = ref(0)
+
+/** Ряд, который рисует гистограмма года: годы или месяцы раскрытого года. */
+type YearRow = { label: string; titles: number; episodes: number; hours: number; meanScore: number }
+
+/** Строки раскрытого года; пусто — раскрывать нечего, экран показывает годы. */
+const yearRows = computed<YearRow[]>(() => {
+  const year = stats.value.years.find((b) => b.year === drilledYear.value)
+  if (year === undefined) return []
+
+  return year.months.map((month) => ({
+    label: MONTH_NAMES[month.month - 1] ?? String(month.month),
+    titles: month.titles,
+    episodes: month.episodes,
+    hours: month.hours,
+    meanScore: month.meanScore,
+  }))
+})
+
+/** Раскрыт ли год: от него зависит и подпись под гистограммой, и курсор у столбиков. */
+const drilled = computed(() => yearRows.value.length > 0)
+
+/** Сменить год: тот же год закрывается, любой другой открывается. */
+function drillTo(year: number): void {
+  drilledYear.value = drilledYear.value === year ? 0 : year
+}
+
+/** Данные колонок для гистограммы «Год просмотра» в зависимости от выбранной вкладки. */
+const yearChartBars = computed(() => {
+  const list: YearRow[] = drilled.value
+    ? yearRows.value
+    : stats.value.years.map((b) => ({
+        label: String(b.year),
+        titles: b.titles,
+        episodes: b.episodes,
+        hours: b.hours,
+        meanScore: b.meanScore,
+      }))
+
+  if (list.length === 0) return []
+
+  if (viewMetric.value === 'titles') {
+    const top = Math.max(1, ...list.map((b) => b.titles))
+    return list.map((b, at) => ({
+      key: drilled.value ? `m${at}` : `y${at}`,
+      label: b.label,
+      valueText: b.titles > 0 ? formatNumber(b.titles) : '',
+      share: b.titles / top,
+      hint: `${b.label}: аниме ${formatNumber(b.titles)}, серий ${formatNumber(b.episodes)}`,
+      year: drilled.value ? 0 : Number(b.label),
+    }))
+  }
+
+  if (viewMetric.value === 'hours') {
+    const top = Math.max(1, ...list.map((b) => b.hours))
+    return list.map((b, at) => ({
+      key: drilled.value ? `m${at}` : `y${at}`,
+      label: b.label,
+      valueText:
+        b.hours > 0 ? (b.hours < 10 ? `${decimalText(b.hours)} ч` : `${formatNumber(b.hours)} ч`) : '',
+      share: b.hours / top,
+      hint: `${b.label}: ≈ ${decimalText(b.hours)} ч (серий: ${formatNumber(b.episodes)})`,
+      year: drilled.value ? 0 : Number(b.label),
     }))
   }
 
   // 'score'
-  return list.map((b) => ({
-    key: b.year,
-    label: String(b.year),
+  return list.map((b, at) => ({
+    key: drilled.value ? `m${at}` : `y${at}`,
+    label: b.label,
     valueText: b.meanScore > 0 ? scoreText(b.meanScore) : '—',
     share: b.meanScore > 0 ? b.meanScore / 10 : 0,
-    hint: `${b.year}: средняя оценка ${b.meanScore > 0 ? scoreText(b.meanScore) : 'нет'} (${formatNumber(b.titles)} тайтл.)`,
+    hint: `${b.label}: средняя оценка ${b.meanScore > 0 ? scoreText(b.meanScore) : 'нет'} (${formatNumber(b.titles)} аниме)`,
+    year: drilled.value ? 0 : Number(b.label),
   }))
 })
 
@@ -271,17 +447,6 @@ const yearSpline = computed(() => {
     line: smoothPath(points),
     area: smoothAreaPath(points, 1000),
   }
-})
-
-/** Пояснение под гистограммой года в зависимости от активной вкладки. */
-const yearNote = computed(() => {
-  if (yearMetric.value === 'titles') {
-    return 'Столбик — число завершённых тайтлов за календарный год; серии в подсказке.'
-  }
-  if (yearMetric.value === 'hours') {
-    return `Столбик — часы просмотра за год из расчёта ${MINUTES_PER_EPISODE} мин на серию.`
-  }
-  return 'Столбик — средняя выставленная оценка по завершённым тайтлам за год (шкала 1–10).'
 })
 
 /** Отказ подписки на правки списка: зовётся при уходе с экрана. */
@@ -306,13 +471,13 @@ onMounted(async () => {
   stats.value = buildStats()
   busy.value = false
 
-  // Добор форматов идёт своим ходом: числа и оба кольца уже на экране.
-  fillFormats()
+  // Добор обликов идёт своим ходом: числа и оба кольца уже на экране.
+  fillLooks()
 
   // Правка списка меняет сводку сама: числа, доли и годы считаются из памяти в тот же миг.
   stopWatching = watchCollection(() => {
     stats.value = buildStats()
-    fillFormats()
+    fillLooks()
   })
 })
 
@@ -323,22 +488,15 @@ onBeforeUnmount(() => {
   stopWatching?.()
   stopWatching = null
 
-  // Идущий добор форматов отпускаем: экран закрыт, отвечать уже некому.
-  formatRun += 1
-  formatsAgain = false
+  // Идущий добор обликов отпускаем: экран закрыт, отвечать уже некому.
+  looksRun += 1
+  looksAgain = false
 })
 </script>
 
 
 <template>
   <section ref="root" class="am-page">
-    <div class="am-stats__top">
-      <h2 class="am-h2">Статистика</h2>
-      <span v-if="!busy" class="am-stats__num">{{ formatNumber(stats.titles) }}</span>
-      <span class="am-bar__gap" />
-      <span class="am-meta">Числа считаются на месте по своему списку; форматы — из кэша обликов</span>
-    </div>
-
     <ul v-if="busy" class="am-stats__tiles">
       <li v-for="n in HOLD_TILES" :key="n" class="am-stats__tile">
         <span class="am-skeleton" />
@@ -358,19 +516,22 @@ onBeforeUnmount(() => {
       >
         <li class="am-stats__tile">
           <span class="am-stats__value">{{ formatNumber(stats.titles) }}</span>
-          <span class="am-stats__name">Тайтлов в списке</span>
+          <span class="am-stats__name">Аниме в списке</span>
           <span class="am-stats__sub">
             завершено {{ formatNumber(stats.completed) }}, смотрю {{ formatNumber(stats.running) }}
           </span>
         </li>
 
-        <li class="am-stats__tile">
+        <li
+          v-tip="episodesTip"
+          class="am-stats__tile"
+        >
           <span class="am-stats__value">{{ formatNumber(stats.episodes) }}</span>
           <span class="am-stats__name">Серий просмотрено</span>
-          <span class="am-stats__sub">{{ decimalText(perTitle) }} серий на тайтл</span>
+          <span class="am-stats__sub">{{ decimalText(perTitle) }} серий на аниме</span>
         </li>
 
-        <li class="am-stats__tile">
+        <li v-tip="daysTip" class="am-stats__tile">
           <span class="am-stats__value">{{ decimalText(stats.days) }}</span>
           <span class="am-stats__name">Дней за просмотром</span>
           <span class="am-stats__sub">≈ {{ formatNumber(stats.hours) }} ч экранного времени</span>
@@ -422,7 +583,7 @@ onBeforeUnmount(() => {
 
             <span class="am-stats__ring-num">
               <span class="am-stats__ring-value">{{ formatNumber(stats.titles) }}</span>
-              <span class="am-stats__ring-name">тайтлов</span>
+              <span class="am-stats__ring-name">аниме</span>
             </span>
           </div>
 
@@ -447,13 +608,30 @@ onBeforeUnmount(() => {
         </section>
 
         <section class="am-panel am-stats__card">
-          <h3 class="am-h3">Распределение по форматам</h3>
+          <div class="am-bar am-stats__head">
+            <h3 class="am-h3">Распределение по форматам</h3>
+            <span class="am-bar__gap" />
+            <div class="am-seg" role="group" aria-label="Что показывает кольцо по видам">
+              <button
+                v-for="scope in FORMAT_SCOPES"
+                :key="scope.key"
+                v-tip="scope.tip"
+                class="am-seg__btn"
+                :class="{ 'am-seg__btn--on': formatScope === scope.key }"
+                type="button"
+                :aria-pressed="formatScope === scope.key"
+                @click="formatScope = scope.key"
+              >
+                {{ scope.title }}
+              </button>
+            </div>
+          </div>
 
           <div class="am-stats__ring-wrap">
             <svg class="am-stats__ring" viewBox="0 0 120 120" aria-hidden="true" focusable="false">
               <circle class="am-stats__ring-bg" cx="60" cy="60" r="44" />
               <path
-                v-for="slice in stats.formats"
+                v-for="slice in formatSlices"
                 :key="`hit-${slice.key}`"
                 class="am-stats__hit"
                 :d="sectorPath(slice.offset, slice.share)"
@@ -461,7 +639,7 @@ onBeforeUnmount(() => {
               />
               <g :transform="RING_TURN">
                 <circle
-                  v-for="slice in stats.formats"
+                  v-for="slice in formatSlices"
                   :key="slice.key"
                   class="am-stats__arc"
                   :class="sliceClass(slice.key)"
@@ -473,10 +651,8 @@ onBeforeUnmount(() => {
                 />
               </g>
             </svg>
-
             <span class="am-stats__ring-num">
               <span class="am-stats__ring-value">{{ formatNumber(formatsKnown) }}</span>
-              <span class="am-stats__ring-name">с форматом</span>
             </span>
           </div>
 
@@ -499,18 +675,14 @@ onBeforeUnmount(() => {
             {{ percent(formatLegend.tail.share) }}
           </p>
 
-          <p v-if="formatsBusy" class="am-stats__note">
-            Добираю форматы из кэша: осталось {{ formatNumber(formatsLeft) }} — кольцо достроится само
-          </p>
-
-          <p v-else-if="formatsLeft > 0" class="am-stats__note">
-            {{ formatNumber(formatsLeft) }} записей пока без формата: он берётся из кэша обликов
+          <p v-if="looksBusy" class="am-stats__note">
+            Добираю виды и длины серий — кольцо и часы достроятся сами
           </p>
         </section>
       </div>
 
       <section class="am-panel am-stats__card am-stats__card--wide">
-        <h3 class="am-h3">Свои оценки</h3>
+        <h3 class="am-h3">Оценки</h3>
 
         <div class="am-stats__plot am-stats__plot--wide">
           <div class="am-stats__plot-row am-stats__plot-nums">
@@ -563,107 +735,173 @@ onBeforeUnmount(() => {
 
       <section v-if="stats.years.length > 0" class="am-panel am-stats__card am-stats__card--wide">
         <div class="am-bar am-stats__head">
-          <h3 class="am-h3">Год просмотра</h3>
+          <h3 class="am-h3">{{ drilled ? `Месяцы ${drilledYear}` : 'Год просмотра' }}</h3>
+          <button
+            v-if="drilled"
+            class="am-stats__back"
+            type="button"
+            @click="drilledYear = 0"
+          >
+            ← К годам
+          </button>
           <span class="am-bar__gap" />
           <div class="am-seg" role="group" aria-label="Метрика по годам">
             <button
               v-for="tab in YEAR_TABS"
               :key="tab.key"
               class="am-seg__btn"
-              :class="{ 'am-seg__btn--on': yearMetric === tab.key }"
+              :class="{ 'am-seg__btn--on': viewMetric === tab.key }"
               type="button"
-              :aria-pressed="yearMetric === tab.key"
-              @click="yearMetric = tab.key"
+              :aria-pressed="viewMetric === tab.key"
+              @click="viewMetric = tab.key"
             >
               {{ tab.title }}
             </button>
           </div>
         </div>
 
-        <div class="am-stats__plot am-stats__plot--wide">
-          <div class="am-stats__plot-row am-stats__plot-nums">
-            <span v-for="bar in yearChartBars" :key="bar.key" class="am-stats__plot-num">
-              {{ bar.valueText }}
-            </span>
-          </div>
+        <!-- Обёртка прокручивает ряд, когда лет много: сам ряд с min-width остаётся широким,
+             иначе колонки сжались бы вместо того, чтобы уехать за край. -->
+        <div class="am-stats__scroll">
+          <div
+            class="am-stats__plot am-stats__plot--wide"
+            :style="plotStyle(yearChartBars.length)"
+          >
+            <div class="am-stats__plot-row am-stats__plot-nums">
+              <span v-for="bar in yearChartBars" :key="bar.key" class="am-stats__plot-num">
+                {{ bar.valueText }}
+              </span>
+            </div>
 
-          <div class="am-stats__plot-tracks">
-            <svg
-              v-if="yearSpline.line"
-              class="am-stats__spline"
-              viewBox="0 0 1000 1000"
-              preserveAspectRatio="none"
-              aria-hidden="true"
-            >
-              <defs>
-                <linearGradient id="am-stats-year-grad" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" class="am-stats__grad-top" />
-                  <stop offset="100%" class="am-stats__grad-end" />
-                </linearGradient>
-              </defs>
-              <path v-if="yearSpline.area" :d="yearSpline.area" fill="url(#am-stats-year-grad)" />
-              <path :d="yearSpline.line" class="am-stats__spline-line" />
-            </svg>
-
-            <ol class="am-stats__plot-cols">
-              <li
-                v-for="bar in yearChartBars"
-                :key="bar.key"
-                v-tip="bar.hint"
-                class="am-stats__plot-col"
+            <div class="am-stats__plot-tracks">
+              <svg
+                v-if="yearSpline.line"
+                class="am-stats__spline"
+                viewBox="0 0 1000 1000"
+                preserveAspectRatio="none"
+                aria-hidden="true"
               >
-                <span class="am-stats__bar-track">
-                  <span class="am-stats__bar-fill" :style="{ height: barHeight(bar.share) }">
-                    <span v-if="bar.share > 0" class="am-stats__bar-node" />
-                  </span>
-                </span>
-              </li>
-            </ol>
-          </div>
+                <defs>
+                  <linearGradient id="am-stats-year-grad" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" class="am-stats__grad-top" />
+                    <stop offset="100%" class="am-stats__grad-end" />
+                  </linearGradient>
+                </defs>
+                <path v-if="yearSpline.area" :d="yearSpline.area" fill="url(#am-stats-year-grad)" />
+                <path :d="yearSpline.line" class="am-stats__spline-line" />
+              </svg>
 
-          <div class="am-stats__plot-row am-stats__plot-keys">
-            <span v-for="bar in yearChartBars" :key="bar.key" class="am-stats__plot-key">
-              {{ bar.label }}
-            </span>
+              <ol class="am-stats__plot-cols">
+                <li
+                  v-for="bar in yearChartBars"
+                  :key="bar.key"
+                  v-tip="bar.hint"
+                  class="am-stats__plot-col"
+                  :class="{
+                    'am-stats__plot-col--open': !drilled && bar.year > 0,
+                    'am-stats__plot-col--on': drilled,
+                  }"
+                  @click="drillTo(bar.year)"
+                >
+                  <span class="am-stats__bar-track">
+                    <span class="am-stats__bar-fill" :style="{ height: barHeight(bar.share) }">
+                      <span v-if="bar.share > 0" class="am-stats__bar-node" />
+                    </span>
+                  </span>
+                </li>
+              </ol>
+            </div>
+
+            <div class="am-stats__plot-row am-stats__plot-keys">
+              <span v-for="bar in yearChartBars" :key="bar.key" class="am-stats__plot-key">
+                {{ bar.label }}
+              </span>
+            </div>
+          </div>
+        </div>
+      </section>
+      <section
+        v-if="releaseChartBars.length > 0"
+        class="am-panel am-stats__card am-stats__card--wide"
+      >
+        <div class="am-bar am-stats__head">
+          <h3 class="am-h3">Год выпуска</h3>
+          <span class="am-bar__gap" />
+          <!-- Переключатель метрик один на обе гистограммы: два разных выборя рядом читались бы
+               как «здесь одно, там другое», а считают они одно и то же по разным осям. -->
+          <div class="am-seg" role="group" aria-label="Метрика по годам выпуска">
+            <button
+              v-for="tab in YEAR_TABS"
+              :key="tab.key"
+              class="am-seg__btn"
+              :class="{ 'am-seg__btn--on': releaseMetric === tab.key }"
+              type="button"
+              :aria-pressed="releaseMetric === tab.key"
+              @click="releaseMetric = tab.key"
+            >
+              {{ tab.title }}
+            </button>
           </div>
         </div>
 
-        <p class="am-stats__note">{{ yearNote }}</p>
+        <div class="am-stats__scroll">
+          <div
+            class="am-stats__plot am-stats__plot--wide"
+            :style="plotStyle(releaseChartBars.length)"
+          >
+            <div class="am-stats__plot-row am-stats__plot-nums">
+              <span v-for="bar in releaseChartBars" :key="bar.key" class="am-stats__plot-num">
+                {{ bar.valueText }}
+              </span>
+            </div>
+
+            <div class="am-stats__plot-tracks">
+              <svg
+                v-if="releaseSpline.line"
+                class="am-stats__spline"
+                viewBox="0 0 1000 1000"
+                preserveAspectRatio="none"
+                aria-hidden="true"
+              >
+                <defs>
+                  <linearGradient id="am-stats-release-grad" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" class="am-stats__grad-top" />
+                    <stop offset="100%" class="am-stats__grad-end" />
+                  </linearGradient>
+                </defs>
+                <path v-if="releaseSpline.area" :d="releaseSpline.area" fill="url(#am-stats-release-grad)" />
+                <path :d="releaseSpline.line" class="am-stats__spline-line" />
+              </svg>
+
+              <ol class="am-stats__plot-cols">
+                <li
+                  v-for="bar in releaseChartBars"
+                  :key="bar.key"
+                  v-tip="bar.hint"
+                  class="am-stats__plot-col"
+                >
+                  <span class="am-stats__bar-track">
+                    <span class="am-stats__bar-fill" :style="{ height: barHeight(bar.share) }">
+                      <span v-if="bar.share > 0" class="am-stats__bar-node" />
+                    </span>
+                  </span>
+                </li>
+              </ol>
+            </div>
+
+            <div class="am-stats__plot-row am-stats__plot-keys">
+              <span v-for="bar in releaseChartBars" :key="bar.key" class="am-stats__plot-key">
+                {{ bar.label }}
+              </span>
+            </div>
+          </div>
+        </div>
       </section>
-
-      <p class="am-stats__note">
-        Дни и часы — оценка: одна серия считается за {{ MINUTES_PER_EPISODE }} минуты. Длительности
-        серий в списке нет, поэтому числа с «≈».
-      </p>
-
-      <p v-if="stats.hidden > 0" class="am-stats__note">
-        Скрыто тумблером 18+: {{ formatNumber(stats.hidden) }}. С ним числа пересчитаются.
-      </p>
     </template>
   </section>
 </template>
 
 <style scoped>
-/* Полоса над сводкой — то же стекло, что у отбора в списках и истории: вкладка стоит с ними в одном меню. */
-.am-stats__top {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 10px;
-  align-items: center;
-  padding: 10px 14px;
-  background: var(--am-glass);
-  border: 1px solid var(--am-line-soft);
-  border-radius: var(--am-r-xl);
-  box-shadow: inset 0 1px 0 var(--am-edge);
-  backdrop-filter: blur(var(--am-blur)) saturate(1.4);
-}
-
-.am-stats__num {
-  font-size: 12px;
-  color: var(--am-faint);
-  font-variant-numeric: tabular-nums;
-}
-
 /* Плитки без стекла и размытия: их тут десяток, а blur в каждой считался бы кадром.
     auto-fit ниже — запас на первый кадр и скелет; рабочие столбцы ставит разметка (tileCols),
     деля ряды поровну, чтобы пустых клеток не было ни при какой ширине окна. */
@@ -739,9 +977,34 @@ onBeforeUnmount(() => {
   gap: 12px;
 }
 
+/* Возврат к годам: тот же сегмент, но отдельной кнопкой — ряд столбиков трогать не нужно. */
+.am-stats__back {
+  padding: 4px 10px;
+  font: inherit;
+  font-size: 12px;
+  color: var(--am-dim);
+  cursor: pointer;
+  background: var(--am-fill-1);
+  border: 1px solid var(--am-line-soft);
+  border-radius: var(--am-r-cap);
+}
+
+.am-stats__back:hover {
+  color: var(--am-text);
+  background: var(--am-fill-2);
+}
+
 .am-stats__head .am-seg {
   max-width: 100%;
   overflow-x: auto;
+}
+
+/* Области графиков мышью не выделяются: клик по кольцу, легенде или столбику оставлял бы на
+   краске прямоугольник выделения. Подсказка по наведению и раскрытие года по клику не задеты. */
+.am-stats__ring-wrap,
+.am-stats__legend,
+.am-stats__plot {
+  user-select: none;
 }
 
 .am-stats__ring-wrap {
@@ -758,6 +1021,9 @@ onBeforeUnmount(() => {
 .am-stats__ring {
   width: 100%;
   height: 100%;
+  /* События полотно не ловит: клик по нему не должен ничего выделять и забирать фокус — ловят их
+     невидимые сектора .am-stats__hit, для подсказки они и нарисованы. */
+  pointer-events: none;
 }
 
 .am-stats__ring-bg {
@@ -780,6 +1046,8 @@ onBeforeUnmount(() => {
 .am-stats__hit {
   fill: transparent;
   cursor: help;
+  /* Полотно выключило события себе, сектор возвращает их себе: подсказка приходит по наведению. */
+  pointer-events: auto;
   transition: fill var(--am-fast) var(--am-ease);
 }
 
@@ -919,10 +1187,13 @@ onBeforeUnmount(() => {
   width: 100%;
 }
 
+/* Колонка не уже PLOT_COL (задаётся разметкой): иначе столбики слипаются, а при многих
+   колонках ряд сжимает их в нить. Промежутка у сетки намеренно нет — на равенстве колонок
+   держится сплайн, а gap увел бы линию с краски; зазор даёт разница «колонка минус столбик». */
 .am-stats__plot-row {
   display: grid;
   grid-auto-flow: column;
-  grid-auto-columns: minmax(0, 1fr);
+  grid-auto-columns: minmax(var(--am-stat-col, 46px), 1fr);
   width: 100%;
   justify-items: center;
 }
@@ -984,7 +1255,7 @@ onBeforeUnmount(() => {
   z-index: 1;
   display: grid;
   grid-auto-flow: column;
-  grid-auto-columns: minmax(0, 1fr);
+  grid-auto-columns: minmax(var(--am-stat-col, 46px), 1fr);
   width: 100%;
   height: 100%;
   margin: 0;
@@ -1011,8 +1282,10 @@ onBeforeUnmount(() => {
   transition: background-color var(--am-fast) var(--am-ease);
 }
 
+/* Столбик уже колонки: зазор между соседями и есть PLOT_COL минус эта ширина. Потолок
+   держит и редкий случай трёх столбков на широкой карточке — иначе растянулись бы во всю. */
 .am-stats__plot--wide .am-stats__bar-track {
-  max-width: 46px;
+  max-width: 40px;
 }
 
 .am-stats__plot-col:hover .am-stats__bar-track {
@@ -1057,9 +1330,25 @@ onBeforeUnmount(() => {
   box-shadow: 0 0 10px var(--am-accent);
 }
 
+/* Обёртка ряда: ширину считает разметка (plotStyle), а здесь ряд уезжает за край по горизонтали.
+   Прокрутка появляется сама, когда лет больше, чем влезает в окно. */
+.am-stats__scroll {
+  width: 100%;
+  overflow-x: auto;
+}
+
 .am-stats__plot-keys {
   height: 18px;
   align-items: start;
+}
+
+/* Раскрываемый год ловит курсор и подсвечивается; раскрытые месяцы — уже не кнопка. */
+.am-stats__plot-col--open {
+  cursor: pointer;
+}
+
+.am-stats__plot-col--on {
+  cursor: default;
 }
 
 .am-stats__plot-key {

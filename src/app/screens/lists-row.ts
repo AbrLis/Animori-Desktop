@@ -16,6 +16,7 @@ import {
 import type { SnapshotEntry } from '@/core/snapshot'
 import { Logger } from '@/utils/logger'
 
+import { watchCovers } from '../covers'
 import { formatWord, partsShort } from '../labels'
 
 import type { SortName } from './lists-keep'
@@ -149,6 +150,8 @@ export function sortEntries(list: readonly SnapshotEntry[], key: SortName): Snap
 
 /** Запись памяти в плитку. */
 export function toRow(entry: SnapshotEntry): Row {
+  // Появление постеров — тоже повод перерисовать строку: иначе плитка останется с адресом CDN.
+  watchCovers()
   const look = peekLook(entry.mediaId)
 
   // У идущего сезона знаменателем служат вышедшие серии.

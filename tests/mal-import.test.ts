@@ -85,6 +85,10 @@ describe('importMalList', () => {
         isAdult: false,
         romaji: 'Romaji 501',
         english: null,
+        format: null,
+        seasonYear: null,
+        episodes: null,
+        duration: null,
       },
     ])
     expect(mockedBriefs).toHaveBeenCalledWith([21])
