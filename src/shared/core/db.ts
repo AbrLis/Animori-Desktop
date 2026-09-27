@@ -225,6 +225,48 @@ export async function dbGet<T = unknown>(
   }
 }
 
+/**
+ * Читает пачку записей одним заходом: сводке нужен вид всего списка сразу, и заход на каждый
+ * ключ — сотни транзакций там, где хватает одной. `null` — склад не открылся; пустая карта
+ * значит, что записей нет, — это разные ответы, и путать их нельзя.
+ */
+export async function dbGetMany<T = unknown>(
+  store: CacheStoreName,
+  keys: readonly IDBValidKey[],
+): Promise<Map<IDBValidKey, T> | null> {
+  const name = physicalStore(store)
+  const found = new Map<IDBValidKey, T>()
+  if (keys.length === 0) return found
+
+  try {
+    const db = await openDB()
+    if (!db) return null
+
+    return await new Promise<Map<IDBValidKey, T> | null>((resolve) => {
+      const tx = db.transaction(name, 'readonly')
+      const objectStore = tx.objectStore(name)
+
+      for (const key of keys) {
+        const req = objectStore.get(key)
+        req.onsuccess = () => {
+          if (req.result !== undefined) found.set(key, req.result as T)
+        }
+      }
+
+      // Отказ транзакции отдаётся как null: недобранная пачка хуже честного «склад не ответил».
+      tx.oncomplete = () => resolve(found)
+      tx.onerror = () => {
+        Logger('ERROR', `Ошибка чтения DB пачкой (${name})`)
+        resolve(null)
+      }
+      tx.onabort = () => resolve(null)
+    })
+  } catch (e) {
+    Logger('ERROR', `Сбой dbGetMany (${name})`, e)
+    return null
+  }
+}
+
 /** Пишет (put — вставка или перезапись) запись в object store. */
 export async function dbSet(store: CacheStoreName, data: CacheRecord): Promise<void> {
   const name = physicalStore(store)

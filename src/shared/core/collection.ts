@@ -74,6 +74,32 @@ export interface ShikiPullResult extends PullResult {
 /** Записи по номеру тайтла: словарь — обход тысяч записей на приставке виден глазом. */
 const entries = new Map<number, SnapshotEntry>()
 
+/** Кто ждёт правок памяти: сводки считаются заново сами, руками их не обновляют. */
+const watchers = new Set<() => void>()
+
+/**
+ * Сообщает о правке памяти: подписчики зовутся. Сломанный подписчик не отменяет ни правку, ни
+ * остальных — сводка на экране не повод терять запись.
+ */
+function touched(): void {
+  for (const watcher of Array.from(watchers)) {
+    try {
+      watcher()
+    } catch (e) {
+      Logger('ERROR', 'Коллекция: подписчик упал на правке', e)
+    }
+  }
+}
+
+/** Подписка на правки памяти; возвращённый отказ экран обязан звать при уходе. */
+export function watchCollection(watcher: () => void): () => void {
+  watchers.add(watcher)
+
+  return () => {
+    watchers.delete(watcher)
+  }
+}
+
 /** Чей список в памяти. null — местный (переноса не было или счёт отвязан); записи остаются живыми. */
 let ownerUserId: number | null = null
 
@@ -151,6 +177,9 @@ export async function initCollection(): Promise<number> {
     ownSnapshot(collectSnapshot)
     loaded = true
     Logger('DB', `Коллекция поднята из снимка: записей ${entries.size}`)
+
+    // Поднятый снимок — тоже перемена памяти: экран, открывшийся раньше его, считал по пустому списку.
+    touched()
 
     return entries.size
   })()
@@ -251,6 +280,10 @@ export async function refreshFromServer(mode: PullMode = 'merge'): Promise<PullR
 
     // Перенос бывает редко и двигает список целиком — дубль в файл здесь уместен.
     await saveSnapshotNow({ backup: true })
+
+    // Список поменялся целиком: сводки на экранах считаются заново отсюда же.
+    touched()
+
     Logger(
       'DB',
       `Коллекция перенесена с сервера (${done.mode}): всего ${done.total}, ` +
@@ -287,6 +320,8 @@ export async function pullFromShikimori(
       mode === 'replace' ? replaceFromServer(got.entries) : mergeFromServer(got.entries)
 
     await saveSnapshotNow({ backup: true })
+    // Список поменялся целиком: сводки считаются заново.
+    touched()
     Logger(
       'DB',
       `Коллекция перенесена с Шикимори (${done.mode}, ${got.user.nick}): ` +
@@ -343,6 +378,8 @@ export async function pullFromMalFile(xml: string, mode: PullMode = 'merge'): Pr
       mode === 'replace' ? replaceFromServer(got.entries) : mergeFromServer(got.entries)
 
     await saveSnapshotNow({ backup: true })
+    // Список поменялся целиком: сводки считаются заново.
+    touched()
     Logger(
       'DB',
       `Коллекция перенесена из файла MAL (${done.mode}): ` +
@@ -384,12 +421,14 @@ export function eachEntry(): IterableIterator<SnapshotEntry> {
 export function putEntry(entry: SnapshotEntry): void {
   entries.set(entry.mediaId, entry)
   markSnapshotDirty()
+  touched()
 }
 
 /** Убирает запись из памяти. Отсутствие записи ошибкой не считается. */
 export function dropEntry(mediaId: number): void {
   if (!entries.delete(mediaId)) return
   markSnapshotDirty()
+  touched()
 }
 
 /**
@@ -443,6 +482,7 @@ export async function unlinkCollection(): Promise<number> {
 
   ownerUserId = null
   await saveSnapshotNow({ backup: true })
+  touched()
 
   Logger('DB', `Коллекция отвязана от счёта: записей ${entries.size}`)
 
@@ -458,6 +498,7 @@ export async function forgetCollection(): Promise<void> {
   entries.clear()
   ownerUserId = null
   await saveSnapshotNow({ backup: true })
+  touched()
   Logger('DB', 'Коллекция забыта: снимок очищен')
 }
 

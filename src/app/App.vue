@@ -17,6 +17,7 @@ import './styles/theme.css'
 const SCREENS: Record<ScreenName, Component> = {
   home: defineAsyncComponent(() => import('./screens/HomeScreen.vue')),
   lists: defineAsyncComponent(() => import('./screens/ListsScreen.vue')),
+  stats: defineAsyncComponent(() => import('./screens/StatsScreen.vue')),
   history: defineAsyncComponent(() => import('./screens/HistoryScreen.vue')),
   search: defineAsyncComponent(() => import('./screens/SearchScreen.vue')),
   media: defineAsyncComponent(() => import('./screens/MediaScreen.vue')),

@@ -1,8 +1,8 @@
-// Облик тайтла для сетки постеров: обложка, цвет и счёт серий — память, склад, сеть.
+// Облик тайтла для сетки постеров и сводки: обложка, цвет, счёт серий и формат — память, склад, сеть.
 // Снимок картинок не держит, поэтому вид живёт отдельно; хозяин обликов — этот модуль.
 
 import { CACHE_TIME } from './constants'
-import { dbGet, dbSet } from './db'
+import { dbGet, dbGetMany, dbSet } from './db'
 import { fetchBriefsByIds } from '../api/anilist-lookup'
 import type { MediaBrief } from '../api/anilist-media'
 import { Logger } from '../utils/logger'
@@ -13,6 +13,9 @@ const KEY_PREFIX = 'LOOK3_'
 
 /** По скольку тайтлов спрашиваем за раз: потолок страницы у AniList. */
 const LOOK_CHUNK = 50
+
+/** По скольку ключей читаем склад за одну транзакцию: сводке нужен формат всего списка сразу. */
+const STORE_CHUNK = 200
 
 /** Статус «ни одной части ещё не вышло»; вынесен сюда, чтобы метка анонса не заводилась на каждом экране. */
 export const SOON_STATUS = 'NOT_YET_RELEASED'
@@ -138,6 +141,62 @@ function fromBrief(brief: MediaBrief): MediaLook {
 /** Что известно прямо сейчас, без ожидания. Разметка ждать не умеет. */
 export function peekLook(mediaId: number): MediaLook | null {
   return memory.get(mediaId) ?? null
+}
+
+/**
+ * Спрашивали ли облик и что ответили. Отличается от `peekLook` тем, что различает «ещё не знаем»
+ * и «сервер тайтла не знает»: и то, и другое читается как null, а сводке важно второе не переспрашивать.
+ */
+export function lookKnown(mediaId: number): boolean {
+  return memory.has(mediaId)
+}
+
+/**
+ * Поднимает облики со склада пачкой и без сети: сводке нужен формат всех записей списка сразу,
+ * а не только тех, что человек пролистал. Чего на складе нет, остаётся неизвестным — за это
+ * отвечает warmLooks. Отказ склада не запоминается: со следующего захода его спросят снова.
+ */
+export async function hydrateLooks(mediaIds: readonly number[]): Promise<number> {
+  const wanted = mediaIds.filter(
+    (mediaId) => !memory.has(mediaId) && !asked.has(mediaId) && !cacheReads.has(mediaId),
+  )
+  if (wanted.length === 0) return 0
+
+  let raised = 0
+
+  for (let from = 0; from < wanted.length; from += STORE_CHUNK) {
+    const chunk = wanted.slice(from, from + STORE_CHUNK)
+
+    const records = await dbGetMany<MediaCacheRecord<MediaLook>>(
+      'mediaCache',
+      chunk.map(cacheKey),
+    )
+
+    // Склад не ответил — «спрашивали» ставить нельзя: иначе запись на нём не найдётся уже никогда.
+    if (records === null) {
+      Logger('WARN', 'Облик: склад не ответил на пачку, подъём прекращён')
+      break
+    }
+
+    for (const mediaId of chunk) {
+      asked.add(mediaId)
+
+      const record = records.get(cacheKey(mediaId))
+      if (!record || typeof record.ts !== 'number') continue
+
+      const data = record.data
+      if (!data || typeof data !== 'object') continue
+
+      // Серия онгоинга уже вышла: запись отстала, её место занимает сеть.
+      if (airedOut(data)) continue
+
+      memory.set(mediaId, data)
+      raised++
+    }
+  }
+
+  if (raised > 0) Logger('INFO', `Облик: со склада поднято ${raised} из ${wanted.length}`)
+  return raised
 }
 
 /** Запоминает облик, даром доставшийся с находкой поиска: списки получат обложку без запроса. */

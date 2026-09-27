@@ -4,6 +4,7 @@
 export const SCREEN_NAMES = [
   'home',
   'lists',
+  'stats',
   'history',
   'search',
   'media',
@@ -33,6 +34,8 @@ export type MenuItem = {
 export const MENU: ReadonlyArray<MenuItem> = [
   { name: 'home', title: 'Главная', icon: '⌂' },
   { name: 'lists', title: 'Моё', icon: '≡' },
+  // Статистика рядом со списками: она про то же — про своё, только числами.
+  { name: 'stats', title: 'Статистика', icon: '◔' },
   { name: 'history', title: 'История', icon: '◷' },
   { name: 'search', title: 'Поиск', icon: '⌕' },
   { name: 'settings', title: 'Настройки', icon: '⚙' },
@@ -43,6 +46,7 @@ export const MENU: ReadonlyArray<MenuItem> = [
 export const SCREEN_DEPTH: Record<ScreenName, number> = {
   home: 0,
   lists: 0,
+  stats: 0,
   history: 0,
   search: 0,
   settings: 0,
@@ -55,6 +59,7 @@ export const SCREEN_DEPTH: Record<ScreenName, number> = {
 export const SCREEN_TITLES: Record<ScreenName, string> = {
   home: 'Главная',
   lists: 'Моё',
+  stats: 'Статистика',
   history: 'История',
   search: 'Поиск',
   media: 'Аниме',
