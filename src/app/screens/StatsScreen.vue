@@ -4,10 +4,19 @@
 // нет — экран ведёт добором по складу обликов, чтобы человек не пролистывал ради кольца весь список.
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 
+// Геометрия гистограмм (кривая по верхам, деления шкалы) — в общем модуле: рисующий их
+// компонент не должен тянуться в код экрана.
+import { niceTicks, pointsForBars, smoothAreaPath, smoothPath } from '../charts'
+
 import { eachEntry, initCollection, watchCollection } from '@/core/collection'
 import { hydrateLooks, lookKnown, warmLooks } from '@/core/media-looks'
+import { Logger } from '@/utils/logger'
 
 import EmptyMark from '../components/EmptyMark.vue'
+import StatsPlot from '../components/StatsPlot.vue'
+
+// Розетка подложки плиток та же, что у россыпи на главной: копия пути разошлась бы с знаком.
+import { SAKURA_ROSETTE, SAKURA_ROSETTE_BOX } from '../sakura'
 
 import {
   arcDash,
@@ -16,46 +25,25 @@ import {
   emptyStats,
   formatNumber,
   looklessIds,
-  pointsForBars,
   RING_TURN,
   sectorPath,
-  smoothAreaPath,
-  smoothPath,
   splitLegend,
   type StatsSummary,
 } from './stats-count'
 
 /** Сколько плиток-заглушек показать, пока снимок поднимается с диска: столько же, сколько настоящих. */
-const HOLD_TILES = 5
+const HOLD_TILES = 6
 
 /** Что показывает кольцо по видам: просмотренное или весь список. */
 type FormatScope = 'watched' | 'all'
 
 const FORMAT_SCOPES: ReadonlyArray<{ key: FormatScope; title: string; tip: string }> = [
   { key: 'watched', title: 'Просмотренное', tip: 'Виды просмотренных аниме' },
-  { key: 'all', title: 'Всему списку', tip: 'Виды всего списка, включая планы' },
+  { key: 'all', title: 'Весь список', tip: 'Виды всего списка, включая планы' },
 ]
 
 /** Сколько тайтлов спрашиваем у сети за раз: столько же везёт одна страница обликов. */
 const LOOK_CHUNK = 50
-
-/**
- * Ширина колонки гистограммы и промежуток между столбиками задаются одной цифрой: колонка чуть шире
- * самого столбика, и зазор получается сам. Сетка колонки равная и без своего промежутка — на этом
- * держится сплайн (X столбика = (i + 0.5) / n), и добавленный в CSS gap увел бы линию с краски.
- */
-const PLOT_COL = 46
-
-/**
- * Размеры ряда: ширина колонки и минимальная ширина всего ряда. Когда лет не влезает, ряд уезжает
- * за край по горизонтали, а столбики остаются читаемыми — вместо того чтобы сжаться в нить.
- */
-function plotStyle(count: number): Record<string, string> {
-  return {
-    '--am-stat-col': `${PLOT_COL}px`,
-    minWidth: count > 0 ? `calc(${count} * var(--am-stat-col))` : '0',
-  }
-}
 
 /** Вкладки метрики гистограммы «Год просмотра». */
 type YearMetric = 'titles' | 'hours' | 'score'
@@ -104,11 +92,6 @@ function sliceClass(key: string): string {
   return `am-stats__arc--${key.toLowerCase()}`
 }
 
-/** Высота столбика: ноль остаётся нулём, остальное не тоньше четырёх процентов — иначе колонки не видно. */
-function barHeight(share: number): string {
-  return share <= 0 ? '0%' : `${Math.max(4, share * 100)}%`
-}
-
 /** Проценты для легенды: целые — дробные спорили бы с числами рядом. */
 function percent(share: number): string {
   return `${Math.round(share * 100)}%`
@@ -129,14 +112,45 @@ function sliceTip(slice: { title: string; count: number; share: number }): strin
   return `${slice.title}: ${formatNumber(slice.count)} · ${percent(slice.share)}`
 }
 
-/** Легенды колец: три крупнейших сектора по убыванию и хвост одной строкой. */
-const statusLegend = computed(() => splitLegend(stats.value.statuses))
+/**
+ * Сколько долей показывает легенда кольца. На широком окне — все: легенда там стоит рядом с
+ * кольцом и берёт его высоту, а больше восьми долей не бывает (шесть видов и семь статусов
+ * AniList плюс «неизвестно») — хвост «Ещё N · …» остаётся запасом на девятый. Ниже — легенда
+ * под кольцом, и там, как и раньше, три крупнейших и сводка остальных одной строкой: полная
+ * занимала полкарточки.
+ */
+const LEGEND_LIMIT = 8
+const COMPACT_LIMIT = 3
+
+/**
+ * Широкое окно: та же граница, что у боковой легенды в оформлении (@media 1900px). Числам
+ * ширина не нужна — она решает, сколько долей показывает легенда: столько, сколько помещается
+ * в свободную высоту рядом с кольцом.
+ */
+const LAYOUT_QUERY = '(min-width: 1900px)'
+
+const wideLayout = ref(
+  typeof window === 'undefined' || typeof window.matchMedia !== 'function'
+    ? true
+    : window.matchMedia(LAYOUT_QUERY).matches,
+)
+
+/** Смена раскладки: порог легенды — computed, и доли пересчитываются сами. */
+function onLayoutChange(event: MediaQueryList | MediaQueryListEvent): void {
+  wideLayout.value = event.matches
+}
+
+/** Доли легенды: на широком окне все, в компактной раскладке — три крупнейших и хвост. */
+const legendLimit = computed(() => (wideLayout.value ? LEGEND_LIMIT : COMPACT_LIMIT))
+
+/** Легенды колец: крупнейшие доли по убыванию. */
+const statusLegend = computed(() => splitLegend(stats.value.statuses, legendLimit.value))
 
 /** Кольцо по видам живёт по выбранной вкладке: своя доля и свой знаменатель у каждой. */
 const formatSlices = computed(() =>
   formatScope.value === 'watched' ? stats.value.formatsWatched : stats.value.formats,
 )
-const formatLegend = computed(() => splitLegend(formatSlices.value))
+const formatLegend = computed(() => splitLegend(formatSlices.value, legendLimit.value))
 
 /** Корень экрана: по его ширине считаются столбцы плиток. */
 const root = ref<HTMLElement | null>(null)
@@ -149,6 +163,9 @@ const tileCols = ref(3)
 
 /** Смотритель за шириной окна: без него расчёт столбцов сделался бы одноразовым. */
 let tilesObserver: ResizeObserver | null = null
+
+/** Подписка на раскладку: уход с экрана её снимает. */
+let layoutWatch: MediaQueryList | null = null
 
 /**
  * Столбцы плиток: сначала сколько влезает, потом ряды делятся поровну —
@@ -244,7 +261,7 @@ async function runLooks(run: number): Promise<void> {
     }
   } catch (e) {
     // Отказ разметку не роняет: кольцо и часы покажут то, что уже собрано.
-    console.error('AniMori: облики не добрались', e)
+    Logger('ERROR', 'Облики не добрались', e)
   }
 }
 
@@ -264,6 +281,15 @@ const daysTip = computed(() => {
 
   return `Не учтено ${formatNumber(left)} серий: у этих аниме AniList не знает длину серии. Часы оттого меньше правды.`
 })
+
+/**
+ * Подсказка к плитке просмотренных. Плитка стоит в середине верхнего ряда, а вкладка
+ * «Просмотренное» — через два кольца от неё, и без подсказки человек их не свяжет:
+ * обе считают одно и то же число.
+ */
+const watchedTip = computed(
+  () => 'Начата хотя бы одна серия. Этим же числом считается вкладка «Просмотренное» у кольца по видам',
+)
 
 /**
  * Подсказка к счёту серий. Наше число — сумма progress по списку, ровно та же величина, что и на сайте;
@@ -288,76 +314,124 @@ const lastEdit = computed(() => {
   return `${date.getDate()} ${month} ${date.getFullYear()}`
 })
 
-/** Данные колонок для гистограммы оценок (1–10). */
-const scoreChartBars = computed(() => {
-  return stats.value.scores.map((bar) => ({
-    key: bar.score,
-    label: String(bar.score),
-    valueText: bar.count > 0 ? formatNumber(bar.count) : '',
-    share: bar.share,
-    hint: `Оценка ${bar.score}: записей ${formatNumber(bar.count)}`,
-  }))
-})
+/**
+ * Строка одного столбика для StatsPlot. Высота приходит долей от потолка шкалы, а не от самой
+ * высокой колонки: иначе пик всегда упирался бы в край поля, а деления сетки читались бы неверно.
+ */
+interface PlotRow {
+  key: string
+  label: string
+  value: number
+  valueText: string
+  tip: string
+  /** Год для раскрытия; 0 — столбик не раскрывается. */
+  year: number
+}
 
-/** Плавный график поверх столбиков оценок. */
-const scoreSpline = computed(() => {
-  if (stats.value.rated === 0) return { line: '', area: '' }
-  const points = pointsForBars(scoreChartBars.value)
+/** Данные для StatsPlot: круглые деления, доли от потолка и честная кривая по верхам столбиков. */
+interface PlotData {
+  bars: { key: string; label: string; valueText: string; share: number; tip: string; year: number }[]
+  ticks: { value: number; text: string }[]
+  line: string
+  area: string
+}
+
+function buildPlot(
+  rows: PlotRow[],
+  tickText: (value: number) => string = formatNumber,
+  fixedMax = 0,
+): PlotData {
+  const top = fixedMax > 0 ? fixedMax : Math.max(0, ...rows.map((row) => row.value))
+  const ticks = niceTicks(top)
+  const ceiling = ticks[ticks.length - 1] ?? 1
+
+  const bars = rows.map((row) => ({
+    key: row.key,
+    label: row.label,
+    valueText: row.valueText,
+    share: ceiling > 0 ? Math.min(1, row.value / ceiling) : 0,
+    tip: row.tip,
+    year: row.year,
+  }))
+
+  const points = pointsForBars(bars)
   return {
+    bars,
+    ticks: ticks.map((value) => ({ value, text: value === 0 ? '0' : tickText(value) })),
     line: smoothPath(points),
     area: smoothAreaPath(points, 1000),
   }
+}
+
+/** Пустой график: оценок не поставили или годов нет — рисовать нечего. */
+const EMPTY_PLOT: PlotData = { bars: [], ticks: [], line: '', area: '' }
+
+/** Подпись деления шкалы под метрику: у часов своя единица, у оценки — балл из десяти. */
+function metricTickText(metric: YearMetric, value: number): string {
+  if (metric === 'hours') return `${formatNumber(value)} ч`
+  if (metric === 'score') return decimalText(value)
+  return formatNumber(value)
+}
+
+/** Подпись значения столбика под метрику. */
+function metricValueText(metric: YearMetric, value: number): string {
+  if (metric === 'titles') return value > 0 ? formatNumber(value) : ''
+  if (metric === 'hours') {
+    return value > 0 ? (value < 10 ? `${decimalText(value)} ч` : `${formatNumber(value)} ч`) : ''
+  }
+  return value > 0 ? scoreText(value) : '—'
+}
+
+/**
+ * Гистограмма оценок 1–10: сколько записей на каждый балл. Розовая краска — у неё одной:
+ * синий и фиолетовый заняты годами, а средняя оценка и так стоит плиткой наверху, второй раз
+ * показывать её пунктиром по оси значило бы таврить то же число дважды.
+ */
+const scorePlot = computed(() => {
+  if (stats.value.rated === 0) return EMPTY_PLOT
+  return buildPlot(
+    stats.value.scores.map((bar) => ({
+      key: `s${bar.score}`,
+      label: String(bar.score),
+      value: bar.count,
+      valueText: bar.count > 0 ? formatNumber(bar.count) : '',
+      tip: `Оценка ${bar.score}: записей ${formatNumber(bar.count)}`,
+      year: 0,
+    })),
+  )
 })
 
 /**
- * Колонки гистограммы «Год выпуска». Ось — год выхода аниме, а не год просмотра, поэтому ряд
- * другой: сортировка кота может быть с восьмидесятых, а досмотрено всё в этом году.
+ * Гистограмма «Год выпуска». Ось — год выхода аниме, а не год просмотра, поэтому ряд другой:
+ * сортировка кота может быть с восьмидесятых, а досмотрено всё в этом году.
  */
-const releaseChartBars = computed(() => {
+const releasePlot = computed(() => {
   const list = stats.value.releases
-  if (list.length === 0) return []
+  if (list.length === 0) return EMPTY_PLOT
 
-  if (releaseMetric.value === 'titles') {
-    const top = Math.max(1, ...list.map((b) => b.titles))
-    return list.map((b) => ({
-      key: `r${b.year}`,
-      label: String(b.year),
-      valueText: b.titles > 0 ? formatNumber(b.titles) : '',
-      share: b.titles / top,
-      hint: `${b.year} год: аниме ${formatNumber(b.titles)}, серий ${formatNumber(b.episodes)}`,
-    }))
-  }
+  const metric = releaseMetric.value
+  const rows: PlotRow[] = list.map((bar) => {
+    const value = metric === 'titles' ? bar.titles : metric === 'hours' ? bar.hours : bar.meanScore
+    return {
+      key: `r${bar.year}`,
+      label: String(bar.year),
+      value,
+      valueText: metricValueText(metric, value),
+      tip:
+        metric === 'hours'
+          ? `${bar.year} год: ≈ ${decimalText(bar.hours)} ч (серий: ${formatNumber(bar.episodes)})`
+          : metric === 'score'
+            ? `${bar.year} год: средняя оценка ${bar.meanScore > 0 ? scoreText(bar.meanScore) : 'нет'} (${formatNumber(bar.titles)} аниме)`
+            : `${bar.year} год: аниме ${formatNumber(bar.titles)}, серий ${formatNumber(bar.episodes)}`,
+      year: 0,
+    }
+  })
 
-  if (releaseMetric.value === 'hours') {
-    const top = Math.max(1, ...list.map((b) => b.hours))
-    return list.map((b) => ({
-      key: `r${b.year}`,
-      label: String(b.year),
-      valueText:
-        b.hours > 0 ? (b.hours < 10 ? `${decimalText(b.hours)} ч` : `${formatNumber(b.hours)} ч`) : '',
-      share: b.hours / top,
-      hint: `${b.year} год: ≈ ${decimalText(b.hours)} ч (серий: ${formatNumber(b.episodes)})`,
-    }))
-  }
-
-  return list.map((b) => ({
-    key: `r${b.year}`,
-    label: String(b.year),
-    valueText: b.meanScore > 0 ? scoreText(b.meanScore) : '—',
-    share: b.meanScore > 0 ? b.meanScore / 10 : 0,
-    hint: `${b.year} год: средняя оценка ${b.meanScore > 0 ? scoreText(b.meanScore) : 'нет'} (${formatNumber(b.titles)} аниме)`,
-  }))
-})
-
-/** Плавный график поверх столбиков по годам выпуска. */
-const releaseSpline = computed(() => {
-  const bars = releaseChartBars.value
-  if (bars.length < 2) return { line: '', area: '' }
-  const points = pointsForBars(bars)
-  return {
-    line: smoothPath(points),
-    area: smoothAreaPath(points, 1000),
-  }
+  return buildPlot(
+    rows,
+    (value) => metricTickText(metric, value),
+    metric === 'score' ? 10 : 0,
+  )
 })
 
 /** Раскрытый год: ноль — весь ряд по годам, иначе месяцы этого года. */
@@ -388,8 +462,9 @@ function drillTo(year: number): void {
   drilledYear.value = drilledYear.value === year ? 0 : year
 }
 
-/** Данные колонок для гистограммы «Год просмотра» в зависимости от выбранной вкладки. */
-const yearChartBars = computed(() => {
+/** Гистограмма «Год просмотра»: годы или месяцы раскрытого года, по метрике тумблера. */
+const yearPlot = computed(() => {
+  const metric = viewMetric.value
   const list: YearRow[] = drilled.value
     ? yearRows.value
     : stats.value.years.map((b) => ({
@@ -400,53 +475,31 @@ const yearChartBars = computed(() => {
         meanScore: b.meanScore,
       }))
 
-  if (list.length === 0) return []
+  if (list.length === 0) return EMPTY_PLOT
 
-  if (viewMetric.value === 'titles') {
-    const top = Math.max(1, ...list.map((b) => b.titles))
-    return list.map((b, at) => ({
+  const rows: PlotRow[] = list.map((row, at) => {
+    const value = metric === 'titles' ? row.titles : metric === 'hours' ? row.hours : row.meanScore
+    return {
       key: drilled.value ? `m${at}` : `y${at}`,
-      label: b.label,
-      valueText: b.titles > 0 ? formatNumber(b.titles) : '',
-      share: b.titles / top,
-      hint: `${b.label}: аниме ${formatNumber(b.titles)}, серий ${formatNumber(b.episodes)}`,
-      year: drilled.value ? 0 : Number(b.label),
-    }))
-  }
+      label: row.label,
+      value,
+      valueText: metricValueText(metric, value),
+      tip:
+        metric === 'hours'
+          ? `${row.label}: ≈ ${decimalText(row.hours)} ч (серий: ${formatNumber(row.episodes)})`
+          : metric === 'score'
+            ? `${row.label}: средняя оценка ${row.meanScore > 0 ? scoreText(row.meanScore) : 'нет'} (${formatNumber(row.titles)} аниме)`
+            : `${row.label}: аниме ${formatNumber(row.titles)}, серий ${formatNumber(row.episodes)}`,
+      // Раскрытый год повторно не раскрывается: месяцы только показывают.
+      year: drilled.value ? 0 : Number(row.label),
+    }
+  })
 
-  if (viewMetric.value === 'hours') {
-    const top = Math.max(1, ...list.map((b) => b.hours))
-    return list.map((b, at) => ({
-      key: drilled.value ? `m${at}` : `y${at}`,
-      label: b.label,
-      valueText:
-        b.hours > 0 ? (b.hours < 10 ? `${decimalText(b.hours)} ч` : `${formatNumber(b.hours)} ч`) : '',
-      share: b.hours / top,
-      hint: `${b.label}: ≈ ${decimalText(b.hours)} ч (серий: ${formatNumber(b.episodes)})`,
-      year: drilled.value ? 0 : Number(b.label),
-    }))
-  }
-
-  // 'score'
-  return list.map((b, at) => ({
-    key: drilled.value ? `m${at}` : `y${at}`,
-    label: b.label,
-    valueText: b.meanScore > 0 ? scoreText(b.meanScore) : '—',
-    share: b.meanScore > 0 ? b.meanScore / 10 : 0,
-    hint: `${b.label}: средняя оценка ${b.meanScore > 0 ? scoreText(b.meanScore) : 'нет'} (${formatNumber(b.titles)} аниме)`,
-    year: drilled.value ? 0 : Number(b.label),
-  }))
-})
-
-/** Плавный график поверх столбиков по годам. */
-const yearSpline = computed(() => {
-  const bars = yearChartBars.value
-  if (bars.length < 2) return { line: '', area: '' }
-  const points = pointsForBars(bars)
-  return {
-    line: smoothPath(points),
-    area: smoothAreaPath(points, 1000),
-  }
+  return buildPlot(
+    rows,
+    (value) => metricTickText(metric, value),
+    metric === 'score' ? 10 : 0,
+  )
 })
 
 /** Отказ подписки на правки списка: зовётся при уходе с экрана. */
@@ -460,12 +513,19 @@ onMounted(async () => {
     tilesObserver.observe(root.value)
   }
 
+  // Раскладка окна: под кольцом легенда сворачивается в три строки с хвостом.
+  if (typeof window !== 'undefined' && typeof window.matchMedia === 'function') {
+    layoutWatch = window.matchMedia(LAYOUT_QUERY)
+    onLayoutChange(layoutWatch)
+    layoutWatch.addEventListener('change', onLayoutChange)
+  }
+
   // Список поднимается здесь же: без ожидания сводка была бы нулевой.
   // Ошибка подъёма окно не роняет — сводка останется пустой, а причина уйдёт в журнал.
   try {
     await initCollection()
   } catch (e: unknown) {
-    console.error('AniMori: статистика не дождалась списка', e)
+    Logger('ERROR', 'Статистика не дождалась списка', e)
   }
 
   stats.value = buildStats()
@@ -485,6 +545,9 @@ onBeforeUnmount(() => {
   tilesObserver?.disconnect()
   tilesObserver = null
 
+  layoutWatch?.removeEventListener('change', onLayoutChange)
+  layoutWatch = null
+
   stopWatching?.()
   stopWatching = null
 
@@ -497,11 +560,13 @@ onBeforeUnmount(() => {
 
 <template>
   <section ref="root" class="am-page">
-    <ul v-if="busy" class="am-stats__tiles">
-      <li v-for="n in HOLD_TILES" :key="n" class="am-stats__tile">
-        <span class="am-skeleton" />
-      </li>
-    </ul>
+    <div v-if="busy" class="am-stats__grid">
+      <ul class="am-stats__tiles">
+        <li v-for="n in HOLD_TILES" :key="n" class="am-stats__tile">
+          <span class="am-skeleton" />
+        </li>
+      </ul>
+    </div>
 
     <div v-else-if="stats.titles === 0" class="am-empty">
       <span class="am-empty__mark"><EmptyMark name="chart" /></span>
@@ -510,49 +575,76 @@ onBeforeUnmount(() => {
     </div>
 
     <template v-else>
-      <ul
-        class="am-stats__tiles"
-        :style="{ gridTemplateColumns: `repeat(${tileCols}, minmax(0, 1fr))` }"
-      >
-        <li class="am-stats__tile">
-          <span class="am-stats__value">{{ formatNumber(stats.titles) }}</span>
-          <span class="am-stats__name">Аниме в списке</span>
-          <span class="am-stats__sub">
-            завершено {{ formatNumber(stats.completed) }}, смотрю {{ formatNumber(stats.running) }}
-          </span>
-        </li>
-
-        <li
-          v-tip="episodesTip"
-          class="am-stats__tile"
-        >
-          <span class="am-stats__value">{{ formatNumber(stats.episodes) }}</span>
-          <span class="am-stats__name">Серий просмотрено</span>
-          <span class="am-stats__sub">{{ decimalText(perTitle) }} серий на аниме</span>
-        </li>
-
-        <li v-tip="daysTip" class="am-stats__tile">
-          <span class="am-stats__value">{{ decimalText(stats.days) }}</span>
-          <span class="am-stats__name">Дней за просмотром</span>
-          <span class="am-stats__sub">≈ {{ formatNumber(stats.hours) }} ч экранного времени</span>
-        </li>
-
-        <li class="am-stats__tile">
-          <span class="am-stats__value">{{ scoreText(stats.meanScore) }}</span>
-          <span class="am-stats__name">Средняя оценка</span>
-          <span class="am-stats__sub">по {{ formatNumber(stats.rated) }} записям с оценкой</span>
-        </li>
-
-        <li class="am-stats__tile">
-          <span class="am-stats__value">{{ formatNumber(stats.titles - stats.rated) }}</span>
-          <span class="am-stats__name">Без оценки</span>
-          <span class="am-stats__sub">оценено {{ formatNumber(stats.rated) }}</span>
-        </li>
-      </ul>
-
       <div class="am-stats__grid">
-        <section class="am-panel am-stats__card">
-          <h3 class="am-h3">Распределение по статусам</h3>
+        <ul
+          class="am-stats__tiles"
+          :style="{ gridTemplateColumns: `repeat(${tileCols}, minmax(0, 1fr))` }"
+        >
+          <li class="am-stats__tile">
+            <span class="am-stats__tile-flower" aria-hidden="true">
+              <svg :viewBox="SAKURA_ROSETTE_BOX"><path :d="SAKURA_ROSETTE" /></svg>
+            </span>
+            <span class="am-stats__value">{{ formatNumber(stats.titles) }}</span>
+            <span class="am-stats__name">Аниме в списке</span>
+            <span class="am-stats__sub">
+              завершено {{ formatNumber(stats.completed) }}, смотрю {{ formatNumber(stats.running) }}
+            </span>
+          </li>
+
+          <li v-tip="watchedTip" class="am-stats__tile">
+            <span class="am-stats__tile-flower" aria-hidden="true">
+              <svg :viewBox="SAKURA_ROSETTE_BOX"><path :d="SAKURA_ROSETTE" /></svg>
+            </span>
+            <span class="am-stats__value">{{ formatNumber(stats.titlesWatched) }}</span>
+            <span class="am-stats__name">Просмотрено аниме</span>
+            <span class="am-stats__sub">с хотя бы одной серией</span>
+          </li>
+
+          <li
+            v-tip="episodesTip"
+            class="am-stats__tile"
+          >
+            <span class="am-stats__tile-flower" aria-hidden="true">
+              <svg :viewBox="SAKURA_ROSETTE_BOX"><path :d="SAKURA_ROSETTE" /></svg>
+            </span>
+            <span class="am-stats__value">{{ formatNumber(stats.episodes) }}</span>
+            <span class="am-stats__name">Серий просмотрено</span>
+            <span class="am-stats__sub">{{ decimalText(perTitle) }} серий на аниме</span>
+          </li>
+
+          <li v-tip="daysTip" class="am-stats__tile">
+            <span class="am-stats__tile-flower" aria-hidden="true">
+              <svg :viewBox="SAKURA_ROSETTE_BOX"><path :d="SAKURA_ROSETTE" /></svg>
+            </span>
+            <span class="am-stats__value">{{ decimalText(stats.days) }}</span>
+            <span class="am-stats__name">Дней за просмотром</span>
+            <span class="am-stats__sub">≈ {{ formatNumber(stats.hours) }} ч экранного времени</span>
+          </li>
+
+          <li class="am-stats__tile">
+            <span class="am-stats__tile-flower" aria-hidden="true">
+              <svg :viewBox="SAKURA_ROSETTE_BOX"><path :d="SAKURA_ROSETTE" /></svg>
+            </span>
+            <span class="am-stats__value">{{ scoreText(stats.meanScore) }}</span>
+            <span class="am-stats__name">Средняя оценка</span>
+            <span class="am-stats__sub">по {{ formatNumber(stats.rated) }} записям с оценкой</span>
+          </li>
+
+          <li class="am-stats__tile">
+            <span class="am-stats__tile-flower" aria-hidden="true">
+              <svg :viewBox="SAKURA_ROSETTE_BOX"><path :d="SAKURA_ROSETTE" /></svg>
+            </span>
+            <span class="am-stats__value">{{ formatNumber(stats.titles - stats.rated) }}</span>
+            <span class="am-stats__name">Без оценки</span>
+            <span class="am-stats__sub">оценено {{ formatNumber(stats.rated) }}</span>
+          </li>
+        </ul>
+
+        <section class="am-panel am-stats__card am-stats__card--status">
+          <div class="am-bar am-stats__head">
+            <h3 class="am-h3">Распределение по статусам</h3>
+            <span class="am-bar__gap" />
+          </div>
 
           <div class="am-stats__ring-wrap">
             <svg class="am-stats__ring" viewBox="0 0 120 120" aria-hidden="true" focusable="false">
@@ -561,6 +653,7 @@ onBeforeUnmount(() => {
                 v-for="slice in stats.statuses"
                 :key="`hit-${slice.key}`"
                 class="am-stats__hit"
+                focusable="false"
                 :d="sectorPath(slice.offset, slice.share)"
                 v-tip="sliceTip(slice)"
               />
@@ -607,7 +700,7 @@ onBeforeUnmount(() => {
           </p>
         </section>
 
-        <section class="am-panel am-stats__card">
+        <section class="am-panel am-stats__card am-stats__card--formats">
           <div class="am-bar am-stats__head">
             <h3 class="am-h3">Распределение по форматам</h3>
             <span class="am-bar__gap" />
@@ -634,6 +727,7 @@ onBeforeUnmount(() => {
                 v-for="slice in formatSlices"
                 :key="`hit-${slice.key}`"
                 class="am-stats__hit"
+                focusable="false"
                 :d="sectorPath(slice.offset, slice.share)"
                 v-tip="sliceTip(slice)"
               />
@@ -684,53 +778,7 @@ onBeforeUnmount(() => {
       <section class="am-panel am-stats__card am-stats__card--wide">
         <h3 class="am-h3">Оценки</h3>
 
-        <div class="am-stats__plot am-stats__plot--wide">
-          <div class="am-stats__plot-row am-stats__plot-nums">
-            <span v-for="bar in scoreChartBars" :key="bar.key" class="am-stats__plot-num">
-              {{ bar.valueText }}
-            </span>
-          </div>
-
-          <div class="am-stats__plot-tracks">
-            <svg
-              v-if="scoreSpline.line"
-              class="am-stats__spline"
-              viewBox="0 0 1000 1000"
-              preserveAspectRatio="none"
-              aria-hidden="true"
-            >
-              <defs>
-                <linearGradient id="am-stats-score-grad" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" class="am-stats__grad-top" />
-                  <stop offset="100%" class="am-stats__grad-end" />
-                </linearGradient>
-              </defs>
-              <path v-if="scoreSpline.area" :d="scoreSpline.area" fill="url(#am-stats-score-grad)" />
-              <path :d="scoreSpline.line" class="am-stats__spline-line" />
-            </svg>
-
-            <ol class="am-stats__plot-cols">
-              <li
-                v-for="bar in scoreChartBars"
-                :key="bar.key"
-                v-tip="bar.hint"
-                class="am-stats__plot-col"
-              >
-                <span class="am-stats__bar-track">
-                  <span class="am-stats__bar-fill" :style="{ height: barHeight(bar.share) }">
-                    <span v-if="bar.share > 0" class="am-stats__bar-node" />
-                  </span>
-                </span>
-              </li>
-            </ol>
-          </div>
-
-          <div class="am-stats__plot-row am-stats__plot-keys">
-            <span v-for="bar in scoreChartBars" :key="bar.key" class="am-stats__plot-key">
-              {{ bar.label }}
-            </span>
-          </div>
-        </div>
+        <StatsPlot v-bind="scorePlot" tone="sakura" />
       </section>
 
       <section v-if="stats.years.length > 0" class="am-panel am-stats__card am-stats__card--wide">
@@ -760,70 +808,10 @@ onBeforeUnmount(() => {
           </div>
         </div>
 
-        <!-- Обёртка прокручивает ряд, когда лет много: сам ряд с min-width остаётся широким,
-             иначе колонки сжались бы вместо того, чтобы уехать за край. -->
-        <div class="am-stats__scroll">
-          <div
-            class="am-stats__plot am-stats__plot--wide"
-            :style="plotStyle(yearChartBars.length)"
-          >
-            <div class="am-stats__plot-row am-stats__plot-nums">
-              <span v-for="bar in yearChartBars" :key="bar.key" class="am-stats__plot-num">
-                {{ bar.valueText }}
-              </span>
-            </div>
-
-            <div class="am-stats__plot-tracks">
-              <svg
-                v-if="yearSpline.line"
-                class="am-stats__spline"
-                viewBox="0 0 1000 1000"
-                preserveAspectRatio="none"
-                aria-hidden="true"
-              >
-                <defs>
-                  <linearGradient id="am-stats-year-grad" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" class="am-stats__grad-top" />
-                    <stop offset="100%" class="am-stats__grad-end" />
-                  </linearGradient>
-                </defs>
-                <path v-if="yearSpline.area" :d="yearSpline.area" fill="url(#am-stats-year-grad)" />
-                <path :d="yearSpline.line" class="am-stats__spline-line" />
-              </svg>
-
-              <ol class="am-stats__plot-cols">
-                <li
-                  v-for="bar in yearChartBars"
-                  :key="bar.key"
-                  v-tip="bar.hint"
-                  class="am-stats__plot-col"
-                  :class="{
-                    'am-stats__plot-col--open': !drilled && bar.year > 0,
-                    'am-stats__plot-col--on': drilled,
-                  }"
-                  @click="drillTo(bar.year)"
-                >
-                  <span class="am-stats__bar-track">
-                    <span class="am-stats__bar-fill" :style="{ height: barHeight(bar.share) }">
-                      <span v-if="bar.share > 0" class="am-stats__bar-node" />
-                    </span>
-                  </span>
-                </li>
-              </ol>
-            </div>
-
-            <div class="am-stats__plot-row am-stats__plot-keys">
-              <span v-for="bar in yearChartBars" :key="bar.key" class="am-stats__plot-key">
-                {{ bar.label }}
-              </span>
-            </div>
-          </div>
-        </div>
+        <!-- Прокрутку и притухание краёв берёт на себя компонент: ряду не влезает, и он уезжает. -->
+        <StatsPlot v-bind="yearPlot" @pick="drillTo" />
       </section>
-      <section
-        v-if="releaseChartBars.length > 0"
-        class="am-panel am-stats__card am-stats__card--wide"
-      >
+      <section v-if="stats.releases.length > 0" class="am-panel am-stats__card am-stats__card--wide">
         <div class="am-bar am-stats__head">
           <h3 class="am-h3">Год выпуска</h3>
           <span class="am-bar__gap" />
@@ -844,58 +832,7 @@ onBeforeUnmount(() => {
           </div>
         </div>
 
-        <div class="am-stats__scroll">
-          <div
-            class="am-stats__plot am-stats__plot--wide"
-            :style="plotStyle(releaseChartBars.length)"
-          >
-            <div class="am-stats__plot-row am-stats__plot-nums">
-              <span v-for="bar in releaseChartBars" :key="bar.key" class="am-stats__plot-num">
-                {{ bar.valueText }}
-              </span>
-            </div>
-
-            <div class="am-stats__plot-tracks">
-              <svg
-                v-if="releaseSpline.line"
-                class="am-stats__spline"
-                viewBox="0 0 1000 1000"
-                preserveAspectRatio="none"
-                aria-hidden="true"
-              >
-                <defs>
-                  <linearGradient id="am-stats-release-grad" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" class="am-stats__grad-top" />
-                    <stop offset="100%" class="am-stats__grad-end" />
-                  </linearGradient>
-                </defs>
-                <path v-if="releaseSpline.area" :d="releaseSpline.area" fill="url(#am-stats-release-grad)" />
-                <path :d="releaseSpline.line" class="am-stats__spline-line" />
-              </svg>
-
-              <ol class="am-stats__plot-cols">
-                <li
-                  v-for="bar in releaseChartBars"
-                  :key="bar.key"
-                  v-tip="bar.hint"
-                  class="am-stats__plot-col"
-                >
-                  <span class="am-stats__bar-track">
-                    <span class="am-stats__bar-fill" :style="{ height: barHeight(bar.share) }">
-                      <span v-if="bar.share > 0" class="am-stats__bar-node" />
-                    </span>
-                  </span>
-                </li>
-              </ol>
-            </div>
-
-            <div class="am-stats__plot-row am-stats__plot-keys">
-              <span v-for="bar in releaseChartBars" :key="bar.key" class="am-stats__plot-key">
-                {{ bar.label }}
-              </span>
-            </div>
-          </div>
-        </div>
+        <StatsPlot v-bind="releasePlot" tone="violet" />
       </section>
     </template>
   </section>
@@ -926,6 +863,50 @@ onBeforeUnmount(() => {
   background: var(--am-fill-1);
   border: 1px solid var(--am-line-soft);
   border-radius: var(--am-r-l);
+  /* Цветок-подложка лежит под текстом (плитка своим контекстом держит его внутри) и уходит
+     за угол плитки (обрезка) — виден только бледный край цветка. */
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+}
+
+/* Цветок под числом: та же розетка, что в россыпи на главной (sakura.ts), срезанная углом.
+   Цвет и поворот берутся по номеру плитки: четыре тона палитры темы по кругу, соседние плитки
+   в ряду не совпадают — ряд не читается штампом. Новых цветов не заводим: цвет колец там несёт
+   смысл, и цвет у плиток читался бы как то же правило, хотя правила нет. */
+.am-stats__tile-flower {
+  position: absolute;
+  right: -34px;
+  bottom: -38px;
+  z-index: -1;
+  width: 104px;
+  height: 104px;
+  color: var(--am-sakura);
+  opacity: 0.16;
+  pointer-events: none;
+  transform: rotate(-24deg);
+}
+
+.am-stats__tile-flower svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+  fill: currentcolor;
+}
+
+.am-stats__tile:nth-child(4n + 2) .am-stats__tile-flower {
+  color: var(--am-accent);
+  transform: rotate(14deg);
+}
+
+.am-stats__tile:nth-child(4n + 3) .am-stats__tile-flower {
+  color: var(--am-accent-2);
+  transform: rotate(-8deg);
+}
+
+.am-stats__tile:nth-child(4n + 4) .am-stats__tile-flower {
+  color: var(--am-good);
+  transform: rotate(32deg);
 }
 
 /* Заглушки подъёма снимка занимают плитку целиком: иначе экран дёрнулся бы на первом числе. */
@@ -953,15 +934,59 @@ onBeforeUnmount(() => {
   color: var(--am-faint);
 }
 
-/* Два кольца рядом: карточек ровно две, поэтому auto-fit заполняет ряд целиком,
-    а на узком окне складывает их в столбик — пустых клеток не бывает. */
+/* Верх экрана — три зоны в один ряд: кольцо статусов слева, плитки с числами посередине,
+   кольцо форматов справа. Плитки отдельной строкой были бы широким рядом без содержимого,
+   а по краям от колец на полноэкранном окне зияла пустота. Число зон нечётное, а плиток
+   шесть — мозаика встаёт ровно, и полупустой клетки не бывает ни при какой ширине. */
 .am-stats__grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(330px, 1fr));
+  grid-template-columns: minmax(0, 1fr);
   gap: var(--am-gap);
-  align-items: start;
+  /* Низ один на весь ряд: start оставлял бы три разные высоты, и под плитками зияла бы полоса
+     пустоты. Зоны тянутся до самой высокой, а кто короче — добирает содержимым, см. ниже. */
+  align-items: stretch;
 }
 
+/* Ряд в три колонки — от 1180 px: кольцо с легендой нужно не меньше 330 px, плиткам — 196,
+   а промежутки и padding страницы съедают ещё около сотни. Уже на 1280 px это влезает. */
+@media (min-width: 1180px) {
+  .am-stats__grid {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1.2fr) minmax(0, 1fr);
+  }
+
+  /* Плитки доходят до низа своего места, а не висят кольцом вверху: их ряды делят высоту
+     зоны поровну. Число рядов известно разметке (restyleTiles), поэтому растягиваются все
+     строки сразу, а не первая — иначе низ мозаики уехал бы вверх. */
+  .am-stats__tiles {
+    align-content: stretch;
+    grid-auto-rows: minmax(104px, 1fr);
+  }
+
+  /* Внутри плитки число и подпись встают по центру: подпись с margin-top: auto уехала бы
+     на самый низ, и в растянутой плитке между ними зияла бы дыра. */
+  .am-stats__tiles .am-stats__tile {
+    justify-content: center;
+  }
+
+  .am-stats__tiles .am-stats__sub {
+    margin-top: 0;
+  }
+}
+
+/* Порядок в разметке — плитки, потом оба кольца: на узком окне он и виден, и прежний,
+   узкое окно ничего не меняет. В широком режиме левое кольцо встаёт в первую колонку, а плитки
+   уходят в среднюю, поэтому именно ему нужен отрицательный order — на узком он был бы лишним. */
+@media (min-width: 1180px) {
+  .am-stats__card--status {
+    order: -1;
+  }
+}
+
+/* Кольцо с легендой в ряд для широкого окна — в самом конце файла, после всех базовых правил
+   карточки. Медиазапрос не даёт специфичности: при равных селекторах решает порядок, и базовые
+   display: flex у .am-stats__card и 236px у кольца, стоящие ниже по файлу, победили бы grid и
+   новые размеры. Поэтому блок перенесён вниз — см. конец файла. Головы колец на половине экрана
+   выравнивает блок при .am-stats__head: там селекторы длиннее, и порядок уже не важен. */
 .am-stats__card {
   display: flex;
   flex-direction: column;
@@ -973,8 +998,35 @@ onBeforeUnmount(() => {
   width: 100%;
 }
 
+/* Голова карточки — та же строка у обоих колец: у правого в ней ещё и переключатель видов,
+   и без этого он выше, а кольца вставали на разные высоты. Пустое am-bar__gap держит высоту
+   капсулы (min-height 30px у кнопок), а align-items центрирует заголовок в этой строке.
+   Где строки не хватает, головы выравнивает блок ниже — по нему видно, откуда берётся высота. */
 .am-stats__head {
   gap: 12px;
+  min-height: 30px;
+  align-items: center;
+}
+
+/* Половина экрана (кольца в ряд, до 1900 px): у правой карточки в голове ещё вкладки видов, и,
+   не влезая рядом с заголовком, они уезжают на вторую строку — кольцо уезжает вместе с ними,
+   а соседнее остаётся выше. Голова обеих карточек берёт высоту двух таких строк: капсула
+   вкладок — 38 px (кнопка 30, паддинг 3 и рамка 1 с каждой стороны, как в теме), зазор головы —
+   12 px. Пустой am-bar__gap держит высоту первой строки и в левой карточке: вкладок там нет, и
+   без него её заголовок встал бы выше соседнего. */
+@media (min-width: 1180px) and (max-width: 1899px) {
+  .am-stats__card--status .am-stats__head,
+  .am-stats__card--formats .am-stats__head {
+    /* Содержимое прижато к верху: с растяжением единственная строка заняла бы всю голову,
+       и заголовок уехал бы к её середине — ниже соседнего. */
+    align-content: flex-start;
+    min-height: 88px;
+  }
+
+  .am-stats__card--status .am-stats__head > .am-bar__gap,
+  .am-stats__card--formats .am-stats__head > .am-bar__gap {
+    height: 38px;
+  }
 }
 
 /* Возврат к годам: тот же сегмент, но отдельной кнопкой — ряд столбиков трогать не нужно. */
@@ -1000,10 +1052,10 @@ onBeforeUnmount(() => {
 }
 
 /* Области графиков мышью не выделяются: клик по кольцу, легенде или столбику оставлял бы на
-   краске прямоугольник выделения. Подсказка по наведению и раскрытие года по клику не задеты. */
+   краске прямоугольник выделения. Подсказка по наведению и раскрытие года по клику не задеты.
+   Сами столбики не выделяются в компоненте: у него своя область видимости. */
 .am-stats__ring-wrap,
-.am-stats__legend,
-.am-stats__plot {
+.am-stats__legend {
   user-select: none;
 }
 
@@ -1049,6 +1101,11 @@ onBeforeUnmount(() => {
   /* Полотно выключило события себе, сектор возвращает их себе: подсказка приходит по наведению. */
   pointer-events: auto;
   transition: fill var(--am-fast) var(--am-ease);
+  /* Ни выделения, ни фокуса: и то и другое Chromium рисует рамкой вокруг сектора, а на кольце
+     это прямоугольник поверх краски. Правило на обёртке до содержимого SVG не доходит. */
+  user-select: none;
+  -webkit-user-select: none;
+  outline: none;
 }
 
 .am-stats__hit:hover {
@@ -1178,188 +1235,52 @@ onBeforeUnmount(() => {
   text-align: right;
 }
 
+/* Половина и полный экран: легенда читается строкой — числа встают сразу за названием, а между
+   ними тире: «Завершено — 120 · 45%» вместо «Завершено          120   45%». Столбец названия
+   перестал тянуться (minmax(0, auto) вместо 1fr), промежутки строки поджаты с 10 до 8 px, и
+   числа больше не улетают к правому краю карточки.
+   justify-content: start держит строку по содержимому: без него auto-столбцы растянулись бы и
+   развели числа обратно. */
+@media (min-width: 1180px) {
+  /* Легенда — отдельный блок: под кольцом или в стороне от него. Стоит по середине своей
+     области: строки собраны по содержимому (max-content), и пустота делится на оба края, а не
+     копится справа. Кегль крупнее компактного — рядом с большим кольцом 12.5px читались мелко. */
+  .am-stats__legend {
+    align-self: center;
+    justify-self: center;
+    width: max-content;
+    max-width: 100%;
+  }
 
-/* Столбчатый график со сплайн-кривой по верхам столбиков. */
-.am-stats__plot {
-  display: flex;
-  flex-direction: column;
-  gap: 5px;
-  width: 100%;
-}
+  .am-stats__legend-row {
+    grid-template-columns: 12px minmax(0, auto) auto auto;
+    justify-content: start;
+    gap: 8px;
+    font-size: 14px;
+  }
 
-/* Колонка не уже PLOT_COL (задаётся разметкой): иначе столбики слипаются, а при многих
-   колонках ряд сжимает их в нить. Промежутка у сетки намеренно нет — на равенстве колонок
-   держится сплайн, а gap увел бы линию с краски; зазор даёт разница «колонка минус столбик». */
-.am-stats__plot-row {
-  display: grid;
-  grid-auto-flow: column;
-  grid-auto-columns: minmax(var(--am-stat-col, 46px), 1fr);
-  width: 100%;
-  justify-items: center;
-}
+  /* Точка растёт вместе с кеглем: на фоне 14px текста прежние 10px читались крошкой. */
+  .am-stats__dot {
+    width: 12px;
+    height: 12px;
+  }
 
-.am-stats__plot-nums {
-  height: 16px;
-  align-items: end;
-}
+  /* Тире вместо пустоты перед числом: строка читается как «Завершено — 120 · 45%». Название
+     длиннее строки — тире и числа остаются на виду, а многоточие берёт имя на себя. */
+  .am-stats__legend-num::before {
+    content: '— ';
+  }
 
-.am-stats__plot-num {
-  font-size: 11px;
-  color: var(--am-faint);
-  font-variant-numeric: tabular-nums;
-}
+  /* Доля отделена тем же «·», что у хвоста легенды и подсказок, и жмётся к счётчику: min-width
+     в 38 px и правый край были нужны колонке чисел, а не строке. */
+  .am-stats__legend-share {
+    min-width: 0;
+    text-align: left;
+  }
 
-.am-stats__plot-tracks {
-  position: relative;
-  width: 100%;
-  height: 110px;
-}
-
-.am-stats__plot--wide .am-stats__plot-tracks {
-  height: 180px;
-}
-
-/* Сплайн-линия соединяет верхушки колонок. */
-.am-stats__spline {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  overflow: visible;
-  pointer-events: none;
-}
-
-/* Краска градиента через классы: presentation-атрибут var() не во всех движках читает. */
-.am-stats__grad-top {
-  stop-color: var(--am-accent);
-  stop-opacity: 0.25;
-}
-
-.am-stats__grad-end {
-  stop-color: var(--am-accent);
-  stop-opacity: 0;
-}
-
-.am-stats__spline-line {
-  fill: none;
-  stroke: var(--am-accent);
-  stroke-width: 2.2;
-  stroke-linecap: round;
-  stroke-linejoin: round;
-  vector-effect: non-scaling-stroke;
-  filter: drop-shadow(0 2px 5px rgb(var(--am-accent-rgb) / 0.45));
-}
-
-.am-stats__plot-cols {
-  position: relative;
-  z-index: 1;
-  display: grid;
-  grid-auto-flow: column;
-  grid-auto-columns: minmax(var(--am-stat-col, 46px), 1fr);
-  width: 100%;
-  height: 100%;
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-
-.am-stats__plot-col {
-  display: flex;
-  justify-content: center;
-  align-items: flex-end;
-  width: 100%;
-  height: 100%;
-  cursor: default;
-}
-
-.am-stats__bar-track {
-  position: relative;
-  width: 100%;
-  max-width: 26px;
-  height: 100%;
-  background: var(--am-fill-1);
-  border-radius: var(--am-r-s);
-  transition: background-color var(--am-fast) var(--am-ease);
-}
-
-/* Столбик уже колонки: зазор между соседями и есть PLOT_COL минус эта ширина. Потолок
-   держит и редкий случай трёх столбков на широкой карточке — иначе растянулись бы во всю. */
-.am-stats__plot--wide .am-stats__bar-track {
-  max-width: 40px;
-}
-
-.am-stats__plot-col:hover .am-stats__bar-track {
-  background: var(--am-fill-2);
-}
-
-.am-stats__bar-fill {
-  position: absolute;
-  right: 0;
-  bottom: 0;
-  left: 0;
-  background: linear-gradient(180deg, var(--am-accent), rgb(var(--am-accent-rgb) / 0.5));
-  border-radius: var(--am-r-s);
-  transition: height var(--am-mid) var(--am-ease);
-}
-
-/* Точка на верхушке столбика, через которую проходит плавная линия. */
-.am-stats__bar-node {
-  position: absolute;
-  top: 0;
-  left: 50%;
-  width: 7px;
-  height: 7px;
-  background: var(--am-text);
-  border: 2px solid var(--am-accent);
-  border-radius: var(--am-r-cap);
-  box-shadow: 0 0 6px rgb(var(--am-accent-rgb) / 0.7);
-  transform: translate(-50%, -50%);
-  transition:
-    transform var(--am-fast) var(--am-ease),
-    box-shadow var(--am-fast) var(--am-ease);
-}
-
-.am-stats__plot--wide .am-stats__bar-node {
-  width: 9px;
-  height: 9px;
-  border-width: 2.5px;
-}
-
-.am-stats__plot-col:hover .am-stats__bar-node {
-  transform: translate(-50%, -50%) scale(1.25);
-  box-shadow: 0 0 10px var(--am-accent);
-}
-
-/* Обёртка ряда: ширину считает разметка (plotStyle), а здесь ряд уезжает за край по горизонтали.
-   Прокрутка появляется сама, когда лет больше, чем влезает в окно. */
-.am-stats__scroll {
-  width: 100%;
-  overflow-x: auto;
-}
-
-.am-stats__plot-keys {
-  height: 18px;
-  align-items: start;
-}
-
-/* Раскрываемый год ловит курсор и подсвечивается; раскрытые месяцы — уже не кнопка. */
-.am-stats__plot-col--open {
-  cursor: pointer;
-}
-
-.am-stats__plot-col--on {
-  cursor: default;
-}
-
-.am-stats__plot-key {
-  font-size: 11px;
-  color: var(--am-dim);
-  font-variant-numeric: tabular-nums;
-}
-
-.am-stats__plot--wide .am-stats__plot-key {
-  font-size: 12px;
-  font-weight: 600;
+  .am-stats__legend-share::before {
+    content: '· ';
+  }
 }
 
 .am-stats__note {
@@ -1371,8 +1292,135 @@ onBeforeUnmount(() => {
 /* Хвост легенды отделён тонкой чертой: без неё строка «Ещё 3 · 7 · 18%» читалась
    как продолжение предыдущей и приписывалась к третьему сектору. */
 .am-stats__note--tail {
+  /* auto прижимает хвост к низу карточки: карточки в ряду равны, а без этого пустота зияла
+     бы под хвостом в той, где секторов больше. */
+  margin-top: auto;
   padding-top: 10px;
   border-top: 1px solid var(--am-line-soft);
   font-variant-numeric: tabular-nums;
+}
+
+/* Широкое окно: кольцо и легенда встают в один ряд, потому что карточка наконец широкая на оба.
+   До 1900 px легенде рядом с кольцом места нет — её строки («ТВ-короткометражное» с числом и
+   долей) уходили бы в многоточие, — и там держим прежнюю композицию: кольцо, под ним легенда.
+   Левое кольцо уходит к левому краю карточки и растёт, правое — к правому, а освободившуюся
+   середину занимает легенда.
+
+   Блок стоит в конце файла намеренно: медиазапрос не добавляет специфичности, при равных
+   селекторах решает порядок. Выше по файлу базовые display: flex у карточки, 236px у кольца и
+   столбцы сетки с 1180 px перебили бы и grid, и новые размеры. */
+@media (min-width: 1900px) {
+  /* Крайние зоны шире средней: кольцу с легендой в ряд нужно больше ширины, чем ряду плиток,
+     а средняя доля держит мозаику ровной — плиток шесть, и полупустой клетки не бывает. */
+  .am-stats__grid {
+    grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr) minmax(0, 1.1fr);
+  }
+
+  .am-stats__card--status,
+  .am-stats__card--formats {
+    display: grid;
+    grid-template-rows: auto 1fr auto;
+    align-items: center;
+    column-gap: 20px;
+    /* Карточка мерит себя сама: рост кольца привязан к её ширине, а не к окну — на широком
+       экране страница упирается в потолок ширины, и окно о запасе уже ничего не говорит. */
+    container-type: inline-size;
+  }
+
+  /* Голова — одна строка у обоих колец: у левой только заголовок, у правой ещё вкладки, и без
+     общей высоты кольца вставали на разные высоты. */
+  .am-stats__card--status .am-stats__head,
+  .am-stats__card--formats .am-stats__head {
+    min-height: 38px;
+  }
+
+  /* Левое кольцо прижато к левому краю, легенда — вправо от него. */
+  .am-stats__card--status {
+    grid-template-columns: auto minmax(0, 1fr);
+    grid-template-areas:
+      'head head'
+      'ring legend'
+      'note note';
+  }
+
+  /* Зеркально: у правого кольца легенда слева, само кольцо — у правого края. */
+  .am-stats__card--formats {
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-areas:
+      'head head'
+      'legend ring'
+      'note note';
+  }
+
+  .am-stats__card--status .am-stats__head,
+  .am-stats__card--formats .am-stats__head {
+    grid-area: head;
+  }
+
+  /* Кольцо прижато к краю колонки, а не к центру: auto-колонка по ширине кольца, но
+     margin: 0 auto оставил бы его посередине, то есть ровно там, где оно было. */
+  .am-stats__card--status .am-stats__ring-wrap,
+  .am-stats__card--formats .am-stats__ring-wrap {
+    grid-area: ring;
+    margin: 0;
+  }
+
+  .am-stats__card--status .am-stats__legend,
+  .am-stats__card--formats .am-stats__legend {
+    grid-area: legend;
+  }
+
+  /* Подписи во всю ширину карточки: в ячейке кольца они встали бы узкой колонкой, а две
+     подряд (хвост и «добираю виды») заняли бы одну ячейку и наложились. align-self вместо
+     margin-top: auto — карточка здесь сетка, и auto в её третий ряд не загоняет подпись вниз. */
+  .am-stats__card--status .am-stats__note,
+  .am-stats__card--formats .am-stats__note {
+    grid-column: 1 / -1;
+    align-self: end;
+  }
+
+  .am-stats__card--status .am-stats__note--tail,
+  .am-stats__card--formats .am-stats__note--tail {
+    margin-top: 0;
+  }
+
+  /* Кольцо шире прежних 236px: освободившаяся ширина карточки и есть причина роста, а не
+     отдельный потолок. Число в центре — обычный текст, а не часть viewBox, поэтому
+     под кольцо увеличено и оно, иначе 32px на таком кольце читались бы мелко. Дальше кольцо
+     растёт по ширине самой карточки — см. пороги ниже. */
+  .am-stats__ring-wrap {
+    width: 300px;
+    height: 300px;
+  }
+
+  .am-stats__ring-value {
+    font-size: 40px;
+  }
+}
+
+/* Рост кольца по ширине карточки: 300 px кольца требуют легенды рядом, её самая длинная строка
+   («ТВ-короткометражное» с числом и долей) занимает около 220 px, плюс 20 px промежутка — отсюда
+   пороги. Контейнер объявлен выше, в широком окне: на половине экрана кольцо живёт по прежнему
+   размеру, и эти правила там не срабатывают. */
+@container (min-width: 600px) {
+  .am-stats__ring-wrap {
+    width: 330px;
+    height: 330px;
+  }
+
+  .am-stats__ring-value {
+    font-size: 44px;
+  }
+}
+
+@container (min-width: 680px) {
+  .am-stats__ring-wrap {
+    width: 380px;
+    height: 380px;
+  }
+
+  .am-stats__ring-value {
+    font-size: 50px;
+  }
 }
 </style>

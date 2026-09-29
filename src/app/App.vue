@@ -4,6 +4,7 @@
 import { computed, defineAsyncComponent, onBeforeUnmount, onMounted, type Component } from 'vue'
 
 import { markFirstPaint } from '@/core/playable'
+import { Logger } from '@/utils/logger'
 
 import { refreshAuth, watchAuth } from './auth/session'
 import AppShell from './components/AppShell.vue'
@@ -42,7 +43,7 @@ onMounted(() => {
   // Состояние входа нужно всем экранам: без него запросы идут без подписи, а список выглядит пустым.
   // Ошибка не роняет запуск: без входа приложение работает.
   void refreshAuth().catch((e: unknown) => {
-    console.error('AniMori: состояние входа не прочитано', e)
+    Logger('ERROR', 'Состояние входа не прочитано', e)
   })
 
   // Вход случается в стороннем окне, и ждать его надо всю жизнь окна,
@@ -52,7 +53,7 @@ onMounted(() => {
       stopAuth = stop
     })
     .catch((e: unknown) => {
-      console.error('AniMori: подписка на вход не удалась', e)
+      Logger('ERROR', 'Подписка на вход не удалась', e)
     })
 
   // Очередь меток доступности ждёт этого сигнала: до первой отрисовки её запросы

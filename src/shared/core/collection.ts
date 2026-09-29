@@ -5,6 +5,7 @@ import { fetchUserList, fetchViewer, type RawListEntry } from '../api/anilist-li
 import { importMalList } from '../api/mal-import'
 import { importShikiList } from '../api/shikimori-list'
 import { Logger } from '../utils/logger'
+import { noteActivity, type ActivityKind } from './activity'
 import {
   emptySnapshot,
   markSnapshotDirty,
@@ -450,6 +451,61 @@ export function dropEntry(mediaId: number): void {
 }
 
 /**
+ * Вид правки в журнале активности.
+ *
+ * Даты записи и повтор видами больше не идут в журнал, и это не потеря, а правда. Дата окончания —
+ * часть самой закладки: поставить «Просмотрено» значит вместе с ней и поставить дату, и из одного
+ * жеста шла вторая строка «Статус изменён» рядом с «Статус сменился на “Просмотрено”». Пересмотры
+ * же, наоборот, получили свой вид: раньше они ложились на прогресс, и чипса про счётчик
+ * пересмотров говорила «Прогресс обновлён», то есть вругала.
+ *
+ * Неизвестный вид молча не пишется — журнал витрина, и он не должен ломать правку из-за опечатки.
+ */
+function activityOfEdit(kind: EditKind): ActivityKind | null {
+  switch (kind) {
+    case 'status':
+      return 'status'
+    case 'score':
+      return 'score'
+    case 'progress':
+      return 'progress'
+    case 'repeat':
+      return 'repeat'
+    case 'notes':
+      return 'note'
+    case 'remove':
+      return 'remove'
+    default:
+      return null
+  }
+}
+
+/** Число, которое несёт правка: у прогресса — место, у пересмотров — счётчик, у прочих дел ноль. */
+function activityParts(kind: EditKind, value: string | number | null): number {
+  if (kind !== 'progress' && kind !== 'repeat') return 0
+  return typeof value === 'number' && Number.isFinite(value) ? value : 0
+}
+
+/**
+ * Подпись тайтла для журнала: латиница из самой записи. Русское имя сюда не достать — импорт
+ * media-title дал бы кольцо через датасет, — и его дозаполнит экран активности.
+ */
+function activityTitle(entry: SnapshotEntry): string {
+  return entry.romaji ?? entry.english ?? ''
+}
+
+/**
+ * С чего шла правка: прежний балл, прежнее число серий или прежний счётчик пересмотров. Без этого
+ * чипса дня не покажет переход «7 → 8», а только конечное число. Ноль — раньше этого не было.
+ */
+function activityFrom(kind: EditKind, known: SnapshotEntry | undefined): number | undefined {
+  if (kind === 'score') return known?.score10 ?? 0
+  if (kind === 'progress') return known?.progress ?? 0
+  if (kind === 'repeat') return known?.repeat ?? 0
+  return undefined
+}
+
+/**
  * Единственная точка правки записи для экранов: синхронно, без входа и сети; пустая строка — «стереть».
  */
 export function editEntry(
@@ -461,7 +517,14 @@ export function editEntry(
   if (!Number.isFinite(mediaId) || mediaId <= 0) return
 
   if (kind === 'remove') {
+    // Запись читается до вычистки: после неё подпись тайтла брать уже неоткуда.
+    const gone = entries.get(mediaId)
     dropEntry(mediaId)
+    // Убранную запись в журнале отмечаем до потери тайтла из списка: событие должно пережить его
+    // исчезновение, иначе в тот день сетка показала бы тишину там, где человек что-то делал.
+    noteActivity('remove', mediaId, 0, Date.now(), {
+      title: gone === undefined ? '' : activityTitle(gone),
+    })
     return
   }
 
@@ -494,6 +557,20 @@ export function editEntry(
   // Метка правки — наши часы: по ней слияние решает спор с сервером, ставить обязательно.
   entry.updatedAt = Date.now()
   putEntry(entry)
+
+  // Новый тайтл и есть то, чем он для человека был секунду назад: пустой записи в списке не было.
+  const noted = known === undefined ? 'add' : activityOfEdit(kind)
+  if (noted !== null) {
+    // Закладка, оценка и переход едут в событие: чипсу дня неоткуда взять их после перезахода, а сама
+    // правка знает их только сейчас. У новых записей закладка — та, ради которой тайтл и завёлся.
+    const onStatus = kind === 'status' || noted === 'add'
+    noteActivity(noted, mediaId, activityParts(kind, value), Date.now(), {
+      title: activityTitle(entry),
+      mark: onStatus ? (entry.status ?? '') : '',
+      score: kind === 'score' ? entry.score10 : undefined,
+      from: activityFrom(kind, known),
+    })
+  }
 }
 
 /**

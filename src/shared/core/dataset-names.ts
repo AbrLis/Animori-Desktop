@@ -213,21 +213,23 @@ export function updateDatasetNamesInBackground(force = false): Promise<void> | u
       return
     }
 
-    const answer = await fetchDatasetIndex(knownEtag || null)
+    // Ручная проверка идёт без отпечатка: иначе кнопка не помогла бы там, где
+    // отпечаток и содержимое диска разошлись.
+    const answer = await fetchDatasetIndex(force ? null : knownEtag || null)
 
-    // Неудача час проверки не сдвигает: иначе один отказ сети на старте
-    // отодвинул бы следующую попытку на полсуток на ровном месте.
+    // Ни отказ сети, ни сорванная запись час проверки не сдвигают: иначе одна
+    // неудача на старте отодвинула бы следующую попытку на полсуток.
     if (answer.kind === 'fail') return
 
-    await Bridge.storage.set(CHECKED_AT_KEY, Date.now())
-
-    // 304: сервер сам сказал, что опись та же. Тела нет, и сравнивать нечего.
-    if (answer.kind === 'same') return
+    if (answer.kind === 'same') {
+      await Bridge.storage.set(CHECKED_AT_KEY, Date.now())
+      return
+    }
 
     const { index, etag } = answer
-    if (etag !== '') await Bridge.storage.set(ETAG_KEY, etag)
 
     if (installedBuiltAt !== '' && index.builtAt <= installedBuiltAt) {
+      await Bridge.storage.set(CHECKED_AT_KEY, Date.now())
       Logger('DB', `Датасет актуален: сборка ${installedBuiltAt}`)
       return
     }
@@ -258,13 +260,20 @@ export function updateDatasetNamesInBackground(force = false): Promise<void> | u
     }
 
     const ok = await Bridge.files.write(DATASET_FILE, JSON.stringify(file))
-    if (ok) {
-      loading = null
-      await initDatasetNames()
-      Logger('DB', `Датасет обновлён до сборки ${index.builtAt}: имён ${titles.count}`)
-    } else {
+    if (!ok) {
       Logger('WARN', 'Датасет: новый выпуск не записался на диск')
+      return
     }
+
+    // Отпечаток запоминается только после записи: он значит «на диске ровно
+    // этот выпуск». Сохранённый раньше, он заставил бы клиент после сбоя вечно
+    // получать 304 и не пробовать до следующего выпуска.
+    if (etag !== '') await Bridge.storage.set(ETAG_KEY, etag)
+    await Bridge.storage.set(CHECKED_AT_KEY, Date.now())
+
+    loading = null
+    await initDatasetNames()
+    Logger('DB', `Датасет обновлён до сборки ${index.builtAt}: имён ${titles.count}`)
   })()
 
   updating

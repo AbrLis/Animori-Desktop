@@ -219,71 +219,6 @@ export function heightsOf(counts: number[]): number[] {
   return counts.map((count) => count / top)
 }
 
-/** Точка графика в относительной системе координат 0..1000 для построения SVG-кривой. */
-export interface SplinePoint {
-  x: number
-  y: number
-}
-
-/**
- * Координаты верхушек столбиков для SVG-графика поверх гистограммы.
- * X центрируется по ширине каждого столбика, Y совпадает с верхним краем заливки.
- */
-export function pointsForBars(bars: readonly { share: number }[]): SplinePoint[] {
-  const n = bars.length
-  if (n === 0) return []
-
-  return bars.map((b, i) => {
-    const x = ((i + 0.5) / n) * 1000
-    const fillPercent = b.share <= 0 ? 0 : Math.max(4, b.share * 100)
-    const y = 1000 - fillPercent * 10
-    return { x, y }
-  })
-}
-
-/**
- * Строит плавную кривую Безье (Catmull-Rom -> Cubic Bezier) по верхушкам столбиков.
- * На двух и более точках выдаёт готовую команду пути M ... C ...
- */
-export function smoothPath(points: readonly SplinePoint[]): string {
-  if (points.length < 2) return ''
-
-  const start = points[0]
-  if (!start) return ''
-
-  let d = `M ${start.x.toFixed(1)} ${start.y.toFixed(1)}`
-
-  for (let i = 0; i < points.length - 1; i += 1) {
-    const p0 = points[i === 0 ? 0 : i - 1] ?? start
-    const p1 = points[i] ?? start
-    const p2 = points[i + 1] ?? p1
-    const p3 = points[i + 2 < points.length ? i + 2 : i + 1] ?? p2
-
-    const k = 0.2
-
-    const cp1x = p1.x + (p2.x - p0.x) * k
-    const cp1y = Math.max(0, Math.min(1000, p1.y + (p2.y - p0.y) * k))
-
-    const cp2x = p2.x - (p3.x - p1.x) * k
-    const cp2y = Math.max(0, Math.min(1000, p2.y - (p3.y - p1.y) * k))
-
-    d += ` C ${cp1x.toFixed(1)} ${cp1y.toFixed(1)}, ${cp2x.toFixed(1)} ${cp2y.toFixed(1)}, ${p2.x.toFixed(1)} ${p2.y.toFixed(1)}`
-  }
-
-  return d
-}
-
-/** Замыкает кривую ко дну (bottomY), формируя замкнутый контур для градиентной подложки. */
-export function smoothAreaPath(points: readonly SplinePoint[], bottomY = 1000): string {
-  if (points.length < 2) return ''
-  const first = points[0]
-  const last = points[points.length - 1]
-  if (!first || !last) return ''
-
-  const lineD = smoothPath(points)
-  return `${lineD} L ${last.x.toFixed(1)} ${bottomY.toFixed(1)} L ${first.x.toFixed(1)} ${bottomY.toFixed(1)} Z`
-}
-
 /** Центр кольца в поле 120×120: общий у краски и у сектора под курсором. */
 const RING_CENTER = 60
 
@@ -366,7 +301,11 @@ export interface LegendSplit<T> {
   tail: LegendTail | null
 }
 
-/** Легенда кольца: три крупнейших сектора в порядке убывания и хвост одной строкой — полная занимала полкарточки. */
+/**
+ * Легенда кольца: крупнейшие сектора по убыванию и хвост одной строкой из остальных. Порог
+ * задаёт экран: на широком окне он просит все доли, в компактной раскладке — умолчание в три
+ * сектора, где полная легенда занимала полкарточки.
+ */
 export function splitLegend<T extends { count: number; share: number }>(
   slices: readonly T[],
   limit = 3,

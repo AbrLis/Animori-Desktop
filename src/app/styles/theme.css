@@ -334,6 +334,16 @@ html {
   letter-spacing: -0.005em;
 }
 
+/* Заголовок плитки — ряд: слева знак (components/TileMark.vue), справа название. Без знака ряд из
+   одного слова выглядит ровно как было: зазор работает только между элементами. Правило общее,
+   а не в настройках: плитки лежат ещё и в CloudBox с ProxyBox, и у каждого своя папка стилей. */
+.am-box > .am-h3,
+.am-box .am-bar .am-h3 {
+  display: flex;
+  gap: 9px;
+  align-items: center;
+}
+
 .am-dim {
   color: var(--am-dim);
 }

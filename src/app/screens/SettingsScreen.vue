@@ -5,6 +5,7 @@ import { onBeforeUnmount, onMounted, ref } from 'vue'
 
 import { Bridge } from '@/bridge'
 import { forgetCatalogMemory } from '@/api/anilist-catalog'
+import { clearActivity } from '@/core/activity'
 import {
   eachEntry,
   entryCount,
@@ -25,6 +26,7 @@ import { buildMalXml, malXmlFileName, parseMalXml } from '@/core/mal-xml'
 import { adultByBirth } from '@/core/adult'
 import { clearHidden } from '@/core/recs'
 import { saveSetting, settings } from '@/core/settings'
+import { setLogEnabled } from '@/utils/logger'
 
 import { APPEARANCES, appearance, setAppearance } from '../appearance'
 import {
@@ -40,24 +42,18 @@ import BrandMark from '../components/BrandMark.vue'
 import CloudBox from '../components/CloudBox.vue'
 import DatePick from '../components/DatePick.vue'
 import ProxyBox from '../components/ProxyBox.vue'
+import TileMark from '../components/TileMark.vue'
 import { pickTextFile } from '../load-file'
+import { navigate } from '../router'
 import { saveXmlFile } from '../save-file'
 import { dropFeed } from './home-keep'
+import { systemName } from '../host'
+import { flushWatchKeep, wipeWatch } from './player-keep'
 
 const version = __ANIMORI_VERSION__
 
 const desktop = isDesktop()
 
-/// Человеку важна его система, а не имя нашей сборки: слово «app» ему
-/// не говорит ничего, а «Windows» отвечает на вопрос сразу.
-function systemName(): string {
-  const ua = typeof navigator === 'undefined' ? '' : navigator.userAgent
-  if (/Android/i.test(ua)) return 'Android'
-  if (/Windows/i.test(ua)) return 'Windows'
-  if (/Mac OS X/i.test(ua)) return 'macOS'
-  if (/Linux/i.test(ua)) return 'Linux'
-  return 'неизвестна'
-}
 
 const system = systemName()
 
@@ -76,6 +72,29 @@ const REPO_URL = 'https://github.com/foulnike/Animori-Desktop'
 
 function onRepoLink(): void {
   void Bridge.shell.openExternal(REPO_URL)
+}
+
+/**
+ * Журнал отладки: экран живёт, зарегистрирован в роутере и умеет «Назад» — пропал лишь путь к
+ * нему, и добраться было нечем. Вход вернули отдельной плиткой «Отладка» под облачной копией,
+ * а не в меню: в рельсе отладка читалась бы обычным разделом, от которого человек ждёт
+ * содержания, а не журнала ошибок.
+ */
+function toLog(): void {
+  navigate('log')
+}
+
+/**
+ * Консоль WebView2. В установленном приложении F12 не работает (клавиша системная), а журнал
+ * отладки не показывает то, что движок печатает мимо него: ошибки сети, предупреждения
+ * WebView2, чужие вызовы console. Отказ приходит в строку ошибок настроек.
+ */
+function onDevtools(): void {
+  void guard(async () => {
+    note.value = ''
+    await Bridge.shell.devtools()
+    note.value = 'Консоль открыта отдельным окном: вкладка Console, ошибки и предупреждения.'
+  })
 }
 
 /** Страница выгрузки списка на MAL: входа в сервис у нас нет, файл забирается руками. */
@@ -101,11 +120,35 @@ const login = ref<LoginStart | null>(null)
 const note = ref('')
 const cleared = ref(false)
 
+/**
+ * Пишем ли журнал отладки. Флаг лежит в настройках под ключом `set_logger`, а само значение
+ * журналу отдаётся через `setLogEnabled`: модуль журнала настройки не видит (иначе кольцо
+ * модулей), и переключение работает на ходу, без перезапуска.
+ */
+const loggerOn = ref(settings.enableLogger)
+
+async function onLogger(): Promise<void> {
+  await saveSetting('enableLogger', 'set_logger', loggerOn.value)
+  setLogEnabled(loggerOn.value)
+  note.value = loggerOn.value
+    ? 'Журнал пишется. Новые записи видны в «Журнале отладки» и в копии оттуда.'
+    : 'Журнал выключен: новые записи не пишутся, прошлые остаются.'
+}
+
 /** Спрошено ли подтверждение переноса: даже слияние двигает записи, а замена вычищает список целиком. */
 const asking = ref(false)
 
 /** Спрошено ли подтверждение удаления: местные записи вернуть потом неоткуда — их нет ни на каком сервере. */
 const askingDrop = ref(false)
+
+/**
+ * Спрошено ли подтверждение стирания истории: квадраты календаря и просмотренное живут только на
+ * этом диске, а кнопка стоит в одном ряду с кнопкой списка — спрашиваем так же, как соседнюю.
+ */
+const askingWipe = ref(false)
+
+/** Спрошено ли подтверждение сброса памяти: он вычищает склад целиком, а человек может быть в середине правок. */
+const askingClear = ref(false)
 
 /** Ник на Шикимори: списывается из настроек один раз — общий объект не реактивен, v-model не показал бы. */
 const shikiNick = ref(settings.shikiNick)
@@ -443,6 +486,45 @@ function onDropList(): void {
   })
 }
 
+/** Нажатие на стирание истории: только вопрос, как у соседней кнопки удаления списка. */
+function onAskWipe(): void {
+  note.value = ''
+  error.value = ''
+  askingWipe.value = true
+}
+
+function onCancelWipe(): void {
+  askingWipe.value = false
+}
+
+/** Стирание истории по прямой просьбе: календарь активности и просмотренное живут только на этом
+ * диске — вернуть их нечем. Выбор озвучки остаётся: это настройка тайтла, а не след просмотра. */
+function onWipeHistory(): void {
+  askingWipe.value = false
+
+  void guard(async () => {
+    note.value = ''
+    // Календарь пишет пустоту сам, сразу; метки и историю wipeWatch отложил бы на четыре секунды —
+    // уход с экрана этого не дождался бы, и история всплыла бы после перезапуска.
+    clearActivity()
+    wipeWatch()
+    flushWatchKeep()
+
+    note.value = 'История стёрта: календарь активности и просмотренное удалены.'
+  })
+}
+
+/** Нажатие на сброс памяти: тоже только вопрос, без действия. */
+function onAskClear(): void {
+  note.value = ''
+  error.value = ''
+  askingClear.value = true
+}
+
+function onCancelClear(): void {
+  askingClear.value = false
+}
+
 /** Выбор папки для выгрузок: спрашивается один раз, дальше выгрузка идёт молча. Закрытое окно ошибкой не считается:
  * null значит «передумал». Ответа словами нет намеренно — новый путь встаёт в ту же строку, которую нажали. */
 function onPickDir(): void {
@@ -520,9 +602,12 @@ function closeAge(): void {
   ageError.value = ''
 }
 
-// Память сбрасывается только руками: человек может быть в середине правок.
+// Память сбрасывается только руками и только после вопроса: человек может быть в середине правок.
 // Вместе со складом снимаются метки «не интересно», лента подбора тоже выбрасывается.
+// Календарь и историю здесь не трогаем — это отдельная кнопка рядом, со своим вопросом.
 function onClear(): void {
+  askingClear.value = false
+
   void guard(async () => {
     note.value = ''
     await clearCache()
@@ -616,7 +701,9 @@ onBeforeUnmount(() => {
         <!-- Импорт списка: две половины одного вида. У каждой знак сервиса,
              название, строка состояния, кнопки и свои ответы. -->
         <div class="am-panel am-box">
-          <h3 class="am-h3">Импорт списка</h3>
+          <h3 class="am-h3">
+            <TileMark name="import" /> Импорт списка
+          </h3>
 
           <!-- AniList. Знак берёт components/BrandMark.vue из файла
                src/app/brand/anilist.svg: фирменный вектор, а не наш рисунок. -->
@@ -882,7 +969,9 @@ onBeforeUnmount(() => {
 
         <!-- Данные: что лежит на этом диске и что с этим можно сделать. -->
         <div class="am-panel am-box">
-          <h3 class="am-h3">Данные</h3>
+          <h3 class="am-h3">
+            <TileMark name="data" /> Данные
+          </h3>
 
           <ul class="am-facts">
             <li class="am-fact">
@@ -899,17 +988,28 @@ onBeforeUnmount(() => {
             </li>
           </ul>
 
-          <!-- Необратимое одной строкой: сброс памяти и удаление списка стоят
-               рядом, потому что оба про то, что лежит на этом диске. -->
+          <!-- Необратимое одной строкой: сброс памяти, стирание истории и удаление списка стоят
+               рядом, потому что все трое про то, что лежит на этом диске. Каждый спрашивает
+               отдельно: объём у них разный, и один вопрос на троих соврал бы. -->
           <div class="am-row">
             <button
               v-tip="'Убрать сохранённые названия, описания и обложки'"
               class="am-btn am-btn--ghost"
               type="button"
               :disabled="busy"
-              @click="onClear"
+              @click="onAskClear"
             >
               Очистить память
+            </button>
+
+            <button
+              v-tip="'Стереть календарь активности и историю просмотра'"
+              class="am-btn am-btn--ghost"
+              type="button"
+              :disabled="busy"
+              @click="onAskWipe"
+            >
+              Стереть историю
             </button>
 
             <button
@@ -961,6 +1061,38 @@ onBeforeUnmount(() => {
             </button>
           </div>
 
+          <!-- Сброс памяти тоже спрашиваем: он вычищает склад целиком. Вопрос коротким —
+               подпись кнопки под ним и есть весь ответ, как у соседнего удаления списка. -->
+          <div v-if="askingClear" class="am-ask">
+            <p class="am-ask__text">Очистить сохранённые названия, описания и обложки?</p>
+
+            <div class="am-row">
+              <button class="am-btn" type="button" :disabled="busy" @click="onClear">
+                Очистить память
+              </button>
+              <button class="am-btn am-btn--ghost" type="button" @click="onCancelClear">
+                Отмена
+              </button>
+            </div>
+          </div>
+
+          <!-- История необратима: спрашиваем всегда, тем же вопросом, что и удаление списка рядом.
+               Выбор озвучки остаётся — он не часть истории. -->
+          <div v-if="askingWipe" class="am-ask">
+            <p class="am-ask__text">
+              Стереть календарь активности и историю просмотра? Действие необратимо.
+            </p>
+
+            <div class="am-row">
+              <button class="am-btn" type="button" :disabled="busy" @click="onWipeHistory">
+                Стереть историю
+              </button>
+              <button class="am-btn am-btn--ghost" type="button" @click="onCancelWipe">
+                Отмена
+              </button>
+            </div>
+          </div>
+
           <!-- Удаление списка необратимо для местных записей: спрашиваем всегда.
                Вопрос коротким: подпись кнопки под ним и есть весь ответ. -->
           <div v-if="askingDrop" class="am-ask">
@@ -983,7 +1115,9 @@ onBeforeUnmount(() => {
       <!-- Оформление и справка: то, что смотрят, а не то, чем правят. -->
       <div class="am-set__col am-set__col--look">
         <div class="am-panel am-box">
-          <h3 class="am-h3">Оформление</h3>
+          <h3 class="am-h3">
+            <TileMark name="look" /> Оформление
+          </h3>
 
           <div class="am-skins">
             <button
@@ -1021,7 +1155,9 @@ onBeforeUnmount(() => {
         </div>
 
         <div class="am-panel am-box">
-          <h3 class="am-h3">О программе</h3>
+          <h3 class="am-h3">
+            <TileMark name="about" /> О программе
+          </h3>
 
           <ul class="am-facts">
             <li class="am-fact">
@@ -1098,6 +1234,54 @@ onBeforeUnmount(() => {
       <!-- Правая стопка: копия и прокси; на полном экране остаётся копией одной. -->
       <div class="am-set__col am-set__col--right">
         <CloudBox :list="listCount" :device="system" @changed="onCloudChanged" />
+
+        <!--
+          Журнал отладки — плиткой под облачной копией: он про поломки, а не про содержимое
+          списка, и после «что-то сломалось» человек идёт сюда, а не в «О программе». Отдельная
+          плитка нужна и по раскладке: на узком окне стопки растворяются, и порядок плиток задаёт
+          CSS по номерам детей.
+        -->
+        <div class="am-panel am-box">
+          <h3 class="am-h3">
+            <TileMark name="debug" /> Отладка
+          </h3>
+
+          <p class="am-meta am-fine">
+            Журнал пишет ошибки, запросы и склад этого запуска. Когда что-то сломалось, пришлите
+            копию оттуда: версия, система и маршрут в ней уже есть.
+          </p>
+
+          <div class="am-row">
+            <button
+              v-tip="'Ошибки, запросы и склад этого запуска'"
+              class="am-btn am-btn--ghost"
+              type="button"
+              @click="toLog"
+            >
+              Журнал отладки
+            </button>
+
+            <!-- Консоль движка: F12 в установленном приложении не работает, а из журнала её не
+                 видно — там только то, что приложение записало само. -->
+            <button
+              v-tip="'Окно WebView2: Console, Network, ошибки движка'"
+              class="am-btn am-btn--ghost"
+              type="button"
+              :disabled="busy"
+              @click="onDevtools"
+            >
+              Консоль разработчика
+            </button>
+          </div>
+
+          <!-- Тумблер журнала: пока он включён, пишутся ошибки, запросы и склад, а при выключенном
+               журнал молчит и человек решает, что поломок не было. -->
+          <label class="am-switch">
+            <input v-model="loggerOn" type="checkbox" class="am-switch__box" @change="onLogger" />
+            <span class="am-switch__name">Записывать журнал отладки</span>
+          </label>
+        </div>
+
         <ProxyBox v-if="!wide" />
       </div>
     </div>

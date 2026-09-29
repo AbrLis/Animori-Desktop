@@ -1,7 +1,8 @@
 // Пользовательские настройки: читать `settings.x` в момент использования; до loadSettings() — дефолты.
-// Логгер недоступен: utils/logger сам читает этот модуль, импорт дал бы цикл.
+// Логировать отсюда можно: журнал настроек не читает, иначе был бы цикл (настройки → мост → прокси).
 
 import { Bridge } from '@/bridge'
+import { Logger } from '../utils/logger'
 
 export type TitleSource = 'shikimori' | 'anime365' | 'off' | 'none'
 export type AccentPreset =
@@ -239,7 +240,9 @@ export async function loadSettings(): Promise<AniMoriSettings> {
     Object.assign(settings, await readSettings())
   } catch (e) {
     // Хранилище недоступно — работаем на дефолтах: без настроек приложение ещё полезно, без запуска — уже нет.
-    console.error('[AniMori] Не удалось прочитать настройки, используются значения по умолчанию', e)
+    // Именно это место логирует и предупреждение в консоль, и запись в журнал: раньше кольцо модулей
+    // (журнал → настройки) не пускало сюда Logger, и человек знал о поломке только из devtools.
+    Logger('ERROR', 'Настройки не прочитаны, взяты значения по умолчанию', e)
   }
   return settings
 }
@@ -258,6 +261,6 @@ export async function saveSetting<K extends keyof AniMoriSettings>(
   try {
     await Bridge.storage.set(storageKey, value)
   } catch (e) {
-    console.error('[AniMori] Не удалось сохранить настройку ' + storageKey, e)
+    Logger('ERROR', `Не удалось сохранить настройку ${storageKey}`, e)
   }
 }

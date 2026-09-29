@@ -84,6 +84,7 @@ const {
   onPickStarted,
   onPickCompleted,
   onPickNotes,
+  onPickRemove,
 } = useMediaCard(mediaId)
 
 // Просмотр — отдельный экран со своим адресом, а не окно поверх карточки:
@@ -425,6 +426,7 @@ watch(mediaId, () => {
           @started-at="onPickStarted"
           @completed-at="onPickCompleted"
           @notes="onPickNotes"
+          @remove="onPickRemove"
         />
       </template>
     </template>

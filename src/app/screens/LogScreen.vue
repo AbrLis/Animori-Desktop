@@ -1,15 +1,17 @@
 <script setup lang="ts">
 // Читатель журнала: раньше записи шли в кольцевой буфер без читателя, а DB/API не доезжали никуда.
 // Экран — единственный способ попросить «что в журнале»; здесь же счётчики бюджета источников и склада.
-import { onBeforeUnmount, onMounted, ref } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 
 import { collectRateStats, type RateLimiterStats } from '@/api/rate-limit'
 import { Bridge } from '@/bridge'
 import { getDbStats } from '@/core/db'
+import { settings } from '@/core/settings'
 import type { DbStats } from '@/core/types'
 import { clearLogs, readLogs, registerLogSink, type LogEntry, type LogType } from '@/utils/logger'
 
 import EmptyMark from '../components/EmptyMark.vue'
+import { systemName } from '../host'
 
 /** Виды записей для отбора; порядок по частоте вопроса: сначала «что сломалось», потом «что происходило». */
 const KINDS: ReadonlyArray<LogType> = ['ERROR', 'WARN', 'INFO', 'API', 'DB']
@@ -21,7 +23,8 @@ const PAGE = 120
 const BUDGET_TICK_MS = 1000
 
 const rows = ref<LogEntry[]>([])
-const kind = ref<LogType | 'all'>('all')
+/** Отбор вида записи: строка, а не только свои пять — свой вид в списке тоже должен отбираться. */
+const kind = ref<string>('all')
 const limit = ref(PAGE)
 const note = ref('')
 
@@ -51,7 +54,7 @@ function onEntry(): void {
   redraw()
 }
 
-function pick(next: LogType | 'all'): void {
+function pick(next: string): void {
   kind.value = next
   limit.value = PAGE
   note.value = ''
@@ -111,6 +114,39 @@ async function onStore(): Promise<void> {
   store.value = res
 }
 
+/**
+ * Подпись времени: у сегодняшних записей — часы, у прочих — с датой. Без даты журнал через полночь
+ * читался бы как один длинный день, а человек по умолчанию ищет вчерашнее.
+ */
+function stamp(entry: LogEntry): string {
+  if (typeof entry.at !== 'number') return entry.time
+
+  const today = new Date()
+  const start = new Date(today.getFullYear(), today.getMonth(), today.getDate()).getTime()
+  if (entry.at >= start) return entry.time
+
+  const date = new Date(entry.at)
+  return `${date.getDate()}.${date.getMonth() + 1} ${entry.time}`
+}
+
+/**
+ * Маршрут записи строкой. Прежде в записи лежал путь к файлу приложения — он был одинаков у всех
+ * строк и молчал, с какого экрана пришла ошибка; теперь там хэш, и строка сама говорит.
+ */
+function routeOf(entry: LogEntry): string {
+  return entry.route === undefined || entry.route === '' ? '' : ` ${entry.route}`
+}
+
+/**
+ * Виды для отбора: пять своих и всякое, что встретилось. Свой вид записи в списке «все» виден, а
+ * кнопки-фильтра у него не было бы — и отфильтровать его было бы нечем.
+ */
+const kinds = computed<ReadonlyArray<string>>(() => {
+  const mine = new Set<string>(KINDS)
+  for (const entry of readLogs()) if (!mine.has(entry.type)) mine.add(entry.type)
+  return [...mine]
+})
+
 /** Подробности строкой. Ошибка разбора не должна ронять сам просмотрщик. */
 function detailsText(entry: LogEntry): string {
   if (entry.details === null || entry.details === undefined) return ''
@@ -131,15 +167,21 @@ function hasMore(entry: LogEntry): boolean {
   )
 }
 
-/** Журнал в буфер обмена: уходит то, что видно на экране, вместе с отбором. */
+/**
+ * Журнал в буфер обмена: уходит то, что видно на экране, вместе с отбором, и шапка запуска —
+ * версия, система и маршрут. Без неё присланный журнал читается как «у меня что-то сломалось»
+ * и требует переписки, прежде чем в нём можно разобраться.
+ */
 function onCopy(): void {
-  const text = rows.value
-    .map((entry) => {
-      const head = `${entry.time} [${entry.type}] ${entry.message}`
-      const tail = detailsText(entry)
-      return tail === '' ? head : `${head}\n${tail}`
-    })
-    .join('\n\n')
+  const head = `AniMori ${__ANIMORI_VERSION__} · ${systemName()} · маршрут ${window.location.hash}`
+  const text =
+    rows.value
+      .map((entry) => {
+        const line = `${stamp(entry)} [${entry.type}]${routeOf(entry)}${entry.message}`
+        const tail = detailsText(entry)
+        return tail === '' ? line : `${line}\n${tail}`
+      })
+      .join('\n\n') + `\n\n—\n${head}`
 
   if (text === '') {
     note.value = 'Копировать нечего: журнал пуст.'
@@ -200,7 +242,7 @@ onBeforeUnmount(() => {
           Все
         </button>
         <button
-          v-for="one in KINDS"
+          v-for="one in kinds"
           :key="one"
           class="am-seg__btn"
           :class="{ 'am-seg__btn--on': kind === one }"
@@ -281,16 +323,20 @@ onBeforeUnmount(() => {
       </p>
     </div>
 
+    <!-- Пустой журнал говорит причину: выключенный журнал и сломанный выглядели бы одинаково,
+         и человек решил бы, что поломок не было. -->
     <div v-if="rows.length === 0" class="am-empty">
       <span class="am-empty__mark"><EmptyMark name="journal" /></span>
-      <span>Записей нет. Журнал пишется, пока открыто окно.</span>
+      <span v-if="settings.enableLogger">Записей нет. Журнал пишется, пока открыто окно.</span>
+      <span v-else>Журнал выключен в настройках: «Отладка» → «Записывать журнал отладки».</span>
     </div>
 
     <ul v-else class="am-log">
       <li v-for="entry in rows" :key="entry.id" class="am-log__row" :data-kind="entry.type">
         <div class="am-log__head">
           <span class="am-log__kind">{{ entry.type }}</span>
-          <span class="am-log__time">{{ entry.time }}</span>
+          <span class="am-log__time">{{ stamp(entry) }}</span>
+          <span v-if="routeOf(entry) !== ''" class="am-log__route">{{ routeOf(entry) }}</span>
           <span class="am-log__text">{{ entry.message }}</span>
           <button
             v-if="hasMore(entry)"
@@ -498,6 +544,17 @@ onBeforeUnmount(() => {
   font-size: 12px;
   color: var(--am-faint);
   font-variant-numeric: tabular-nums;
+}
+
+/* Маршрут записи: с какого экрана пришла ошибка. Тише времени, иначе спорил бы с сообщением. */
+.am-log__route {
+  flex: 0 0 auto;
+  max-width: 30ch;
+  overflow: hidden;
+  font-size: 11px;
+  color: var(--am-faint);
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .am-log__text {

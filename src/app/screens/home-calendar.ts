@@ -256,7 +256,9 @@ const entries = ref<AiringEntry[]>([])
 const busy = ref(false)
 const failed = ref(false)
 const picked = ref(0)
-const scope = ref<CalendarScope>('mine')
+/** Область показа по умолчанию — «Популярное»: «Моё» пусто у только что установившего
+ *  приложение, и календарь открывался бы пустой сеткой. Своё остаётся первым в ряду. */
+const scope = ref<CalendarScope>('popular')
 const startKey = ref(0)
 const todayKey = ref(0)
 const hidden = ref(0)

@@ -16,6 +16,7 @@ import {
 import { proxyRestartNeeded, readProxyConfig, saveProxyField } from '@/core/proxy-settings'
 
 import PickBox from './PickBox.vue'
+import TileMark from './TileMark.vue'
 
 /** Виды прокси; из этого списка строится выбор. Свой PickBox, а не системный `<select>`:
  *  тот на тёмной теме выпадал белым, а переключатель из двух кнопок не влезает в строку. */
@@ -237,7 +238,9 @@ onMounted(() => {
 
 <template>
   <div class="am-panel am-box">
-    <h3 class="am-h3">Прокси</h3>
+    <h3 class="am-h3">
+      <TileMark name="proxy" /> Прокси
+    </h3>
 
     <label class="am-switch">
       <input v-model="enabled" type="checkbox" class="am-switch__box" @change="onEnabled" />

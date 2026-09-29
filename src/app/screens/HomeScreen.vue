@@ -39,6 +39,7 @@ import { watchCovers } from '../covers'
 import { formatWord, GENRE_CHOICES, genreWord, partsShort } from '../labels'
 import { navigate } from '../router'
 import SakuraMark from '../components/SakuraMark.vue'
+import ActivityYear from './ActivityYear.vue'
 import { SAKURA_ROSETTE, SAKURA_ROSETTE_ASPECT, SAKURA_ROSETTE_BOX } from '../sakura'
 import { splashLine } from '../splash'
 import { tagWord } from '../tag-words'
@@ -86,6 +87,8 @@ function layoutSpray(): void {
   const shut: KeepOut[] = []
   if (heyText.value !== null) shut.push(shutOf(heyText.value, box))
   if (heyRose.value !== null) shut.push(shutOf(heyRose.value, box))
+  // Календарик в запрет не входит: лепестки плывут и за ним. Лунка берёт их задним планом
+  // в размытие — под сеткой остаются мутные пятнышки, а не резкие цветки.
 
   grains.value = sprayGrains(wide, high, shut)
 }
@@ -935,6 +938,27 @@ function onEditStatus(value: string): void {
   sendEdit('status', value)
 }
 
+/**
+ * Убрать тайтл из списка из окна правки: запись с её параметрами исчезает, поэтому и список, и
+ * статистика (обе считают по коллекции) теряют тайтл сразу. Обновление то же, что у прочих
+ * правок: снимок перезаписан, полки пересобраны. На сервере AniList запись остаётся — правки
+ * оттуда никогда не уезжали, и удаление местное, как удаление всего списка в настройках.
+ */
+function onEditRemove(): void {
+  if (editId.value === 0) return
+
+  try {
+    // Облик не нужен: удаление забирает запись целиком, а подпись для журнала берётся из неё самой.
+    editEntry(editId.value, 'remove', null)
+    editStamp.value += 1
+    redrawAll()
+  } catch (e) {
+    trouble.value = describe(e)
+  }
+
+  closeEdit()
+}
+
 function onEditScore(value: number): void {
   sendEdit('score', value)
 }
@@ -1037,7 +1061,9 @@ watch(
       </span>
 
       <!-- Россыпь: число цветков выходит из свободного места, поэтому
-           их расставляет расчёт, а не разметка. -->
+           их расставляет расчёт, а не разметка. Календарик в запрет не входит: лепестки
+           плывут и за ним, но лунка берёт их задним планом в размытие и оставляет
+           мутными пятнышками — резкого цветка под сеткой не видно. -->
       <span class="am-hey__spray" aria-hidden="true">
         <span
           v-for="grain in grains"
@@ -1073,6 +1099,12 @@ watch(
           <button class="am-btn am-btn--soft" type="button" @click="toLists">Мои списки</button>
           <button class="am-btn am-btn--ghost" type="button" @click="toSearch">Найти аниме</button>
         </div>
+      </div>
+
+      <!-- Календарик в правой половине плашки. Отдельной карточкой он занимал целый ряд и
+           читался как ещё один блок; здесь он встаёт в одну композицию с приветствием. -->
+      <div class="am-hey__side">
+        <ActivityYear bare />
       </div>
     </div>
 
@@ -1118,6 +1150,16 @@ watch(
           :aria-pressed="day.key === calendarDay?.key"
           @click="pickDay(day.key)"
         >
+          <!-- Розетки по краям: клетка широкая и низкая, а читать в ней нечего, кроме числа
+               и точки, так что место занимает декор. Та же геометрия, что у плиток статистики
+               и в россыпи на главной; пара симметрична, а поворот у каждого дня свой. -->
+          <span class="am-cal__rose am-cal__rose--l" aria-hidden="true">
+            <svg :viewBox="SAKURA_ROSETTE_BOX"><path :d="SAKURA_ROSETTE" /></svg>
+          </span>
+          <span class="am-cal__rose am-cal__rose--r" aria-hidden="true">
+            <svg :viewBox="SAKURA_ROSETTE_BOX"><path :d="SAKURA_ROSETTE" /></svg>
+          </span>
+
           <span class="am-cal__word">{{ day.word }}</span>
           <span class="am-cal__num">{{ day.num }}</span>
           <span
@@ -1368,6 +1410,7 @@ watch(
       :notes="editRow.notes"
       @close="closeEdit"
       @status="onEditStatus"
+      @remove="onEditRemove"
       @score="onEditScore"
       @progress="onEditProgress"
       @repeat="onEditRepeat"
@@ -1380,12 +1423,24 @@ watch(
 
 <style scoped>
 /* Приветствие: первое, что видно при запуске. Форма — лист, а не карточка:
-   один угол срезан и полоса перестаёт быть прямоугольником среди прямоугольников. */
+   один угол срезан и полоса перестаёт быть прямоугольником среди прямоугольников.
+   Половины две: слева приветствие, справа календарик активности. Высота сетки от ширины
+   окна не зависит: клетка задана в пикселях, а где полосы недостаёт — доска прокручивается
+   вбок. Нижняя граница колонок не задана: полосы разной высоты, и общее дно стянуло бы
+   плашку по короткой. */
 .am-hey {
   position: relative;
   isolation: isolate;
   overflow: hidden;
-  padding: clamp(24px, 3.4vw, 40px) clamp(24px, 3.6vw, 44px);
+  display: grid;
+  /* Половин может быть и одна: в узкое окно календарик перестаёт помещаться рядом
+     с приветствием и уходит под него, а не сжимается в нечитаемую полосу. */
+  grid-template-columns: minmax(0, 1fr);
+  align-items: center;
+  gap: clamp(12px, 1.6vw, 20px);
+  /* Отступ по вертикали мал нарочно: высота плашки принадлежит календарику, а он берёт размер
+     клетки от своих пикселей — сорок пикселей поля ужимали бы плашку, а не год. */
+  padding: clamp(14px, 1.7vw, 22px) clamp(20px, 3vw, 40px);
   background: var(--am-glass);
   border: 1px solid var(--am-line-soft);
   border-radius: var(--am-r-leaf);
@@ -1393,6 +1448,37 @@ watch(
     var(--am-sh-2),
     inset 0 1px 0 var(--am-edge);
   backdrop-filter: blur(var(--am-blur-strong)) saturate(1.5);
+}
+
+/* Календарик встаёт рядом с приветствием, только когда под год хватает ширины: у сетки пятьдесят
+   три колонки, и на узкой половине квадраты выродились бы в крапины — при равных долях на окне в
+   тысячу пикселей квадрат выходил четыре пикселя. Ниже порога он уходит под приветствие и
+   занимает всю полосу. Доля календарику почти вдвое: он берёт высоту от ширины своих колонок, а
+   плашке высота нужна ради него, а не ради полей. */
+@media (min-width: 1240px) {
+  .am-hey {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1.8fr);
+  }
+}
+
+/* Слева приветствие столбцом: фраза сверху, кнопки под ней. */
+.am-hey__text {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  max-width: 74ch;
+}
+
+/* Правая половина. Сжиматься ей нельзя: клетке года задан размер в пикселях, и на сжатой
+   половине сетка превращалась бы в прокрутку без конца. Зато по высоте она тянется на всю
+   плашку: высоту полосы задаёт самая высокая половина, и без растяжения календарик вставал бы
+   по центру, оставляя под собой и над собой пустоту. */
+.am-hey__side {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-self: stretch;
+  min-width: 0;
 }
 
 /* Капля под стеклом: без неё размывать нечего, панель выглядела бы грязным прямоугольником. */
@@ -1508,13 +1594,6 @@ watch(
   }
 }
 
-.am-hey__text {
-  display: flex;
-  flex-direction: column;
-  gap: 14px;
-  max-width: 74ch;
-}
-
 /* Одна строка: случайная фраза реестра, а не постоянный заголовок. */
 .am-hey__title {
   display: flex;
@@ -1595,6 +1674,69 @@ watch(
     background-color var(--am-fast) var(--am-ease),
     border-color var(--am-fast) var(--am-ease),
     opacity var(--am-fast) var(--am-ease);
+  /* Свой контекст: розетки лежат под текстом (z-index: -1) и уходят за скруглённый угол
+     клетки, поэтому видно только бледный край цветка — как на плитках статистики. */
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  --am-cal-turn: -18deg;
+}
+
+/* Поворот свой у каждого дня: семь одинаковых рамок читались бы штампом, а не календарём. */
+.am-cal__day:nth-child(7n + 2) { --am-cal-turn: -34deg; }
+.am-cal__day:nth-child(7n + 3) { --am-cal-turn: 14deg; }
+.am-cal__day:nth-child(7n + 4) { --am-cal-turn: -48deg; }
+.am-cal__day:nth-child(7n + 5) { --am-cal-turn: 32deg; }
+.am-cal__day:nth-child(7n + 6) { --am-cal-turn: -6deg; }
+
+/* Розетка подложкой. Размер и сдвиг — доли клетки, а не пиксели: на полной ширине клетка
+   около 180 пикселей и в неё входит середина розетки в 96 пикселей со сдвигом в 30 — там,
+   где лепестки гуще всего. При сужении окна клетки становятся уже, и та же розетка в
+   пикселях доезжала бы до их середины, ложась прямо под число; долями она уходит за край
+   ровно на половину при любом размере. Потолок — те же 96 пикселей, и сдвиг упирается в те
+   же 30: без них доля росла бы вместе с клеткой, и на полном экране цветок растягивался
+   в пятно шириной в полклетки. */
+.am-cal__rose {
+  position: absolute;
+  top: 50%;
+  z-index: -1;
+  width: min(54%, 96px);
+  aspect-ratio: 1;
+  color: var(--am-sakura);
+  /* Пастельный розовый на почти чёрном фоне даёт rgb(74,58,63) — против 0.13 розетки не видно,
+     поэтому здесь она заметно плотнее, чем под плитками статистики. */
+  opacity: 0.3;
+  pointer-events: none;
+}
+
+/* Розетка тянется на обёртку и красится её же краской: без этого svg остался бы
+   со своей, пустой, геометрией и под обёрткой не было бы видно ничего. */
+.am-cal__rose svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+  fill: currentcolor;
+}
+
+.am-cal__rose--l {
+  left: max(-17%, -30px);
+  transform: translateY(-50%) rotate(var(--am-cal-turn));
+}
+
+.am-cal__rose--r {
+  right: max(-17%, -30px);
+  transform: translateY(-50%) rotate(calc(-1 * var(--am-cal-turn)));
+}
+
+.am-cal__day:nth-child(4n + 2) .am-cal__rose { color: var(--am-accent); }
+.am-cal__day:nth-child(4n + 3) .am-cal__rose { color: var(--am-accent-2); }
+.am-cal__day:nth-child(4n + 4) .am-cal__rose { color: var(--am-good); }
+
+/* Под курсором и на выбранном дне цветок проступает: клетка отвечает на нажатие, а не
+   только меняет рамку. */
+.am-cal__day:hover .am-cal__rose,
+.am-cal__day--on .am-cal__rose {
+  opacity: 0.42;
 }
 
 .am-cal__day:hover {

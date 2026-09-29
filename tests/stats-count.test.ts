@@ -11,15 +11,14 @@ import {
   episodeMinutes,
   formatNumber,
   looklessIds,
-  pointsForBars,
   RING_TURN,
   sectorPath,
   sliceAngle,
-  smoothAreaPath,
-  smoothPath,
   splitLegend,
   watchTime,
 } from '@/app/screens/stats-count'
+// Геометрия графиков живёт отдельно от счёта: ею же пользуется компонент StatsPlot.vue.
+import { niceTicks, pointsForBars, smoothAreaPath, smoothPath } from '@/app/charts'
 import { dropEntry, putEntry } from '@/core/collection'
 import { rememberBrief, type MediaLook } from '@/core/media-looks'
 import { settings } from '@/core/settings'
@@ -526,6 +525,56 @@ describe('spline generation', () => {
     expect(points[1]?.y).toBe(500)
     // При 100% — y = 1000 - 1000 = 0
     expect(points[2]?.y).toBe(0)
+  })
+
+  it('кривая не выходит из промежутка между соседними вершинами', () => {
+    // Данные дискретные (годы, оценки): линия, проходящая между ними, читалась бы как правда,
+    // поэтому ни одна точка кривой не вправе оказаться выше или ниже своих соседей.
+    const points = [
+      { x: 100, y: 900 },
+      { x: 200, y: 500 },
+      { x: 300, y: 700 },
+      { x: 400, y: 100 },
+      { x: 500, y: 600 },
+    ]
+    const d = smoothPath(points)
+    const segments = d.split(' C ').slice(1)
+
+    expect(segments).toHaveLength(points.length - 1)
+    segments.forEach((segment, i) => {
+      const a = points[i]?.y ?? 0
+      const b = points[i + 1]?.y ?? 0
+      // Две контрольные точки и конец сегмента — три числа Y на каждую «C».
+      const heights = [...segment.matchAll(/(-?[\d.]+) (-?[\d.]+)/g)].map((m) => Number(m[2]))
+      expect(heights).toHaveLength(3)
+      for (const y of heights) {
+        expect(y).toBeGreaterThanOrEqual(Math.min(a, b) - 0.1)
+        expect(y).toBeLessThanOrEqual(Math.max(a, b) + 0.1)
+      }
+    })
+  })
+})
+
+describe('круглые деления шкалы', () => {
+  it('верхняя линия не ниже самой высокой колонки, шаг — из 1, 2, 5 или 10', () => {
+    expect(niceTicks(26)).toEqual([0, 10, 20, 30])
+    expect(niceTicks(9)).toEqual([0, 5, 10])
+    expect(niceTicks(95)).toEqual([0, 25, 50, 75, 100])
+    expect(niceTicks(10, 5)).toEqual([0, 2, 4, 6, 8, 10])
+  })
+
+  it('у пустого графика остаётся только нулевое деление', () => {
+    expect(niceTicks(0)).toEqual([0])
+  })
+
+  it('верхнее деление всегда не ниже самой высокой колонки', () => {
+    // 44 при шаге 20: без верхней линии пик упирался в край, а поле читалось бы как 40.
+    expect(niceTicks(44)).toEqual([0, 20, 40, 60])
+    for (const top of [1, 7, 26, 44, 95, 130, 1400]) {
+      const ticks = niceTicks(top)
+      expect(ticks[0]).toBe(0)
+      expect(ticks[ticks.length - 1]).toBeGreaterThanOrEqual(top)
+    }
   })
 })
 

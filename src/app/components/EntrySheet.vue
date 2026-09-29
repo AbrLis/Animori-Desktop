@@ -14,6 +14,9 @@ const SCORE_STEP = 0.5
 /** Сколько кнопка «Готово» держит подтверждение, прежде чем закрыть шторку. */
 const SAVE_HOLD = 900
 
+/** Сколько держится взведённая кнопка удаления, прежде чем разоружится. */
+const REMOVE_ARM_MS = 5000
+
 /** Быстрые оценки одним нажатием: целые баллы шкалы. */
 const QUICK_MARKS: ReadonlyArray<number> = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
 
@@ -43,6 +46,7 @@ const emit = defineEmits<{
   (e: 'startedAt', value: string): void
   (e: 'completedAt', value: string): void
   (e: 'notes', value: string): void
+  (e: 'remove'): void
 }>()
 
 // Закладки и подпись счёта теперь одни и те же: выбора вида больше нет,
@@ -87,6 +91,12 @@ let lastSent = props.notes ?? ''
 /** Кнопка «Готово» отвечает «Сохранено» и держит ответ SAVE_HOLD. */
 const saved = ref(false)
 let hold: number | null = null
+
+/** Убрать взведено: второе нажатие убирает запись, первое только спрашивает. */
+const removing = ref(false)
+
+/** Таймер разоружения кнопки удаления. */
+let armTimer = 0
 
 // Значение сверху могло измениться обновлением списка: подхватываем, но не
 // затираем то, что человек уже набрал в поле.
@@ -225,6 +235,37 @@ function onDrop(): void {
   emit('close')
 }
 
+/**
+ * Убрать тайтл из списка. Запись исчезает целиком — закладка, оценка, счёт, даты и заметка, — и из
+ * списка, и из статистики одним движением: обе считают по коллекции, а коллекция теряет запись.
+ * Местная запись: на сервере AniList ничего не пропадает, и об этом говорит подпись кнопки.
+ * В два нажатия, как очистка истории на экране Истории: удаление не должно случиться от щелчка
+ * рядом с «Готово».
+ */
+function onRemove(): void {
+  // Нечего убирать, если тайтла в списке нет: кнопки при такой записи и не видно.
+  if (props.status === '') return
+
+  if (!removing.value) {
+    removing.value = true
+
+    if (armTimer !== 0) window.clearTimeout(armTimer)
+    armTimer = window.setTimeout(() => {
+      armTimer = 0
+      removing.value = false
+    }, REMOVE_ARM_MS)
+
+    return
+  }
+
+  if (armTimer !== 0) window.clearTimeout(armTimer)
+  armTimer = 0
+  removing.value = false
+
+  emit('remove')
+  emit('close')
+}
+
 /** Закрытие по Escape: окно поверх экрана без этого раздражает. */
 function onKey(event: KeyboardEvent): void {
   if (event.key === 'Escape') onDrop()
@@ -239,6 +280,9 @@ onBeforeUnmount(() => {
   // Таймер держит ссылку на шторку: без снятия он дотянет до закрытия
   // уже убранного окна, а emit('close') после этого — лишний.
   if (hold !== null) clearTimeout(hold)
+
+  // Взведённое удаление разоружается тем же ходом: висящий таймер дёрнул бы уже несуществующее окно.
+  if (armTimer !== 0) clearTimeout(armTimer)
 })
 </script>
 
@@ -430,6 +474,23 @@ onBeforeUnmount(() => {
         </div>
 
         <footer class="am-sheet__foot">
+          <!--
+            Убрать из списка: запись исчезает целиком — закладка, оценка, счёт, даты и заметка, —
+            и из списка, и из статистики. Запись местная: на сервере AniList ничего не пропадает,
+            и об этом говорит подпись кнопки. В два нажатия: первое взводит, второе убирает.
+            У тайтла вне списка кнопки нет — убирать нечего.
+          -->
+          <button
+            v-if="status !== ''"
+            v-tip="removing ? 'Ещё раз — и запись уйдёт' : 'Убрать запись с этого устройства'"
+            class="am-btn am-btn--ghost"
+            :class="{ 'am-sheet__drop': removing }"
+            type="button"
+            @click="onRemove"
+          >
+            {{ removing ? 'Нажмите ещё раз' : 'Убрать из списка' }}
+          </button>
+
           <span class="am-bar__gap" />
 
           <button class="am-btn" :class="{ 'am-btn--done': saved }" type="button" @click="onDone">
@@ -756,6 +817,12 @@ onBeforeUnmount(() => {
    Обводку не трогаю: --am-good-rgb в теме нет. */
 .am-btn--done {
   color: var(--am-good);
+}
+
+/* Взведённое удаление краснеет и ждёт второго нажатия — как очистка истории на её экране. */
+.am-sheet__drop {
+  color: var(--am-bad);
+  border-color: color-mix(in srgb, var(--am-bad) 45%, transparent);
 }
 
 /* Галочка штрихом, а не заливкой: на пятнадцати пикселях залитый

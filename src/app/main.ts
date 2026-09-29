@@ -4,6 +4,7 @@
 import { createApp } from 'vue'
 import App from './App.vue'
 import { startAppearance } from './appearance'
+import { systemName } from './host'
 import { seen } from './see-tile'
 import { initSplash } from './splash'
 import { tip } from './tip'
@@ -11,8 +12,8 @@ import { eachEntry, initCollection } from '@/core/collection'
 import { initDatasetNames, updateDatasetNamesInBackground } from '@/core/dataset-names'
 import { hydrateLooks, peekLook } from '@/core/media-looks'
 import { loadCoversFromStore, prefetchCovers, type CoverPair } from '@/core/posters'
-import { loadSettings } from '@/core/settings'
-import { installGlobalErrorHandlers } from '@/utils/logger'
+import { loadSettings, settings } from '@/core/settings'
+import { installGlobalErrorHandlers, Logger, setLogEnabled } from '@/utils/logger'
 
 // Стиль всплывающих подписей: плашка живёт в body, и scoped-правила
 // компонентов до неё не достают.
@@ -61,20 +62,35 @@ async function start(): Promise<void> {
   // иначе спам перезагрузки (F5) показывал бы одну и ту же надпись.
   await Promise.all([loadSettings(), initSplash()])
 
+  // Журнал узнаёт, писать ли, только отсюда: сам он настройки не видит, иначе кольцо модулей.
+  setLogEnabled(settings.enableLogger)
+
   // Тема ставится до первой отрисовки и сразу после настроек: светлое окно,
   // темнеющее на глазах, читается как поломка, а не как выбор оформления.
   startAppearance()
 
+  // Запись о запуске: версия и система — первое, что нужно тому, кому прислали журнал.
+  Logger('INFO', 'Запуск программы', { version: __ANIMORI_VERSION__, platform: systemName() })
+
   // Перехватчики ставятся до первой отрисовки: сбой монтирования — тоже
-  // событие для журнала. Раньше настроек нельзя: тумблер журнала не прочтён.
+  // событие для журнала. Флага им не нужно — пишет ли журнал, решает он сам.
   installGlobalErrorHandlers()
 
   // Подписи v-tip и v-seen регистрируются на всё приложение: их просят метки плиток, кнопки шапок и полки
   // карточек. У каждой один наблюдатель на всё окно, место ей здесь же.
-  createApp(App)
-    .directive('tip', tip)
-    .directive('seen', seen)
-    .mount(root as HTMLElement)
+  const app = createApp(App)
+
+  // Ошибка в разметке или в обработчике мимо журнала не доходит: Vue печатает её себе в консоль и идёт
+  // дальше, а сломанный экран приходит в issue совсем без записей. Это самый частый вид поломки, и он
+  // обязан быть виден.
+  app.config.errorHandler = (e, _instance, info) => {
+    Logger('ERROR', `Ошибка во Vue (${info})`, e)
+  }
+  app.config.warnHandler = (message, _instance, trace) => {
+    Logger('WARN', `Предупреждение Vue: ${message}`, trace)
+  }
+
+  app.directive('tip', tip).directive('seen', seen).mount(root as HTMLElement)
 
   hideBoot()
 
@@ -83,7 +99,7 @@ async function start(): Promise<void> {
   try {
     await initCollection()
   } catch (e: unknown) {
-    console.error('AniMori: список не поднялся из снимка', e)
+    Logger('ERROR', 'Список не поднялся из снимка', e)
   }
 
   void initDatasetNames()
@@ -92,7 +108,7 @@ async function start(): Promise<void> {
   // Постеры своей полки — после снимка и обликов, потому что адреса лежат там. Ошибка не роняет
   // старт: без картинок приложение работает, просто сетка без сети останется пустой.
   void warmListCovers().catch((e: unknown) => {
-    console.error('AniMori: постеры своей полки не поднялись', e)
+    Logger('ERROR', 'Постеры своей полки не поднялись', e)
   })
 }
 

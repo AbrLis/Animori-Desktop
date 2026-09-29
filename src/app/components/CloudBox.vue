@@ -24,6 +24,7 @@ import { saveSetting, settings } from '@/core/settings'
 
 import BrandMark from './BrandMark.vue'
 import CloudHelp from './CloudHelp.vue'
+import TileMark from './TileMark.vue'
 
 const props = defineProps<{
   /** Записей в списке сейчас: это число стоит в вопросах перед заменой. */
@@ -463,7 +464,9 @@ onMounted(() => {
 <template>
   <div class="am-panel am-box">
     <div class="am-bar">
-      <h3 class="am-h3">Облачная копия</h3>
+      <h3 class="am-h3">
+        <TileMark name="cloud" /> Облачная копия
+      </h3>
       <span class="am-bar__gap" />
       <span class="am-flag" :class="{ 'am-flag--on': cloudOn() }">
         <span class="am-flag__dot" aria-hidden="true" />

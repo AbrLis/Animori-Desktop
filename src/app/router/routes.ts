@@ -69,5 +69,5 @@ export const SCREEN_TITLES: Record<ScreenName, string> = {
   studio: 'Студия',
   player: 'Просмотр',
   settings: 'Настройки',
-  log: 'Журнал',
+  log: 'Журнал отладки',
 }

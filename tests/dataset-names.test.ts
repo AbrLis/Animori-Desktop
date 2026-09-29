@@ -190,4 +190,78 @@ describe('dataset-names', () => {
     expect(await initDatasetNames()).toBe(true)
     expect(datasetStatus().builtAt).toBe('2026-01-01T00:00:00.000Z')
   })
+
+  it('не запоминает etag, пока новый выпуск не записан на диск', async () => {
+    const mock = installMockBridge()
+    const oldText = JSON.stringify({
+      v: 1,
+      builtAt: '2026-01-01T00:00:00.000Z',
+      titles: [{ id: 5114, name: 'img', russian: 'Старое имя', kind: 'tv', aired_on: null, score: null }],
+      pairs: [[5114, 16498]],
+    })
+    mock.setFile(FILE_NAME, oldText)
+
+    const release = makeRelease()
+    // Файлы не заданы: отпечаток не сойдётся, и запись не состоится.
+    mock.setHttpResponse(INDEX_URL, {
+      text: JSON.stringify(release.index),
+      headers: { etag: 'W/"release-1"' },
+    })
+
+    const { updateDatasetNamesInBackground, datasetStatus } = await import('@/core/dataset-names')
+
+    await updateDatasetNamesInBackground()
+
+    // Отпечаток и час проверки не тронуты: сохранённый etag после сбоя заставлял бы
+    // клиент вечно получать 304 и больше не пробовать до следующего выпуска.
+    expect(mock.calls.storageSet).toEqual([])
+    expect(mock.getFile(FILE_NAME)).toBe(oldText)
+    expect(datasetStatus().builtAt).toBe('2026-01-01T00:00:00.000Z')
+
+    // Второй запуск, с уже готовыми файлами, доводит дело до конца. Слот обновления
+    // освобождается в finally позже возвращённого промиса, поэтому тик обязателен.
+    mock.setHttpBytes(TITLES_URL, release.titlesBytes)
+    mock.setHttpBytes(MAP_URL, release.mapBytes)
+    await new Promise((resolve) => setTimeout(resolve, 0))
+
+    await updateDatasetNamesInBackground(true)
+
+    expect(mock.getFile(FILE_NAME)).not.toBe(oldText)
+    expect(mock.calls.storageSet).toContainEqual({ key: 'am_dataset_etag', value: 'W/"release-1"' })
+  })
+
+  it('ручная проверка идёт без If-None-Match, обычная без неё даже не спрашивает', async () => {
+    const mock = installMockBridge()
+    const release = makeRelease()
+    mock.setHttpResponse(INDEX_URL, {
+      text: JSON.stringify(release.index),
+      headers: { etag: 'W/"release-1"' },
+    })
+    mock.setHttpBytes(TITLES_URL, release.titlesBytes)
+    mock.setHttpBytes(MAP_URL, release.mapBytes)
+
+    const { updateDatasetNamesInBackground, resetDatasetNames } = await import(
+      '@/core/dataset-names'
+    )
+
+    // Первая проверка проходит целиком и оставляет отпечаток в хранилище.
+    await updateDatasetNamesInBackground()
+    expect(mock.calls.storageSet).toContainEqual({ key: 'am_dataset_etag', value: 'W/"release-1"' })
+
+    resetDatasetNames()
+    await new Promise((resolve) => setTimeout(resolve, 0))
+
+    // Час проверки только что проставлен: обычная проверка молчит, не спрашивая.
+    await updateDatasetNamesInBackground()
+    expect(mock.calls.http).toHaveLength(1)
+
+    resetDatasetNames()
+    await new Promise((resolve) => setTimeout(resolve, 0))
+
+    // Ручная идёт без отпечатка: иначе кнопка не помогла бы там, где он разошёлся
+    // с диском, — а это ровно случай после сбоя записи.
+    await updateDatasetNamesInBackground(true)
+    expect(mock.calls.http).toHaveLength(2)
+    expect(mock.calls.httpHeaders[1]).toBeUndefined()
+  })
 })

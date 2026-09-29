@@ -128,6 +128,38 @@ fn animori_cast_panel(app: AppHandle) -> Result<(), String> {
     }
 }
 
+/// Открывает консоль WebView2 отдельным окном. В установленном приложении F12 не работает:
+/// клавиша системная, и окно получает её через раз. Панель — единственное место, где видно
+/// то, что движок печатает мимо журнала: ошибки сети, предупреждения WebView2, вызовы console.
+///
+/// Только Windows: там панель и открывается. Команда одна на все платформы (разные подписи под
+/// cfg сломали бы generate_handler!), а на остальных она честно отказывает.
+#[tauri::command]
+fn animori_devtools(window: WebviewWindow) -> Result<(), String> {
+    #[cfg(windows)]
+    {
+        window
+            .with_webview(|webview| {
+                // Панель открывает ядро WebView2, а не контроллер: у контроллера в этой версии
+                // обёртки метода нет, и HRESULT молчит — без проверки кнопка выглядела бы рабочей,
+                // а на месте ничего не было бы.
+                let controller = webview.controller();
+                unsafe {
+                    if let Ok(core) = controller.CoreWebView2() {
+                        let _ = core.OpenDevToolsWindow();
+                    }
+                }
+            })
+            .map_err(|e| e.to_string())
+    }
+
+    #[cfg(not(windows))]
+    {
+        let _ = window;
+        Err("Консоль разработчика есть только в Windows".to_string())
+    }
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -157,6 +189,7 @@ pub fn run() {
             animori_toggle_fullscreen,
             animori_open_external,
             animori_cast_panel,
+            animori_devtools,
             auth::animori_auth_start,
             auth::animori_auth_submit,
             auth::animori_auth_status,
@@ -193,13 +226,15 @@ pub fn run() {
             proxy::apply_to_webview(app.handle());
 
             // Свое окно: WebviewUrl::default() — это index.html из frontendDist, то есть наша
-            // сборка dist/app.
+            // сборка dist/app. Панель разработчика включена явно: в установленном приложении F12
+            // не работает, а «Отладка» в настройках открывает именно её.
             WebviewWindowBuilder::new(app.handle(), "main", WebviewUrl::default())
                 .title("AniMori")
                 .inner_size(1280.0, 800.0)
                 .min_inner_size(1024.0, 600.0)
                 .resizable(true)
                 .center()
+                .devtools(true)
                 .build()?;
 
             // Проверка обновлений — последним шагом и только фоновой задачей: запрос

@@ -2,6 +2,7 @@
 // Разбор значений обязан совпадать с Rust (proxy.rs, anilist.rs) — там те же ключи.
 
 import { Bridge, type ProxyStatus } from '@/bridge'
+import { Logger } from '../utils/logger'
 
 import {
   DEFAULT_PROXY,
@@ -53,7 +54,7 @@ export async function saveProxyField<K extends keyof ProxyConfig>(
   try {
     await Bridge.storage.set(PROXY_KEYS[field], value)
   } catch (e) {
-    console.error('[AniMori] Не удалось сохранить настройку прокси ' + PROXY_KEYS[field], e)
+    Logger('ERROR', `Не удалось сохранить настройку прокси ${PROXY_KEYS[field]}`, e)
   }
 }
 

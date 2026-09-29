@@ -171,6 +171,14 @@ function blank() {
   }
 }
 
+/**
+ * Область «Моё» задаётся явно: почти все проверки ниже смотрят именно её, и молча
+ * опираться на значение по умолчанию значило бы ловить чужой сбой при его смене.
+ */
+function mine(view: ReturnType<Calendar['useHomeCalendar']>): void {
+  view.scope.value = 'mine'
+}
+
 beforeEach(async () => {
   vi.resetModules()
 
@@ -355,6 +363,7 @@ describe('состояние недели', () => {
     bridge.bridge.anilist.query = query
 
     const view = cal.useHomeCalendar()
+    mine(view)
     await view.load([])
 
     expect(query).not.toHaveBeenCalled()
@@ -379,6 +388,7 @@ describe('состояние недели', () => {
     }
 
     const view = cal.useHomeCalendar()
+    mine(view)
     await view.load([21, 22])
 
     const start = cal.weekStart(WEDNESDAY.getTime())
@@ -402,6 +412,7 @@ describe('состояние недели', () => {
     }
 
     const view = cal.useHomeCalendar()
+    mine(view)
     await view.load([21])
 
     expect(view.failed.value).toBe(true)
@@ -417,6 +428,7 @@ describe('состояние недели', () => {
     }
 
     const view = cal.useHomeCalendar()
+    mine(view)
     await view.load([21])
 
     expect(view.failed.value).toBe(true)
@@ -431,6 +443,7 @@ describe('состояние недели', () => {
     bridge.bridge.anilist.query = async () => schedule([])
 
     const view = cal.useHomeCalendar()
+    mine(view)
     await view.load([21])
 
     const friday = view.days.value[4]
@@ -452,6 +465,7 @@ describe('имя выхода', () => {
     bridge.bridge.anilist.query = async () => schedule([airing(21, 1179, secs(Date.now()), 'One Piece')])
 
     const view = cal.useHomeCalendar()
+    mine(view)
     await view.load([21])
 
     expect(view.shown.value?.rows[0]?.title).toBe('One Piece')
@@ -464,6 +478,7 @@ describe('имя выхода', () => {
     bridge.bridge.anilist.query = async () => schedule([airing(21, 1179, secs(Date.now()), 'One Piece')])
 
     const view = cal.useHomeCalendar()
+    mine(view)
     await view.load([21])
 
     expect(view.shown.value?.rows[0]?.title).toBe('Ван-Пис')
@@ -474,6 +489,7 @@ describe('имя выхода', () => {
       schedule([airing(21, 1179, secs(Date.now()))])
 
     const view = cal.useHomeCalendar()
+    mine(view)
     await view.load([21])
 
     expect(view.shown.value?.rows[0]?.title).toBe('Аниме #21')
@@ -498,6 +514,7 @@ describe('обложка выхода', () => {
     }
 
     const view = cal.useHomeCalendar()
+    mine(view)
     await view.load([21])
 
     // Расписание обложек не ждёт: полка встаёт сразу, а картинка приезжает
@@ -552,6 +569,7 @@ describe('метки доступности', () => {
     }
 
     const view = fresh.useHomeCalendar()
+    mine(view)
     await view.load([21])
 
     // Срок выхода берётся от текущего мгновения, поэтому выход всегда попадает
@@ -590,6 +608,7 @@ describe('метки доступности', () => {
     }
 
     const view = fresh.useHomeCalendar()
+    mine(view)
     await view.load([21])
 
     // Расписание спрошено, а за номерами дело не пошло: спрашивать не о ком.
@@ -602,8 +621,9 @@ describe('метки доступности', () => {
 // Запас по времени здесь не от медлительности: ограничитель AniList держит
 // две секунды между запросами, а первый в каждом случае уходит сразу.
 describe('область показа', () => {
-  it('начинает со своего', () => {
-    expect(cal.useHomeCalendar().scope.value).toBe('mine')
+  it('начинает с популярного', () => {
+    // Своего списка у только что установившего нет, и календарь открылся бы пустой сеткой.
+    expect(cal.useHomeCalendar().scope.value).toBe('popular')
   })
 
   it('в своём показе спрашивает расписание по переданным номерам', async () => {
@@ -614,6 +634,7 @@ describe('область показа', () => {
     }
 
     const view = cal.useHomeCalendar()
+    mine(view)
     await view.load([21, 22])
 
     expect(sent.ids).toEqual([21, 22])
@@ -643,6 +664,7 @@ describe('область показа', () => {
     }
 
     const view = cal.useHomeCalendar()
+    mine(view)
     await view.load([99])
     await view.setScope('popular', [99])
 
@@ -684,6 +706,7 @@ describe('область показа', () => {
     }
 
     const view = cal.useHomeCalendar()
+    mine(view)
     await view.load([21])
 
     const sunday = view.days.value[6]
@@ -707,6 +730,7 @@ describe('область показа', () => {
     }
 
     const view = cal.useHomeCalendar()
+    mine(view)
     await view.load([21])
     expect(view.shown.value?.rows).toHaveLength(1)
 
@@ -731,6 +755,7 @@ describe('область показа', () => {
     }
 
     const view = cal.useHomeCalendar()
+    mine(view)
     await view.load([21])
 
     const before = asked

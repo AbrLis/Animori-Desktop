@@ -66,7 +66,7 @@ export interface MineFact {
 }
 
 /** Виды правки, доступные с карточки. Удаление записи сюда пока не входит. */
-type CardEdit = 'status' | 'score' | 'progress' | 'repeat' | 'startedAt' | 'completedAt' | 'notes'
+type CardEdit = 'status' | 'score' | 'progress' | 'repeat' | 'startedAt' | 'completedAt' | 'notes' | 'remove'
 
 /** Уже открытая карточка целиком: возврат назад показывает её без вопросов. */
 interface Shown {
@@ -124,6 +124,7 @@ export interface MediaCardView {
   onPickStarted: (value: string) => void
   onPickCompleted: (value: string) => void
   onPickNotes: (value: string) => void
+  onPickRemove: () => void
 }
 
 function describe(e: unknown): string {
@@ -766,7 +767,7 @@ export function useMediaCard(mediaId: Ref<number>): MediaCardView {
   }
 
   /** Кладёт правку в память и обновляет показ: синхронно и без сети, снимок уйдёт на диск отложенно. */
-  function send(kind: CardEdit, value: string | number): void {
+  function send(kind: CardEdit, value: string | number | null): void {
     if (mediaId.value === 0) return
 
     try {
@@ -805,6 +806,15 @@ export function useMediaCard(mediaId: Ref<number>): MediaCardView {
 
   function onPickNotes(value: string): void {
     send('notes', value)
+  }
+
+  /**
+   * Убрать из списка прямо из окна правки: запись с параметрами исчезает, и карточка сразу читает
+   * тайтл как чужой («Не в списке»), а полки и статистика — как тайтла, которого у них больше нет.
+   * Местное удаление: на сервере AniList запись остаётся, как и при удалении всего списка.
+   */
+  function onPickRemove(): void {
+    send('remove', null)
   }
 
   return {
@@ -851,6 +861,7 @@ export function useMediaCard(mediaId: Ref<number>): MediaCardView {
     onPickRepeat,
     onPickStarted,
     onPickCompleted,
+    onPickRemove,
     onPickNotes,
   }
 }

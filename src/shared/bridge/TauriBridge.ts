@@ -14,6 +14,7 @@ import {
   proxyUrl,
   type ProxyConfig,
 } from '@/core/proxy'
+import { Logger } from '@/utils/logger'
 
 import {
   BridgeHttpError,
@@ -54,7 +55,7 @@ async function loadSnapshot(): Promise<Map<string, unknown> | null> {
       return snapshot
     } catch (e) {
       // Падать незачем: ниже есть путь через store.get() по одному ключу.
-      console.error('[AniMori] Не удалось прочитать файл настроек целиком', e)
+      Logger('ERROR', 'Файл настроек не прочитан целиком', e)
       return null
     } finally {
       snapshotLoading = null
@@ -133,7 +134,7 @@ const tauriFiles: IFiles = {
       const text = await invoke<string | null>('animori_file_read', { name })
       return text ?? null
     } catch (e) {
-      console.error('[AniMori] Не удалось прочитать файл приложения', name, e)
+      Logger('ERROR', `Файл приложения не прочитан: ${name}`, e)
       return null
     }
   },
@@ -143,7 +144,7 @@ const tauriFiles: IFiles = {
       await invoke('animori_file_write', { name, text })
       return true
     } catch (e) {
-      console.error('[AniMori] Не удалось записать файл приложения', name, e)
+      Logger('ERROR', `Файл приложения не записан: ${name}`, e)
       return false
     }
   },
@@ -207,7 +208,11 @@ function warnBadProxy(config: ProxyConfig): void {
   if (mark === warnedBadProxy) return
 
   warnedBadProxy = mark
-  console.warn('[AniMori] Прокси включён, но адрес или порт заданы неверно — запросы идут напрямую')
+  Logger('WARN', 'Прокси включён, но адрес или порт заданы неверно — запросы идут напрямую', {
+    kind: config.kind,
+    host: config.host,
+    port: config.port,
+  })
 }
 
 /**
@@ -260,7 +265,7 @@ async function readProxyOption(): Promise<TauriProxyOption> {
       },
     }
   } catch (e) {
-    console.error('[AniMori] Не удалось прочитать настройки прокси, запрос идёт напрямую', e)
+    Logger('ERROR', 'Настройки прокси не прочитаны, запрос идёт напрямую', e)
     return undefined
   }
 }
@@ -310,9 +315,9 @@ async function sendRequest(options: HttpRequestOptions): Promise<TauriResponse> 
     const name = e instanceof Error ? e.name : ''
     if (name === 'AbortError') throw new BridgeHttpError('abort', url)
 
-    // BridgeHttpError несёт только вид сбоя — «проверьте сеть»; в консоль идёт строка с ошибкой:
+    // BridgeHttpError несёт только вид сбоя — «проверьте сеть»; в журнал и консоль идёт строка с ошибкой:
     // адрес не в capabilities/default.json: «url not allowed on the configured scope».
-    console.error('[AniMori] Запрос не ушёл', url, e)
+    Logger('ERROR', `Запрос не ушёл: ${url}`, e)
 
     throw new BridgeHttpError('network', url)
   } finally {
@@ -393,7 +398,7 @@ const tauriShell: IShell = {
     // Ответа не будет: команда уводит процесс целиком, и обещание invoke не разрешится никогда —
     // отдаём управление сразу. Отказ не глотается: невыданное разрешение или нет команды.
     void invoke('animori_restart').catch((e) => {
-      console.error('[AniMori] Перезапуск не удался', e)
+      Logger('ERROR', 'Перезапуск не удался', e)
     })
 
     return Promise.resolve()
@@ -424,6 +429,11 @@ const tauriShell: IShell = {
     // Своя команда, а не animori_open_external: там разрешены только http и https, а панель
     // системы живёт по своей схеме. Ответа нет намеренно: какая панель открылась, знает Rust.
     await invoke('animori_cast_panel')
+  },
+
+  async devtools(): Promise<void> {
+    // Своя команда: панель открывает WebView2 изнутри, и никакой разрешённый адрес её не откроет.
+    await invoke('animori_devtools')
   },
 }
 

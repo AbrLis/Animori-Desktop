@@ -316,6 +316,24 @@ function onEditStatus(value: string): void {
   sendEdit('status', value)
 }
 
+/**
+ * Убрать тайтл из списка из окна правки: запись с её параметрами исчезает, и список с ней тоже.
+ * Удаление местное — на сервере AniList запись остаётся, как и при удалении всего списка.
+ */
+function onEditRemove(): void {
+  if (editId.value === 0) return
+
+  try {
+    editEntry(editId.value, 'remove', null)
+    editStamp.value += 1
+    redraw()
+  } catch (e) {
+    trouble.value = describe(e)
+  }
+
+  closeEdit()
+}
+
 function onEditScore(value: number): void {
   sendEdit('score', value)
 }
@@ -588,6 +606,7 @@ onBeforeUnmount(() => {
       :notes="editRow.notes"
       @close="closeEdit"
       @status="onEditStatus"
+      @remove="onEditRemove"
       @score="onEditScore"
       @progress="onEditProgress"
       @repeat="onEditRepeat"
