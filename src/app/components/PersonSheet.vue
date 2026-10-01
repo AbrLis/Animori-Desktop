@@ -670,8 +670,8 @@ onBeforeUnmount(() => {
 /* Цель нажатия 44px; круг и сакуру рисует вложенный слой, а кнопка остаётся прямоугольной —
    так держатся попадание курсора и кольцо фокуса. Оттенки цветка от --am-hover, тень мелкая (--am-sh-1). */
 .am-sheet__close {
-  --am-bloom-deep: var(--am-hover);
-  --am-bloom-petal: color-mix(in srgb, var(--am-sakura) 30%, var(--am-hover));
+  --am-bloom-deep: var(--am-bloom-base);
+  --am-bloom-petal: color-mix(in srgb, var(--am-sakura) 30%, var(--am-bloom-base));
   --am-bloom-shade: var(--am-sh-1);
 
   position: relative;

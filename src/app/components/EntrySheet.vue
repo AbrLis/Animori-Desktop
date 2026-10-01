@@ -5,8 +5,9 @@ import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 
 import { partsWord, statusList, statusWord } from '../labels'
 
-import DatePick from './DatePick.vue'
+import DateField from './DateField.vue'
 import SakuraBloom from './SakuraBloom.vue'
+import StarBloom from './StarBloom.vue'
 
 /** Шаг оценки. Десятибалльная шкала у AniList дробная, половины достаточно. */
 const SCORE_STEP = 0.5
@@ -54,7 +55,7 @@ const emit = defineEmits<{
 const statuses = statusList()
 const partsName = partsWord()
 
-// Черновик записи: наружу уходит по «Готово». Даты — строками, как отдаёт DatePick,
+// Черновик записи: наружу уходит по «Готово». Даты — строками, как отдаёт DateField,
 // где пустая строка — «даты нет», поэтому сравнение с входом идёт через ?? ''.
 const pickStatus = ref(props.status)
 const pickScore = ref(props.score10)
@@ -119,7 +120,6 @@ function markStyle(mark: number): Record<string, string> {
 
   return {
     '--am-mark': `hsl(${tone} 64% 46%)`,
-    '--am-mark-deep': `hsl(${tone} 68% 34%)`,
   }
 }
 
@@ -365,7 +365,8 @@ onBeforeUnmount(() => {
                 type="button"
                 @click="setScore(mark)"
               >
-                {{ mark }}
+                <StarBloom />
+                <span>{{ mark }}</span>
               </button>
             </div>
           </section>
@@ -384,7 +385,15 @@ onBeforeUnmount(() => {
                 @click="resetParts"
               >
                 <SakuraBloom />
-                <span aria-hidden="true">⇤</span>
+                <span aria-hidden="true">
+                  <!-- Свой знак вместо глифа: системный ⇤ живёт по раскладке, а здесь нужно то же,
+                       что в прочих иконках — упор слева и два шеврона влево одним штрихом. -->
+                  <svg class="am-step__jump" viewBox="0 0 20 20">
+                    <path d="M4 5.5v9" />
+                    <path d="M17 6l-4.5 4 4.5 4" />
+                    <path d="M12 6l-4.5 4 4.5 4" />
+                  </svg>
+                </span>
               </button>
               <button
                 v-tip="'Меньше'"
@@ -416,7 +425,14 @@ onBeforeUnmount(() => {
                 @click="fillParts"
               >
                 <SakuraBloom />
-                <span aria-hidden="true">⇥</span>
+                <span aria-hidden="true">
+                  <!-- Тот же знак, что «В начало», зеркальный: упор справа и два шеврона вправо. -->
+                  <svg class="am-step__jump" viewBox="0 0 20 20">
+                    <path d="M16 5.5v9" />
+                    <path d="M3 6l4.5 4L3 14" />
+                    <path d="M8 6l4.5 4L8 14" />
+                  </svg>
+                </span>
               </button>
             </div>
 
@@ -454,12 +470,12 @@ onBeforeUnmount(() => {
 
           <section class="am-field">
             <span class="am-field__name">Начато</span>
-            <DatePick :value="pickStarted" title="Начато" @pick="onStarted" />
+            <DateField :value="pickStarted" title="Начато" @pick="onStarted" />
           </section>
 
           <section class="am-field">
             <span class="am-field__name">Закончено</span>
-            <DatePick :value="pickCompleted" title="Закончено" @pick="onCompleted" />
+            <DateField :value="pickCompleted" title="Закончено" @pick="onCompleted" />
           </section>
 
           <section class="am-field am-field--wide">
@@ -586,8 +602,8 @@ onBeforeUnmount(() => {
 /* Цель нажатия 44px; круг и сакуру рисует вложенный слой, а кнопка остаётся
    прямоугольной ради цели и кольца фокуса. Оттенки цветка — от --am-hover. */
 .am-sheet__close {
-  --am-bloom-deep: var(--am-hover);
-  --am-bloom-petal: color-mix(in srgb, var(--am-sakura) 30%, var(--am-hover));
+  --am-bloom-deep: var(--am-bloom-base);
+  --am-bloom-petal: color-mix(in srgb, var(--am-sakura) 30%, var(--am-bloom-base));
   --am-bloom-shade: var(--am-sh-1);
 
   position: relative;
@@ -708,36 +724,58 @@ onBeforeUnmount(() => {
 }
 
 /* Балл красится своим тоном шкалы: правила ниже перебивают общую заливку.
-   Тон считается в скрипте, поэтому подпись живёт в своём --am-on-mark. */
+   Тон считается в скрипте, поэтому подпись живёт в своём --am-on-mark.
+   Свой контекст обязателен: слой цветка стоит position: absolute, и без него он мерялся
+   бы не кнопкой, а шторкой — звезда растянулась бы на всё окно. */
 .am-pick--num {
   --am-on-mark: #f7fbff;
+  /* Тон звезды щедрее, чем был: на пудле кнопку подсвечивал край, а мышью ряд из десяти
+     приглушённых пятен читался серой кашей. Сердцевина и лепестки — по яркости к баллу,
+     и вуаль слоя почти непрозрачная, иначе звезда гаснет вместе с цифрой. */
+  --am-bloom-deep: color-mix(in srgb, var(--am-mark) 58%, #0b1017);
+  --am-bloom-petal: color-mix(in srgb, var(--am-mark) 88%, #0b1017);
+  --am-bloom-shade: var(--am-sh-1);
+  --am-bloom-veil: 0.95;
 
-  min-width: 52px;
+  position: relative;
+  /* Квадратная, как шаги рядом: на прямоугольной кольцо выбранного балла выходило овалом,
+     и звезда с цифрой читались не по одной оси. Ширина прежняя (52) держала ряд из десяти
+     кнопок в одну строку на узком окне — здесь она не нужна, 44 на десять укладываются. */
+  width: var(--am-touch);
+  min-width: var(--am-touch);
+  height: var(--am-touch);
+  padding: 0;
   font-weight: 700;
   color: var(--am-on-mark);
-  background: linear-gradient(180deg, var(--am-mark), var(--am-mark-deep));
-  border-color: var(--am-line-soft);
-  border-radius: var(--am-r-m);
-  opacity: 0.58;
-  transition:
-    opacity var(--am-fast) var(--am-ease),
-    box-shadow var(--am-fast) var(--am-ease),
-    border-radius var(--am-mid) var(--am-ease);
+  /* Пилюли нет: подложкой кнопки служит звезда, а тон задаёт её светящаяся кромка. */
+  background: none;
+  border: 0;
+  border-radius: var(--am-r-cap);
+  /* Приглушение осталось, но мягкое: цифра должна читаться, а не тонуть в фоне панели. */
+  opacity: 0.82;
+  transition: opacity var(--am-fast) var(--am-ease);
+}
+
+/* Цифра поднята над слоем цветка: тот лежит absolute, а без собственного якоря знак встаёт
+   под заливку — ровно как у знаков над сакурой в шагах. */
+.am-pick--num > span {
+  position: relative;
 }
 
 .am-pick--num:hover {
-  color: var(--am-on-mark);
-  background: linear-gradient(180deg, var(--am-mark), var(--am-mark-deep));
-  border-radius: var(--am-r-drop);
-  opacity: 0.88;
+  opacity: 0.95;
 }
 
+/* Нажатая кнопка не гаснет: у цветочного слоя своя яркость, и приглушённая кнопка гасила бы её. */
+.am-pick--num:focus {
+  opacity: 1;
+}
+
+/* Выбранный балл: полная яркость и кольцо своего тона. Кольцо нужно и под наведением —
+   звезда у выбранной и просто нажатой одна, и без кольца они неразличимы. */
 .am-pick--num.am-pick--on {
   color: var(--am-on-mark);
-  background: linear-gradient(180deg, var(--am-mark), var(--am-mark-deep));
-  border-color: var(--am-edge);
-  border-radius: var(--am-r-drop);
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--am-mark) 45%, transparent);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--am-mark) 45%, transparent);
   opacity: 1;
 }
 
@@ -756,8 +794,8 @@ onBeforeUnmount(() => {
 /* Своя заливка шагу не нужна: круг и сакуру рисует вложенный слой.
    position — якорь: слой цветка absolute и без него уехал бы к краю окна. */
 .am-step {
-  --am-bloom-deep: var(--am-hover);
-  --am-bloom-petal: color-mix(in srgb, var(--am-sakura) 30%, var(--am-hover));
+  --am-bloom-deep: var(--am-bloom-base);
+  --am-bloom-petal: color-mix(in srgb, var(--am-sakura) 30%, var(--am-bloom-base));
   --am-bloom-shade: var(--am-sh-1);
 
   position: relative;
@@ -794,6 +832,19 @@ onBeforeUnmount(() => {
   font-weight: 700;
   text-align: center;
   font-variant-numeric: tabular-nums;
+}
+
+/* Знак прыжка нарисован, а не набран: системный глиф живёт по раскладке и толщиной
+   не совпадает ни с чем. Тот же штрих, что у прочих иконок, — 1.8 и скругления на концах. */
+.am-step__jump {
+  display: block;
+  width: 21px;
+  height: 21px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
 }
 
 /* Заметка не круглая: скругление полей ввода на большом поле смотрится нелепо. */

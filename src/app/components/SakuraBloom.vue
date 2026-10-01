@@ -9,6 +9,11 @@ import { SAKURA_PETAL as PETAL, SAKURA_TURNS as TURNS, sakuraTurn as petalTurn }
 
 <template>
   <svg class="am-bloom" viewBox="0 0 32 32" aria-hidden="true" focusable="false">
+    <!-- Кромка фокуса — тот же лепесток, развёрнутый на 7 % больше и подложенный под цветок;
+         почему именно так — в стилях ниже. -->
+    <g class="am-bloom__rim">
+      <path v-for="turn in TURNS" :key="turn" :d="PETAL" :transform="petalTurn(turn)" />
+    </g>
     <circle class="am-bloom__bud" cx="16" cy="16" r="14" />
     <g class="am-bloom__petals">
       <path v-for="turn in TURNS" :key="turn" :d="PETAL" :transform="petalTurn(turn)" />
@@ -64,6 +69,30 @@ import { SAKURA_PETAL as PETAL, SAKURA_TURNS as TURNS, sakuraTurn as petalTurn }
     fill var(--am-mid) var(--am-ease),
     opacity var(--am-mid) var(--am-ease),
     transform var(--am-mid) var(--am-ease);
+}
+
+/* Кромка фокуса: кольцо по коробке кнопки резало лепестки, поэтому кромка — путь лепестка,
+   развёрнутый на 7 % и подложенный под цветок. Заливка, а не обводка: та сошлась бы в центре. */
+.am-bloom__rim {
+  fill: var(--am-accent);
+  opacity: 0;
+  transform: rotate(-26deg) scale(0.6634);
+  transform-box: view-box;
+  transform-origin: 16px 16px;
+  transition:
+    opacity var(--am-mid) var(--am-ease),
+    transform var(--am-mid) var(--am-ease);
+}
+
+:where(button, a, [role='button']):focus-visible > .am-bloom .am-bloom__rim {
+  opacity: 1;
+  transform: scale(1.07);
+}
+
+/* Хозяину цветка рамка по коробке не нужна — её рисует сам цветок. Правило с :has(), а не по
+   классу: кнопок с цветком много, а класс знает только сам цветок. */
+:where(button, a, [role='button']):has(> .am-bloom):focus-visible {
+  outline: none;
 }
 
 /* Хозяин описан через :where, чтобы правило не перевешивало собственные

@@ -40,7 +40,7 @@ import {
 } from '../auth/session'
 import BrandMark from '../components/BrandMark.vue'
 import CloudBox from '../components/CloudBox.vue'
-import DatePick from '../components/DatePick.vue'
+import DateField from '../components/DateField.vue'
 import ProxyBox from '../components/ProxyBox.vue'
 import TileMark from '../components/TileMark.vue'
 import { pickTextFile } from '../load-file'
@@ -195,7 +195,7 @@ const adult = ref(settings.showAdult)
 /** Открыт ли вопрос о возрасте: взрослое включается ответом, а не нажатием — до него тумблер выключен. */
 const askingAge = ref(false)
 
-/** Дата рождения из календарика. Живёт только до ответа и никуда не пишется. */
+/** Дата рождения из поля ввода. Живёт только до ответа и никуда не пишется. */
 const birth = ref('')
 
 /** Слова отказа. Пустая строка — отказа нет. */
@@ -1144,13 +1144,15 @@ onBeforeUnmount(() => {
           <div v-if="askingAge" class="am-age">
             <p class="am-age__ask">Укажите ваш возраст</p>
 
-            <DatePick :value="birth" title="Дата рождения" @pick="onBirth" />
+            <div class="am-age__row">
+              <DateField :value="birth" title="Дата рождения" :tools="false" :wide="false" @pick="onBirth" />
+
+              <button class="am-btn am-btn--soft am-age__back" type="button" @click="closeAge">
+                Отмена
+              </button>
+            </div>
 
             <p v-if="ageError" class="am-error">{{ ageError }}</p>
-
-            <button class="am-btn am-btn--soft am-age__back" type="button" @click="closeAge">
-              Отмена
-            </button>
           </div>
         </div>
 

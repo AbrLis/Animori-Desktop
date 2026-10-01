@@ -1218,8 +1218,8 @@ onBeforeUnmount(stop)
 /* Кнопка остаётся прямоугольной и без своей одежды: круг и распускающуюся сакуру рисует вложенный
  * слой, а кнопке остаются попадание курсора по всей цели и кольцо фокуса. */
 .am-tune__hit {
-  --am-bloom-deep: var(--am-hover);
-  --am-bloom-petal: color-mix(in srgb, var(--am-sakura) 30%, var(--am-hover));
+  --am-bloom-deep: var(--am-bloom-base);
+  --am-bloom-petal: color-mix(in srgb, var(--am-sakura) 30%, var(--am-bloom-base));
   --am-bloom-shade: var(--am-sh-1);
   --am-bloom-out: 3px;
 
