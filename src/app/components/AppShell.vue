@@ -212,7 +212,7 @@ function onReload(): void {
   width: calc(var(--am-side-slim) - 14px);
   padding: 18px 12px 16px;
   overflow: hidden;
-  background: var(--am-glass);
+  background: var(--am-glass-rail);
   border: 1px solid var(--am-line-soft);
   border-radius: var(--am-r-xl);
   box-shadow:

@@ -14,7 +14,7 @@ interface AppearanceOption {
 }
 
 export const APPEARANCES: ReadonlyArray<AppearanceOption> = [
-  { name: 'dark', title: 'Тёмная', mark: '◐', hint: 'Тёмная: обычный вид приложения' },
+  { name: 'dark', title: 'Тёмная', mark: '◐', hint: 'Тёмная: серые панели на тёмном фоне' },
   { name: 'light', title: 'Светлая', mark: '☀', hint: 'Светлая: для дневного света' },
   { name: 'amoled', title: 'AMOLED', mark: '⬤', hint: 'AMOLED: чёрный фон, экономит заряд' },
 ]

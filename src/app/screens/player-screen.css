@@ -213,7 +213,7 @@
   align-items: center;
   justify-content: center;
   padding: 24px;
-  background: rgb(6 8 12 / 0.74);
+  background: color-mix(in srgb, var(--am-scrim) 74%, transparent);
   gap: 14px;
   inset: 0;
   text-align: center;
@@ -276,7 +276,7 @@
   padding: 10px 16px;
   border: 1px solid rgb(255 255 255 / 0.2);
   border-radius: var(--am-r-cap);
-  background: rgb(10 12 17 / 0.82);
+  background: color-mix(in srgb, var(--am-scrim) 82%, transparent);
   color: #fff;
   font: inherit;
   font-size: 13px;
@@ -287,7 +287,7 @@
 }
 
 .am-play__skip:hover {
-  background: rgb(18 22 30 / 0.92);
+  background: color-mix(in srgb, var(--am-scrim-up) 92%, transparent);
 }
 
 /*
@@ -304,7 +304,7 @@
   padding: 7px 7px 7px 14px;
   border: 1px solid rgb(255 255 255 / 0.2);
   border-radius: var(--am-r-cap);
-  background: rgb(10 12 17 / 0.82);
+  background: color-mix(in srgb, var(--am-scrim) 82%, transparent);
   color: #fff;
   font-size: 13px;
   animation: am-play-pop var(--am-fast) var(--am-ease) both;
@@ -434,7 +434,7 @@
   bottom: calc(100% + 2px);
   padding: 4px 8px;
   border-radius: var(--am-r-s);
-  background: rgb(8 10 14 / 0.94);
+  background: color-mix(in srgb, var(--am-scrim) 94%, transparent);
   color: #fff;
   font-size: 12px;
   font-variant-numeric: tabular-nums;
@@ -540,7 +540,7 @@
   z-index: 6;
   padding: 5px 9px;
   border-radius: var(--am-r-s);
-  background: rgb(8 10 14 / 0.94);
+  background: color-mix(in srgb, var(--am-scrim) 94%, transparent);
   color: #fff;
   content: attr(data-tip);
   font-size: 12px;
@@ -680,7 +680,7 @@
   overflow-y: auto;
   border: 1px solid rgb(255 255 255 / 0.12);
   border-radius: var(--am-r-m);
-  background: rgb(10 12 17 / 0.96);
+  background: color-mix(in srgb, var(--am-scrim) 96%, transparent);
   box-shadow: var(--am-sh-2);
   animation: am-play-pop var(--am-fast) var(--am-ease) both;
   list-style: none;
@@ -979,7 +979,7 @@
   overflow-y: auto;
   border: 1px solid rgb(255 255 255 / 0.1);
   border-radius: var(--am-r-xl);
-  background: rgb(8 10 14 / 0.88);
+  background: color-mix(in srgb, var(--am-scrim) 88%, transparent);
   box-shadow: var(--am-sh-2);
   animation: am-play-slide var(--am-mid) var(--am-ease) both;
   backdrop-filter: blur(var(--am-blur-strong)) saturate(1.2);
@@ -1019,7 +1019,7 @@
   margin: 0 0 8px;
   padding: 8px;
   border-radius: var(--am-r-s);
-  background: rgb(8 10 14 / 0.92);
+  background: color-mix(in srgb, var(--am-scrim) 92%, transparent);
   color: rgb(255 255 255 / 0.56);
 }
 

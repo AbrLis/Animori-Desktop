@@ -102,7 +102,7 @@ const DEFAULT_SETTINGS: AniMoriSettings = {
   enableLogger: true,
   accentPreset: 'site',
   accentCustom: '',
-  appearance: 'dark',
+  appearance: 'amoled',
   blockPlayerPopups: false,
   hideAds: false,
   showAdult: false,

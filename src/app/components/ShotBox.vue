@@ -511,8 +511,8 @@ watch(() => [props.mediaId, props.malId], load)
   place-items: center;
   width: 46px;
   height: 46px;
-  color: #0b1017;
-  background: rgb(245 179 200 / 0.92);
+  color: var(--am-on-sakura);
+  background: color-mix(in srgb, var(--am-sakura) 92%, transparent);
   border-radius: var(--am-r-blob);
   transform: translate(-50%, -50%);
   transition: transform var(--am-fast) var(--am-ease);
@@ -678,7 +678,7 @@ watch(() => [props.mediaId, props.malId], load)
   inset: 0;
   padding: 0;
   cursor: default;
-  background: rgb(4 6 10 / 0.9);
+  background: color-mix(in srgb, var(--am-scrim) 90%, transparent);
   border: 0;
 }
 
