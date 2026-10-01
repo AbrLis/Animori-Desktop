@@ -71,7 +71,7 @@ jobs:
           # Пол по числу названий в выпуске. Тот же, что у приёмки сборки:
           # если выпуск всё же вышел похудевшим, приёмка была обойдена руками.
           COUNT_FLOOR: '25000'
-          UA: 'AniMori/3.0.3 (+https://github.com/foulnike/Animori-Desktop)'
+          UA: 'AniMori/3.0.4 (+https://github.com/foulnike/Animori-Desktop)'
         run: |
           set -euo pipefail
 
