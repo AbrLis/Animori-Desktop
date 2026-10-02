@@ -3,7 +3,7 @@
 
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-import type { MockBridgeHandle } from './mocks/bridge-module'
+import type { MockBridgeHandle } from '@core-tests/bridge-module'
 
 type Keep = typeof import('../src/app/screens/player-keep')
 
@@ -32,7 +32,7 @@ function settle(): Promise<void> {
 beforeEach(async () => {
   vi.resetModules()
 
-  const mocks = await import('./mocks/bridge-module')
+  const mocks = await import('@core-tests/bridge-module')
   bridge = mocks.installMockBridge()
   keep = await import('../src/app/screens/player-keep')
 })

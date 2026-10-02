@@ -23,13 +23,13 @@ export default defineConfig({
       'hls.js': fileURLToPath(new URL('./node_modules/hls.js/dist/hls.light.mjs', import.meta.url)),
       // Пункт 3.4: реализация моста подставляется сборкой. Шов оставлен: вырезание
       // потребовало бы правки импортов. Ключ идёт до '@': совпадение по порядку.
-      '@bridge-impl': fileURLToPath(new URL('./src/shared/bridge/TauriBridge.ts', import.meta.url)),
+      '@bridge-impl': fileURLToPath(new URL('../../packages/core/src/bridge/TauriBridge.ts', import.meta.url)),
       // Пункт 1.3: имена модулей при переезде в shared не менялись, сменилось
       // только место. Порядок ключей обязателен: побеждает первое совпадение.
-      '@/api': fileURLToPath(new URL('./src/shared/api', import.meta.url)),
-      '@/bridge': fileURLToPath(new URL('./src/shared/bridge', import.meta.url)),
-      '@/core': fileURLToPath(new URL('./src/shared/core', import.meta.url)),
-      '@/utils': fileURLToPath(new URL('./src/shared/utils', import.meta.url)),
+      '@/api': fileURLToPath(new URL('../../packages/core/src/api', import.meta.url)),
+      '@/bridge': fileURLToPath(new URL('../../packages/core/src/bridge', import.meta.url)),
+      '@/core': fileURLToPath(new URL('../../packages/core/src/core', import.meta.url)),
+      '@/utils': fileURLToPath(new URL('../../packages/core/src/utils', import.meta.url)),
       '@': fileURLToPath(new URL('./src', import.meta.url)),
     },
   },
@@ -38,7 +38,7 @@ export default defineConfig({
     // код ядра, а впереди Android — там появится второе значение.
     __ANIMORI_PLATFORM__: JSON.stringify('app'),
     // Пункт 5.3.5: номер версии нужен рантайму для заголовка User-Agent
-    // нашего канала (src/shared/bridge/TauriBridge.ts) и для экранов приложения.
+    // нашего канала (packages/core/src/bridge/TauriBridge.ts) и для экранов приложения.
     __ANIMORI_VERSION__: JSON.stringify(version),
     // Этап 2: флаги сборки Vue. Без них рантаим сыплет предупреждения в консоль.
     // Options API нигде не используется — только Composition API, поэтому false.

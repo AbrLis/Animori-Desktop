@@ -1,22 +1,22 @@
 {
   // Пункт 1.5: сторож границы ядра (typecheck:shared). Кода надстройки нет: файл
-  // из src/shared, потянувшийся в src/app, не найдётся. Алиас ядра — в трёх файлах.
+  // из packages/core/src, потянувшийся в src/app, не найдётся. Алиас ядра — в трёх файлах.
   "extends": "./tsconfig.json",
   "compilerOptions": {
     "baseUrl": ".",
     // Список умышленно короче общего: нет общего @/* — именно он раньше позволял
     // ядру дотянуться до надстройки незаметно. Блокировщик убран вместе с гибридом.
     "paths": {
-      "@/api/*": ["src/shared/api/*"],
-      "@/bridge": ["src/shared/bridge/index"],
-      "@/bridge/*": ["src/shared/bridge/*"],
-      "@/core/*": ["src/shared/core/*"],
-      "@/utils/*": ["src/shared/utils/*"],
-      "@bridge-impl": ["src/shared/bridge/TauriBridge"]
+      "@/api/*": ["../../packages/core/src/api/*"],
+      "@/bridge": ["../../packages/core/src/bridge/index"],
+      "@/bridge/*": ["../../packages/core/src/bridge/*"],
+      "@/core/*": ["../../packages/core/src/core/*"],
+      "@/utils/*": ["../../packages/core/src/utils/*"],
+      "@bridge-impl": ["../../packages/core/src/bridge/TauriBridge"]
     }
   },
   // vite-env.d.ts нужен ради объявлений подставляемых сборкой значений:
   // это описание типов, а не код надстройки.
-  "include": ["src/shared/**/*.ts", "src/shared/**/*.d.ts", "src/vite-env.d.ts"],
+  "include": ["../../packages/core/src/**/*.ts", "../../packages/core/src/**/*.d.ts", "src/vite-env.d.ts"],
   "exclude": ["node_modules", "dist", "src-tauri", "src/app"]
 }

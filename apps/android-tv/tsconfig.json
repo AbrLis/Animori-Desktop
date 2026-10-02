@@ -31,15 +31,16 @@
     "paths": {
       // Пункт 1.3: те же соответствия, что в resolve.alias. Править надо сразу
       // в двух файлах: расхождение даёт сборку, которая идёт, а проверка типов падает.
-      "@/api/*": ["src/shared/api/*"],
-      "@/bridge": ["src/shared/bridge/index"],
-      "@/bridge/*": ["src/shared/bridge/*"],
-      "@/core/*": ["src/shared/core/*"],
-      "@/utils/*": ["src/shared/utils/*"],
+      "@/api/*": ["../../packages/core/src/api/*"],
+      "@/bridge": ["../../packages/core/src/bridge/index"],
+      "@/bridge/*": ["../../packages/core/src/bridge/*"],
+      "@/core/*": ["../../packages/core/src/core/*"],
+      "@/utils/*": ["../../packages/core/src/utils/*"],
+      "@core-tests/*": ["../../packages/core/tests/mocks/*"],
       "@/*": ["src/*"],
       // Этап 3.4: реальную цель '@bridge-impl' выбирает resolve.alias: целей
       // теперь одна, и тайпчекеру больше не нужно выбирать между ними.
-      "@bridge-impl": ["src/shared/bridge/TauriBridge"]
+      "@bridge-impl": ["../../packages/core/src/bridge/TauriBridge"]
     }
   },
   "include": ["src/**/*.ts", "src/**/*.d.ts", "src/**/*.vue", "tests/**/*.ts", "vite.config.ts"],

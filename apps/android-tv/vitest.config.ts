@@ -4,13 +4,20 @@ import { defineConfig } from 'vitest/config'
 export default defineConfig({
   resolve: {
     alias: {
-      '@/api': fileURLToPath(new URL('./src/shared/api', import.meta.url)),
-      '@/bridge': fileURLToPath(new URL('./src/shared/bridge', import.meta.url)),
-      '@/core': fileURLToPath(new URL('./src/shared/core', import.meta.url)),
-      '@/utils': fileURLToPath(new URL('./src/shared/utils', import.meta.url)),
+      '@/api': fileURLToPath(new URL('../../packages/core/src/api', import.meta.url)),
+      '@/bridge': fileURLToPath(new URL('../../packages/core/src/bridge', import.meta.url)),
+      '@/core': fileURLToPath(new URL('../../packages/core/src/core', import.meta.url)),
+      '@/utils': fileURLToPath(new URL('../../packages/core/src/utils', import.meta.url)),
       '@': fileURLToPath(new URL('./src', import.meta.url)),
-      '@bridge-impl': fileURLToPath(new URL('./tests/mocks/bridge.ts', import.meta.url)),
-      '@/bridge': fileURLToPath(new URL('./tests/mocks/bridge-module.ts', import.meta.url)),
+      // Заглушка моста живёт с ядром: одна на оба продукта. Экранные наборы достают её
+      // через этот псевдоним — своей копии у приложения нет и быть не должно.
+      '@core-tests': fileURLToPath(new URL('../../packages/core/tests/mocks', import.meta.url)),
+      '@bridge-impl': fileURLToPath(
+        new URL('../../packages/core/tests/mocks/bridge.ts', import.meta.url),
+      ),
+      '@/bridge': fileURLToPath(
+        new URL('../../packages/core/tests/mocks/bridge-module.ts', import.meta.url),
+      ),
     },
   },
   define: {
