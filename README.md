@@ -1,7 +1,6 @@
 <div align="center">
 
-<img src="apps/windows/assets/screenshots/home.png" width="49%" alt="Настольное приложение">
-<img src="apps/android-tv/screens/preview-recs.png" width="24%" alt="Приставка">
+<img src="apps/windows/src-tauri/icons/128x128@2x.png" width="128" alt="AniMori">
 
 # AniMori
 
