@@ -8,7 +8,7 @@
 
 [![Версия](https://img.shields.io/badge/%D0%B2%D0%B5%D1%80%D1%81%D0%B8%D1%8F-3.0.2-02A9FF?style=flat-square&labelColor=0B1622)](https://github.com/foulnike/Animori/releases/latest)
 [![Загрузка](https://img.shields.io/badge/APK-3.0.2-02A9FF?style=flat-square&labelColor=0B1622)](https://github.com/foulnike/Animori/releases/latest)
-[![Лицензия](https://img.shields.io/badge/%D0%BB%D0%B8%D1%86%D0%B5%D0%BD%D0%B7%D0%B8%D1%8F-MIT-02A9FF?style=flat-square&labelColor=0B1622)](LICENSE)
+[![Лицензия](https://img.shields.io/badge/%D0%BB%D0%B8%D1%86%D0%B5%D0%BD%D0%B7%D0%B8%D1%8F-MIT-02A9FF?style=flat-square&labelColor=0B1622)](../../LICENSE)
 
 ![TypeScript](https://img.shields.io/badge/TypeScript-3178C6?style=flat-square&logo=typescript&logoColor=white)
 ![Rust](https://img.shields.io/badge/Rust-CE422B?style=flat-square&logo=rust&logoColor=white)
@@ -137,7 +137,7 @@ npm run tauri -- android build -t armv7
 
 ## Лицензия
 
-[MIT](LICENSE) © foulnike. Лицензия покрывает код. Данные Shikimori и anime365
+[MIT](../../LICENSE) © foulnike. Лицензия покрывает код. Данные Shikimori и anime365
 ею не покрываются: показываются со ссылкой на источник, в репозитории не
 хранятся.
 

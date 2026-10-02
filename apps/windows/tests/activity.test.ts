@@ -1,4 +1,4 @@
-// Проверки календарика активности (`shared/core/activity` и `app/screens/home-activity`).
+// Проверки календарика активности (`packages/core/src/core/activity` и `app/screens/home-activity`).
 // Считать дни и тона — работа, которая ломается тихо: сетка либо врёт числами, либо молчит.
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'

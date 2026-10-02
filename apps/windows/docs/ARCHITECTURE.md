@@ -16,13 +16,9 @@
 ## Слои
 
 ```
-app/                       знает разметку
-        ↓
-shared/api/ → shared/bridge/
-        ↓          ↓
-      core/  ←─────┘
-        ↓
-      utils/
+apps/windows/src/app/      знает разметку
+        ↓  алиасами @/api, @/bridge, @/core, @/utils
+packages/core/src/          api, bridge, core, utils
 ```
 
 Правила зависимостей и инварианты — в `CONVENTIONS.md`.
@@ -354,7 +350,7 @@ tauri-action, режим установки `passive`, ключи подписи
 
 Акцент живёт дважды: `--am-accent` и `--am-accent-2` — готовые цвета, рядом
 `--am-accent-rgb` и `--am-accent-2-rgb` — триплеты для альфы.
-`amApplyAccentToDom()` из `shared/core/accent.ts` в слое приложения звать нельзя:
+`amApplyAccentToDom()` из `packages/core/src/core/accent.ts` в слое приложения звать нельзя:
 она подменяет цвет на триплет. Стекло не кладут на списковые строки — сотня
 `backdrop-filter` за кадр; полоса музыки исключение, у неё `--am-glass-deep`.
 `@media (prefers-reduced-motion: reduce)` гасит всё движение.

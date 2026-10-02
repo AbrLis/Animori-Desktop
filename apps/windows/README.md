@@ -7,7 +7,7 @@
 **Настольный клиент [AniList](https://anilist.co) для Windows со своим интерфейсом: списки, поиск, страницы тайтлов и студий, встроенный плеер. Всё на русском, без браузера и менеджера скриптов.**
 
 [![Версия](https://img.shields.io/badge/%D0%B2%D0%B5%D1%80%D1%81%D0%B8%D1%8F-3.0.4-02A9FF?style=flat-square&labelColor=0B1622)](https://github.com/foulnike/Animori/releases/latest)
-[![Лицензия](https://img.shields.io/badge/%D0%BB%D0%B8%D1%86%D0%B5%D0%BD%D0%B7%D0%B8%D1%8F-MIT-02A9FF?style=flat-square&labelColor=0B1622)](LICENSE)
+[![Лицензия](https://img.shields.io/badge/%D0%BB%D0%B8%D1%86%D0%B5%D0%BD%D0%B7%D0%B8%D1%8F-MIT-02A9FF?style=flat-square&labelColor=0B1622)](../../LICENSE)
 
 ![TypeScript](https://img.shields.io/badge/TypeScript-3178C6?style=flat-square&logo=typescript&logoColor=white)
 ![Rust](https://img.shields.io/badge/Rust-CE422B?style=flat-square&logo=rust&logoColor=white)
@@ -115,7 +115,7 @@ npm test               # тесты с заглушкой вместо мост�
 
 ## Выпуск
 
-Релиз запускается тегом вида `app-3.0.4`. Сборка на `windows-latest` сверяет номер версии в теге с `package.json`, компилирует Rust, собирает установщик, подписывает обновление и публикует рядом `latest.json`. Описание релиза берётся из верхнего раздела `CHANGELOG.md`.
+Релиз запускается тегом вида `windows-v3.0.4`. Сборка на `windows-latest` сверяет номер версии в теге с `package.json`, компилирует Rust, собирает установщик, подписывает обновление и публикует рядом `latest.json`. Описание релиза берётся из верхнего раздела `CHANGELOG.md`.
 
 ## Документация
 
@@ -145,7 +145,7 @@ npm test               # тесты с заглушкой вместо мост�
 
 ## Лицензия
 
-[MIT](LICENSE) © foulnike
+[MIT](../../LICENSE) © foulnike
 
 Лицензия распространяется только на код проекта. Данные сторонних сервисов под неё не подпадают: русские названия, описания и имена принадлежат Shikimori и anime365. Приложение показывает их со ссылкой на источник и не хранит в репозитории.
 
