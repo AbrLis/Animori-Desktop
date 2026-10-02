@@ -143,12 +143,16 @@ export function createMockBridge(options: { filesAvailable?: boolean } = {}): Mo
         writeText: vi.fn(),
       },
       shell: {
+        // Заглушка объявляет умения десктопа: проверки общего ядра не должны зависеть от
+        // того, на какой платформе их гоняют. Продукт без этих умений проверяет себя сам.
+        can: { browser: true, history: true, fullscreen: true, cast: true, devtools: true },
         reload: vi.fn(),
         restart: vi.fn(),
         openExternal: vi.fn(),
         back: vi.fn(),
         forward: vi.fn(),
         toggleFullscreen: vi.fn(),
+        castPanel: vi.fn(),
         devtools: vi.fn(),
       },
       proxyDiagnostics: {

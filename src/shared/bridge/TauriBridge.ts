@@ -390,6 +390,10 @@ const tauriClipboard: IClipboard = {
  * capabilities). Перезагрузка, внешние ссылки, полный экран и трансляция — только командами.
  */
 const tauriShell: IShell = {
+  // Окно на Windows: браузер есть, история и полный экран есть, трансляция и консоль —
+  // свои команды оболочки. Все пять умений настоящие.
+  can: { browser: true, history: true, fullscreen: true, cast: true, devtools: true },
+
   async reload(): Promise<void> {
     await invoke('animori_reload')
   },
