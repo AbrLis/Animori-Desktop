@@ -273,7 +273,7 @@ async function readProxyOption(): Promise<TauriProxyOption> {
 // ==== http ====
 
 /** Без своего представления reqwest подписывается собой: 403 у AnimeThemes, 5.3.5. */
-const DEFAULT_USER_AGENT = `AniMori/${__ANIMORI_VERSION__} (+https://github.com/foulnike/Animori-Desktop)`
+const DEFAULT_USER_AGENT = `AniMori/${__ANIMORI_VERSION__} (+https://github.com/foulnike/Animori)`
 
 /**
  * Общая часть обоих запросов: прокси, таймаут на весь запрос и разбор

@@ -8,7 +8,7 @@ import { githubLimiter } from './rate-limit'
 
 /** Что читаем: файл в репозитории GitHub, адрес разрешён в capabilities, отдаётся без входа. */
 const CHECK_URL =
-  'https://raw.githubusercontent.com/foulnike/Animori-Desktop/main/README.md'
+  'https://raw.githubusercontent.com/foulnike/Animori/main/README.md'
 
 /** Потолок ожидания: проверка идёт по кнопке, и ждать дольше нечего. */
 const CHECK_TIMEOUT_MS = 8000

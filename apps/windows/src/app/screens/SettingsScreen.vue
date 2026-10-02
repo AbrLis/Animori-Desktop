@@ -68,7 +68,7 @@ function onDatasetLink(): void {
 
 /** Адрес репозитория и просьба при нём. В «О программе», а не окном при запуске: окно на старте читается вымогательством.
  * Звезда значит «пригодилась», issue — «сломалось», и обе вещи делаются в одном месте. */
-const REPO_URL = 'https://github.com/foulnike/Animori-Desktop'
+const REPO_URL = 'https://github.com/foulnike/Animori'
 
 function onRepoLink(): void {
   void Bridge.shell.openExternal(REPO_URL)

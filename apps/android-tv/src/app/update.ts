@@ -8,7 +8,7 @@ import { Bridge } from '@/bridge'
 // Выпуски лежат в общем репозитории с настольным приложением: код и выпуски живут вместе.
 // Старые сборки приставки смотрят в Animori-TV и потому перестанут находить обновления —
 // их адрес вшит в APK и уже не меняется. Новые смотрят сюда.
-const RELEASES = 'https://api.github.com/repos/foulnike/Animori-Desktop/releases?per_page=30'
+const RELEASES = 'https://api.github.com/repos/foulnike/Animori/releases?per_page=30'
 
 /** Приставка тегируется своим именем продукта. Отрезать надо по нему же, а не числом:
  * длина префикса менялась уже один раз и тихо съела бы номер версии. */

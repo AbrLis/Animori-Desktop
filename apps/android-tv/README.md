@@ -31,7 +31,7 @@
 
 > [!NOTE]
 > У проекта три продукта. Этот репозиторий — приставка. Десктоп —
-> `foulnike/Animori-Desktop`, юзерскрипт — `foulnike/Animori-Script`.
+> `foulnike/Animori`, юзерскрипт — `foulnike/Animori-Script`.
 
 ## Как выглядит
 

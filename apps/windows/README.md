@@ -1,12 +1,12 @@
 <div align="center">
 
-<img src="https://raw.githubusercontent.com/foulnike/Animori-Desktop/main/src-tauri/icons/128x128@2x.png" width="128" alt="AniMori">
+<img src="https://raw.githubusercontent.com/foulnike/Animori/main/src-tauri/icons/128x128@2x.png" width="128" alt="AniMori">
 
 # AniMori — приложение для AniList
 
 **Настольный клиент [AniList](https://anilist.co) для Windows со своим интерфейсом: списки, поиск, страницы тайтлов и студий, встроенный плеер. Всё на русском, без браузера и менеджера скриптов.**
 
-[![Версия](https://img.shields.io/badge/%D0%B2%D0%B5%D1%80%D1%81%D0%B8%D1%8F-3.0.4-02A9FF?style=flat-square&labelColor=0B1622)](https://github.com/foulnike/Animori-Desktop/releases/latest)
+[![Версия](https://img.shields.io/badge/%D0%B2%D0%B5%D1%80%D1%81%D0%B8%D1%8F-3.0.4-02A9FF?style=flat-square&labelColor=0B1622)](https://github.com/foulnike/Animori/releases/latest)
 [![Лицензия](https://img.shields.io/badge/%D0%BB%D0%B8%D1%86%D0%B5%D0%BD%D0%B7%D0%B8%D1%8F-MIT-02A9FF?style=flat-square&labelColor=0B1622)](LICENSE)
 
 ![TypeScript](https://img.shields.io/badge/TypeScript-3178C6?style=flat-square&logo=typescript&logoColor=white)
@@ -29,15 +29,15 @@
 AniMori — неофициальный проект, он не связан с командой AniList.
 
 > [!NOTE]
-> **Что где лежит.** У проекта три продукта в трёх репозиториях:<br>
-> — **`Animori-Desktop`** (этот) — настольное приложение, теги вида `app-3.0.4`;<br>
-> — **`Animori-Script`** — юзерскрипт для Tampermonkey, теги вида `script-2.2.0`;<br>
-> — **`Animori-TV`** — приложение для Android TV, APK лежат в релизах.<br>
-> В этом репозитории одна ветка — `main`. Кроме приложения, в ней лежат замороженная копия словаря перевода (для уже установленных копий скрипта) и workflow, который следит за обновлениями датасета.
+> **Что где лежит.** Продукт один — [AniMori](https://github.com/foulnike/Animori), и всё
+> живёт в этом репозитории: общее ядро в `packages/core`, настольное приложение в
+> `apps/windows`, приставка в `apps/android-tv`. Ветка одна — `main`.<br>
+> Юзерскрипт и прежний репозиторий приставки убраны в архив: история и выпуски на месте,
+> кода в них больше нет.
 
 ## Состояние
 
-Текущая версия — 3.0.4. В разделе [Releases](https://github.com/foulnike/Animori-Desktop/releases) есть установщик, портативный архив и манифест обновлений.
+Текущая версия — 3.0.4. В разделе [Releases](https://github.com/foulnike/Animori/releases) есть установщик, портативный архив и манифест обновлений.
 
 Гибридная версия 2.0.2 больше не поддерживается и удалена из рабочих веток. Установленные копии обновились до 3.0 автоматически: идентификатор программы (`com.foulnike.animori`), ключ подписи и адрес манифеста обновлений не изменились. Поэтому тег `app-3.0.0` стал последним релизом, и встроенное обновление старой версии предложило его установить. Настройки и токен хранятся в том же профиле, и новая версия их подхватывает. Подробнее — в [`docs/REPO-LAYOUT.md`](docs/REPO-LAYOUT.md).
 

@@ -14,7 +14,7 @@
 | `CONVENTIONS.md` | правила кода и документации |
 
 Репозиторий — `foulnike/Animori-TV`, ветка `main`. Десктопная сборка
-(`foulnike/Animori-Desktop`) и юзерскрипт (`foulnike/Animori-Script`)
+(`foulnike/Animori`) и юзерскрипт (`foulnike/Animori-Script`)
 живут отдельно: общего кода и общих файлов с ними нет.
 
 Описание продукта и порядок установки — в `README.md` в корне репозитория.
