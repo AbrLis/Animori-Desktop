@@ -130,9 +130,10 @@ packages/core/src/          api, bridge, core, utils
 
 ### IndexedDB
 
-База `AniMoriSuperDB`, версия 7, пять сторов: `mediaCache` и `shikiCache` по
-строковому ключу, `malCache`, `franchiseCache` и `posterCache` по числовому.
-`shikiCache` — наследие шестой версии: карточки из него переехали в `mediaCache`.
+База `AniMoriSuperDB`, версия 7, четыре физических склада: `mediaCache` и
+`malCache` по своему ключу, `franchiseCache` и `posterCache` по числовому.
+`shikiCache` — прежнее имя `mediaCache`: переехал миграцией 6 и остался в коде
+только псевдонимом.
 
 | Префикс    | Что лежит                               |
 | ---------- | --------------------------------------- |
