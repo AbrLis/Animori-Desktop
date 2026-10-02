@@ -5,6 +5,10 @@ import { defineConfig } from 'vitest/config'
 // экранов — экран у каждого продукта свой, а проверять его над `@/app` своего продукта.
 // Заглушка моста лежит рядом с ядром: она проверяет контракт моста, а не экран.
 export default defineConfig({
+  // Корень — от расположения этого файла, а не от того, где запустили. Наборы ядра
+  // гоняются из каталога приложения ( vitest живёт там), и без явного корня он искал бы
+  // их в apps/*/tests, которых у ядра нет.
+  root: fileURLToPath(new URL('.', import.meta.url)),
   resolve: {
     alias: {
       '@/api': fileURLToPath(new URL('./packages/core/src/api', import.meta.url)),

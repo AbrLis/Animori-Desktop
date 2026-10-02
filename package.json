@@ -6,7 +6,7 @@
   "workspaces": ["apps/windows", "apps/android-tv"],
   "scripts": {
     "test": "npm run test:core && npm run test:windows && npm run test:android-tv",
-    "test:core": "vitest run --config vitest.core.config.ts",
+    "test:core": "npm --prefix apps/windows run test:core",
     "test:windows": "npm --prefix apps/windows test",
     "test:android-tv": "npm --prefix apps/android-tv test",
     "typecheck": "npm run typecheck:windows && npm run typecheck:android-tv",
@@ -14,10 +14,5 @@
     "typecheck:android-tv": "npm --prefix apps/android-tv run typecheck:all",
     "build:windows": "npm --prefix apps/windows run build:app",
     "build:android-tv": "npm --prefix apps/android-tv run build:app"
-  },
-  "devDependencies": {
-    "@types/node": "^26.1.2",
-    "happy-dom": "^20.12.0",
-    "vitest": "^4.1.11"
   }
 }
