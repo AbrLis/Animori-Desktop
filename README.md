@@ -1,85 +1,111 @@
 <div align="center">
 
-<img src="apps/windows/src-tauri/icons/128x128@2x.png" width="128" alt="AniMori">
+<img src="apps/windows/src-tauri/icons/128x128@2x.png" width="112" alt="AniMori">
 
 # AniMori
 
-**Клиент [AniList](https://anilist.co) со своим интерфейсом: настольное приложение
-и приложение для телевизора. Списки, поиск, страницы тайтлов, встроенный плеер.**
+### Смотрите аниме и ведите списки AniList на русском — на ПК и ТВ
+
+Неофициальный клиент AniList для Windows и Android TV. Программа сама обращается
+к API и подставляет русские названия и описания из Shikimori и anime365 —
+браузер и менеджер скриптов не нужны.
 
 [![Версия](https://img.shields.io/badge/версия-3.0.4-02A9FF?style=flat-square&labelColor=0B1622)](https://github.com/foulnike/Animori/releases)
+[![Сборка](https://github.com/foulnike/Animori/actions/workflows/ci.yml/badge.svg)](https://github.com/foulnike/Animori/actions/workflows/ci.yml)
 [![Лицензия](https://img.shields.io/badge/лицензия-MIT-02A9FF?style=flat-square&labelColor=0B1622)](LICENSE)
 [![Windows](https://img.shields.io/badge/Windows%2010%2F11-0078D4?style=flat-square&logo=windows&logoColor=white)](apps/windows)
-[![Android TV](https://img.shields.io/badge/Android%20TV-3DDC84?style=flat-square&logo=androidtv&logoColor=black)](apps/android-tv)
+[![Android TV](https://img.shields.io/badge/Android%20TV%207.0%2B-3DDC84?style=flat-square&logo=androidtv&logoColor=black)](apps/android-tv)
 
-[Настольное](#настольное-приложение) · [Телевизор](#приложение-для-телевизора) · [Возможности](#возможности) · [Сборка](#сборка) · [Устройство](#устройство-репозитория)
+**[Скачать для Windows](https://github.com/foulnike/Animori/releases/latest)** ·
+**[Скачать APK для Android TV](https://github.com/foulnike/Animori/releases)** ·
+[Сборка из исходников](#сборка)
 
 </div>
 
----
+<p align="center">
+  <img src="apps/windows/assets/screenshots/home.png" width="92%" alt="Главная: календарь выхода, продолжение просмотра, полки">
+</p>
 
-Приложение работает с AniList напрямую: само грузит данные, само рисует экраны,
-подставляет русские названия и описания из Shikimori и anime365. Рекламы, телеметрии
-и своих серверов нет: токен, настройки и кэш лежат на устройстве.
+## Почему это удобно
 
-Проект неофициальный и с командой AniList не связан.
+- **Список открывается без сети.** Правки хранятся на устройстве: AniList не
+  падает, страница не нужна. Статус, оценка, серии, пересмотры, даты и заметка
+  меняются прямо в шторке.
+- **Продолжение в один клик.** История помнит, где вы остановились.
+- **Русские названия подставляет сама программа.** AniList даёт карточку,
+  Shikimori и anime365 — русский тайтл и описание.
+- **Своего плеера внутри.** Серия, озвучка, качество, два источника.
+- **Ни рекламы, ни телеметрии, ни своих серверов.** Токен, настройки и кэш лежат
+  на вашей машине.
+- **Список никуда не отправляется.** Изменения не уходят ни в AniList, ни в
+  Шикимори.
 
 ## Настольное приложение
 
-Windows 10/11, мышь и клавиатура.
+**Windows 10/11**, мышь и клавиатура. Установщик, MSI или портативный архив без
+установки — в [выпусках](https://github.com/foulnike/Animori/releases/latest).
 
-<p align="center">
-  <img src="apps/windows/assets/screenshots/lists.jpg" width="32%" alt="Списки">
-  <img src="apps/windows/assets/screenshots/media.jpg" width="32%" alt="Тайтл">
-  <img src="apps/windows/assets/screenshots/stats.png" width="32%" alt="Статистика">
-</p>
+<table>
+  <tr>
+    <td width="50%"><img src="apps/windows/assets/screenshots/lists.jpg" alt="Моё: списки по статусам"><br><sub><b>Список.</b> Живёт на устройстве, открывается без сети.</sub></td>
+    <td width="50%"><img src="apps/windows/assets/screenshots/media.jpg" alt="Карточка тайтла"><br><sub><b>Тайтл.</b> Русское описание, кадры, трейлер, персонажи, опенинги.</sub></td>
+  </tr>
+  <tr>
+    <td width="50%"><img src="apps/windows/assets/screenshots/stats.png" alt="Статистика"><br><sub><b>Статистика.</b> Время просмотра, ваши оценки против оценок сообщества.</sub></td>
+    <td width="50%"><img src="apps/windows/assets/screenshots/settings.png" alt="Настройки"><br><sub><b>Настройки.</b> Темы, перенос списка, прокси, журнал отладки.</sub></td>
+  </tr>
+</table>
 
-[Установщик и портативный архив](https://github.com/foulnike/Animori/releases/latest) ·
-[подробности](apps/windows)
+Перенос списка из AniList, с Шикимори по нику или файлом выгрузки MyAnimeList.
+Спасти можно тем же XML, который принимают AniList, Шикимори и Kitsu, либо
+копией в облако. Смотрите в отдельном окне или транслируйте на телевизор.
+Подробности — в [apps/windows](apps/windows).
 
 ## Приложение для телевизора
 
-Android TV, Android 7.0 и выше, пульт.
+**Android TV, Android 7.0 и новее**, управление с пульта.
 
 <p align="center">
-  <img src="apps/android-tv/screens/preview-calendar.png" width="24%" alt="Календарь">
-  <img src="apps/android-tv/screens/preview-lists.png" width="24%" alt="Списки">
-  <img src="apps/android-tv/screens/preview-card.png" width="24%" alt="Карточка">
+  <img src="apps/android-tv/screens/preview-calendar.png" width="23%" alt="Календарь выхода серий">
+  <img src="apps/android-tv/screens/preview-recs.png" width="23%" alt="Полки рекомендаций">
+  <img src="apps/android-tv/screens/preview-lists.png" width="23%" alt="Мои списки">
+  <img src="apps/android-tv/screens/preview-card.png" width="23%" alt="Карточка тайтла">
 </p>
 
-APK лежат в [выпусках](https://github.com/foulnike/Animori/releases): `AniMori_<версия>_armv7.apk`
-для 32-разрядных приставок и `AniMori_<версия>_arm64.apk` для 64-разрядных.
-[Подробности](apps/android-tv)
+<p align="center"><sub>Календарь · Рекомендации · Списки · Карточка</sub></p>
 
-## Возможности
+APK в [выпусках](https://github.com/foulnike/Animori/releases):
+`AniMori_3.0.3_armv7.apk` для 32-разрядных приставок и `AniMori_3.0.3_arm64.apk`
+для 64-разрядных. Установка из неизвестных источников, ставится с пульта.
+Подробности — в [apps/android-tv](apps/android-tv).
 
-- **Плеер.** Выбор серии, озвучки и качества, два источника. История просмотра,
-  продолжение с места остановки.
-- **Список.** Живёт на устройстве, открывается без сети. Правка в шторке: статус,
-  оценка, серии, пересмотры, даты, заметка.
-- **Перенос списка.** Из AniList, с Шикимори по нику, файлом выгрузки MyAnimeList.
-- **Выгрузка.** XML, который принимают AniList, Шикимори и Kitsu; копия в облако.
-- **Тайтл.** Русское описание и названия, персонажи, студия, кадры, трейлер,
-  опенинги и эндинги.
-- **Статистика.** Время просмотра, свои оценки против оценок сообщества, кольца и
-  столбики по годам.
-- **Поиск.** По названиям, персонажам и авторам, на русском.
-- **Настройки.** Темы, акцент, источник русских названий, прокси, журнал отладки.
+## Чем приложения отличаются
+
+| | Windows | Android TV |
+| :--- | :--- | :--- |
+| Вход в AniList | есть | нет |
+| Статистика по коллекции | есть | нет |
+| Окно поверх других программ и трансляция на телевизор | есть | нет |
+| Выгрузка списка в XML | есть | есть |
+| Копия в облако | есть | есть |
+| Перенос с Шикимори по нику | есть | есть |
+
+Списки, снимок, датасет, плеер и русские названия у приложений общие: ядро одно.
 
 ## Сборка
 
-Нужен Node.js 20 или новее. Для Android дополнительно Android SDK и NDK.
+Нужен Node.js 20 или новее; для Android дополнительно Android SDK и NDK.
 
 ```bash
 npm ci
-npm test          # общее ядро и оба приложения
+npm test
 npm run typecheck
 ```
 
 Разработка — из каталога приложения:
 
 ```bash
-cd apps/windows && npm run tauri dev
+cd apps/windows   && npm run tauri dev
 cd apps/android-tv && npm run tauri -- android dev
 ```
 
@@ -97,4 +123,5 @@ cd apps/android-tv && npm run tauri -- android dev
 
 [MIT](LICENSE). Русские названия и описания приходят из [Shikimori](https://shikimori.one)
 и [anime365](https://anime365.ru); датасет собирается в
-[animori-data](https://github.com/foulnike/animori-data).
+[animori-data](https://github.com/foulnike/animori-data). Проект неофициальный и
+с командой AniList не связан.
