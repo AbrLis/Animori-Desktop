@@ -1,12 +1,13 @@
-# Сборка и выкладка релиза приложения. Запуск только по тегу. По пушу в ветку сборка не идёт: каждый
-# прогон — это полная компиляция Rust на windows-latest, а смысл она имеет только для выпуска.
+# Сборка и выкладка релиза приложения. Запуск только по тегу windows-v<версия>. По пушу в ветку
+# сборка не идёт: каждый прогон — это полная компиляция Rust на windows-latest, а смысл она имеет
+# только для выпуска.
 
 name: release
 
 on:
   push:
     tags:
-      - 'app-*'
+      - 'windows-v*'
 
 # Без этого токен прогона только читает, и создание релиза упадёт на 403.
 permissions:
@@ -28,14 +29,14 @@ jobs:
           cache: npm
 
       # Номер версии из имени тега и сверка с package.json. Номер берётся образцом, а не отрезанием
-      # приставки: тег app-3.0 или app-3.0.0-rc1 тихо дал бы странное имя портабл-архива вместо…
+      # приставки: тег windows-v3.0 тихо дал бы странное имя портабл-архива вместо…
       - name: Номер версии из тега
         id: ver
         shell: pwsh
         run: |
           $tag = '${{ github.ref_name }}'
-          if ($tag -notmatch '^app-(?<v>\d+\.\d+\.\d+)$') {
-            throw "Имя тега '$tag' не подходит под app-<версия>"
+          if ($tag -notmatch '^windows-v(?<v>\d+\.\d+\.\d+)$') {
+            throw "Имя тега '$tag' не подходит под windows-v<версия>"
           }
           $version = $Matches['v']
           $declared = (Get-Content package.json -Raw -Encoding utf8 | ConvertFrom-Json).version
@@ -96,8 +97,10 @@ jobs:
           tagName: ${{ github.ref_name }}
           releaseName: AniMori ${{ steps.ver.outputs.version }}
           releaseBody: ${{ steps.notes.outputs.body }}
-          # Черновик и предварительный релиз оба выключены осознанно: адрес
-          # releases/latest/download/...
+          # Черновик и предварительный релиз оба выключены: оба делают релиз невидимым для
+          # подписчиков, а подписчик на Releases их не получает. Адрес `releases/latest`
+          # больше не используется — канал обновлений Windows держит собственный релиз
+          # windows-latest, см. последний шаг.
           releaseDraft: false
           prerelease: false
           includeUpdaterJson: true
@@ -148,3 +151,42 @@ jobs:
           files: |
             artifacts/AniMori_Setup.exe
             artifacts/AniMori_*_x64-portable.zip
+# Канал обновлений Windows: отдельный релиз с постоянным именем, всегда указывающий на
+      # последнюю сборку. Зачем он нужен: апдейтер читает адрес по имени, а `releases/latest`
+      # после появления выпусков приставки в этом же репозитории уезжал бы на них — и Windows
+      # молча перестал бы находить обновление. Свой канал от такого не зависит.
+      - name: Канал обновлений windows-latest
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $channel = 'windows-latest'
+          $sha = '${{ github.sha }}'
+
+          # Прежний канал снимаем целиком вместе с тегом: оставить его — значит онить на
+          # странице Releases выпуск с чужим манифестом.
+          gh release delete $channel --yes --cleanup-tag 2>$null
+
+          gh release create $channel --target $sha `
+            --title 'AniMori: канал обновлений Windows' `
+            --notes 'Указатель на последний выпуск windows. Обновляется при каждом выпуске, вручную не править.'
+
+          # Манифест берём из вывода сборки того же прогона: он подписан тем же ключом, что и
+          # сам установщик, и подменять его своим нельзя.
+          $manifest = Get-ChildItem -Path src-tauri/target -Recurse -Filter latest.json |
+            Sort-Object LastWriteTime -Descending |
+            Select-Object -First 1
+          if (-not $manifest) { throw 'latest.json не найден после сборки — канал нечем наполнить' }
+
+          gh release upload $channel $manifest.FullName --clobber
+          Write-Host "Манифест канала взят из $($manifest.FullName)"
+
+          # Проверка тем адресом, который читает апдейтер: канал без этого шага может
+          # остаться пустым, и обновления перестанут приходить без единой ошибки в сборке.
+          $url = 'https://github.com/${{ github.repository }}/releases/download/' + $channel + '/latest.json'
+          try {
+            $check = Invoke-RestMethod -Uri $url -TimeoutSec 30
+            Write-Host "Канал отвечает, версия в манифесте: $($check.version)"
+          } catch {
+            throw "Канал $url не отдаёт манифест: $($_.Exception.Message)"
+          }
