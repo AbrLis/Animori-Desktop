@@ -39,11 +39,12 @@ jobs:
         run: npm run test:core
 
   # Настольное приложение: экранные наборы и граница ядра.
+  #
+  # Установка всегда из корня: замок один на репозиторий, и в каталоге приложения
+  # его нет — `npm ci` там падает. Рабочие области поднимают всё в корневой
+  # node_modules, откуда приложение и берёт зависимости.
   windows:
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: apps/windows
 
     steps:
       - name: Исходный код
@@ -59,17 +60,16 @@ jobs:
         run: npm ci
 
       - name: Проверка типов
+        working-directory: apps/windows
         run: npm run typecheck:all
 
       - name: Наборы экранов
+        working-directory: apps/windows
         run: npm test
 
   # Приставка: свой экран, тот же код ядра. Node 20 вне поддержки с апреля 2026.
   android-tv:
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: apps/android-tv
 
     steps:
       - name: Исходный код
@@ -85,7 +85,9 @@ jobs:
         run: npm ci
 
       - name: Проверка типов
+        working-directory: apps/android-tv
         run: npm run typecheck:all
 
       - name: Наборы экранов
+        working-directory: apps/android-tv
         run: npm test
