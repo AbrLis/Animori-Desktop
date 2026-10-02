@@ -2,39 +2,17 @@
   "name": "animori",
   "private": true,
   "version": "3.0.4",
-  "type": "module",
-  "description": "AniMori — Toolkit for AniList. Настольное приложение.",
-  "license": "MIT",
-  "author": "foulnike",
+  "description": "AniMori: общее ядро и два приложения — настольное и приставка",
+  "workspaces": ["apps/windows", "apps/android-tv"],
   "scripts": {
-    "dev:app": "vite",
-    "build:app": "npm run typecheck:all && vite build",
-    "preview": "vite preview",
-    "typecheck": "vue-tsc --noEmit",
-    "typecheck:shared": "vue-tsc --noEmit -p tsconfig.shared.json",
-    "typecheck:all": "npm run typecheck:shared && vue-tsc --noEmit",
-    "test": "vitest run",
-    "check:shared": "node scripts/check-shared.mjs",
-    "tauri": "tauri",
-    "tauri:dev": "tauri dev",
-    "tauri:build": "tauri build"
-  },
-  "dependencies": {
-    "@tauri-apps/api": "^2.11.1",
-    "@tauri-apps/plugin-clipboard-manager": "^2.3.2",
-    "@tauri-apps/plugin-http": "^2.5.9",
-    "@tauri-apps/plugin-store": "^2.4.4",
-    "hls.js": "^1.6.0",
-    "vue": "^3.5.13"
-  },
-  "devDependencies": {
-    "@tauri-apps/cli": "^2.11.4",
-    "@types/node": "^26.1.2",
-    "@vitejs/plugin-vue": "^5.2.1",
-    "happy-dom": "^20.12.0",
-    "typescript": "^5.6.2",
-    "vite": "^5.4.8",
-    "vitest": "^4.1.11",
-    "vue-tsc": "^2.1.10"
+    "test": "npm run test:core && npm run test:windows && npm run test:android-tv",
+    "test:core": "npm --prefix apps/windows run test:core",
+    "test:windows": "npm --prefix apps/windows test",
+    "test:android-tv": "npm --prefix apps/android-tv test",
+    "typecheck": "npm run typecheck:windows && npm run typecheck:android-tv",
+    "typecheck:windows": "npm --prefix apps/windows run typecheck:all",
+    "typecheck:android-tv": "npm --prefix apps/android-tv run typecheck:all",
+    "build:windows": "npm --prefix apps/windows run build:app",
+    "build:android-tv": "npm --prefix apps/android-tv run build:app"
   }
 }

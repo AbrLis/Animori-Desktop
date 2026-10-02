@@ -12,6 +12,9 @@ dist-tauri/
 # схемы и разрешения — в src-tauri/.gitignore: широкое «src-tauri/permissions/»
 # закрыло бы и будущие рукописные разрешения, а «src-tauri/gen/» — gen/android.
 src-tauri/target/
+apps/*/src-tauri/target/
+apps/*/src-tauri/gen/android/build/
+apps/*/src-tauri/gen/android/app/build/
 
 # Логи
 *.log

@@ -15,6 +15,12 @@ permissions:
 
 jobs:
   release:
+    # Код настольного приложения лежит в apps/windows, а конвейер — в корне: GitHub читает
+    # .github/workflows только оттуда. Каталог задаётся задачей, а не путями в командах.
+    defaults:
+      run:
+        working-directory: apps/windows
+
     # Только Windows: целей сборки две — nsis и msi.
     runs-on: windows-latest
 
@@ -82,7 +88,9 @@ jobs:
 
       # Нужны для beforeBuildCommand: сборку переднего края (npm run build:app) запускает сам
       # tauri-action перед компиляцией Rust.
+      # Установка из корня: замок один на репозиторий, в каталоге приложения его нет.
       - name: Зависимости npm
+        working-directory: .
         run: npm ci
 
       # Собирает приложение, создаёт релиз по тегу, подписывает установщик и сам генерирует
@@ -94,6 +102,9 @@ jobs:
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         with:
+          # Проект переехал в apps/windows: без этого tauri-action искал бы его в корне
+          # и не нашёл, то есть выпуск падал бы на самом первом шаге.
+          projectPath: apps/windows
           tagName: ${{ github.ref_name }}
           releaseName: AniMori ${{ steps.ver.outputs.version }}
           releaseBody: ${{ steps.notes.outputs.body }}
@@ -139,7 +150,9 @@ jobs:
           New-Item -ItemType Directory -Force -Path $stage | Out-Null
           Copy-Item $exe.FullName (Join-Path $stage 'AniMori.exe')
           Copy-Item README.md (Join-Path $stage 'README.md')
-          Copy-Item LICENSE (Join-Path $stage 'LICENSE')
+          # LICENSE один на репозиторий и лежит в его корне, а не рядом с приложением:
+          # им пользуются оба продукта.
+          Copy-Item ../../LICENSE (Join-Path $stage 'LICENSE')
           Compress-Archive -Path "$stage/*" -DestinationPath "artifacts/AniMori_${version}_x64-portable.zip" -Force
           Write-Host "Портабл собран из: $($exe.FullName)"
 
