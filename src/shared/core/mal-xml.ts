@@ -65,6 +65,8 @@ function titleOf(entry: SnapshotEntry): string {
   return entry.english ?? entry.romaji ?? `Anime #${entry.mediaId}`
 }
 
+// Зовёт только настольное приложение: на приставке выгрузки списка нет. Общее ядро такие
+// места не выбрасывает — см. cloud.ts, saveCopy.
 /**
  * Собирает выгрузку; порядок — по номеру MAL, чтобы две выгрузки совпадали байт в байт; series_episodes не пишем.
  */

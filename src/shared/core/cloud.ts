@@ -169,6 +169,9 @@ async function rememberSeen(token: string): Promise<void> {
   await saveSetting('cloudSeenModified', 'am_cloud_seen_modified', mark)
 }
 
+// Зовёт только настольное приложение: на приставке отправки копии нет, а ядро общее.
+// Такое место не выбрасывают: продукт, который функцию сейчас не зовёт, не вправе менять
+// общий код — этим он разводит копии и теряет перенос правок.
 /** Собирает список и кладёт копию в облако; force — затирать незнакомую копию после вопроса человеку. */
 export async function saveCopy(device: string, force = false): Promise<CloudSaveDone> {
   const token = pass()
