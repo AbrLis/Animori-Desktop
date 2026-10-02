@@ -300,21 +300,20 @@ Rust — через опцию клиента. `proxy.rs` сводит всё к
 
 Режим один: корень `src/app`, выход `dist/app`.
 
-- `@bridge-impl` → `shared/bridge/TauriBridge.ts`; `@/api`, `@/bridge`, `@/core`,
-  `@/utils`, `@` — соответствия каталогов, `@` последним. Те же соответствия в
-  `tsconfig.json` и `tsconfig.shared.json`.
+- `@bridge-impl` → `packages/core/src/bridge/TauriBridge.ts`; `@/api`, `@/bridge`,
+  `@/core`, `@/utils`, `@` — соответствия каталогов, `@` последним. Те же
+  соответствия в `tsconfig.json` и `tsconfig.shared.json`.
 - `__ANIMORI_PLATFORM__` = `'app'`, `__ANIMORI_VERSION__` — из `package.json`.
 - `minify: 'esbuild'`, `target: 'es2022'`, `emptyOutDir: true`.
-- `hls.js` переименован на `hls.light.mjs` в `vite.config.ts`: полная сборка
-  приносила в кусок просмотра лишние килобайты.
+- `hls.js` берётся лёгкой сборкой `hls.light.mjs`; путь ищет `require.resolve`.
 
 `beforeBuildCommand` и `beforeDevCommand` зовут `npm run build:app`,
 `frontendDist` смотрит на `dist/app`, а `build:app` начинается с `typecheck:all`.
 `npm test` гоняет vitest по `tests/**/*.test.ts`, мост подменяется
-(`@bridge-impl` → `tests/mocks/bridge.ts`), окружение — `happy-dom`.
+(`@bridge-impl` → `packages/core/tests/mocks/bridge.ts`), окружение — `happy-dom`.
 
 Номер версии один, в `package.json`; `tauri.conf.json` берёт его строкой
-`"version": "../package.json"`. Теги выпуска — `app-<версия>`.
+`"version": "../package.json"`. Теги выпуска — `windows-v<версия>`.
 
 ### Выпуск и обновление
 
@@ -463,24 +462,6 @@ PlayerScreen.vue         — путь между плеером и списко�
 | `@tauri-apps/cli`, `vite`, `@vitejs/plugin-vue`, `vue-tsc`, `typescript` | сборка и проверка типов     |
 | `vitest`, `happy-dom`, `@types/node`                             | проверки ядра                          |
 
-Библиотек меньше, чем можно ждать: значки нарисованы прямо в разметке (`<svg>` в
-восемнадцати файлах), адреса экранов разбирает свой хеш-роутер
-`app/router/index.ts` (`parseHash` и `buildHash`), gzip распаковывает встроенный
-`DecompressionStream`, память коллекции — обычная `Map` по номеру тайтла. Ни
-хранилища состояния, ни библиотеки значков, ни роутера из коробки.
-
 AniLiberty — отдельный сервис со своим API (`anilibria.top/api/v1`); номер AniList
-приводится к его релизу и лежит под `ALIB1_`. Датасет названий и список тайтлов —
-animori-data, они же источник номеров Шикимори (в датасете поле равно номеру
-MAL); русскими именами закрыто около 86 % записей, парами MAL и AniList — около
-двух третей. Живые числа лежат в `index.json` последнего выпуска, состав — в
-`DATA.md`. Свой адрес трансляции Aniliberty не хранится и каждый раз приходит из
-`video-sources.ts`.
+приводится к его релизу и лежит под `ALIB1_`. Состав датасета — `DATA.md`.
 
-## Остатки манги
-
-- Экрана манги нет и не запланирован. Язык интерфейса русский, названия глав и
-  номера глав не переводятся.
-- Всё, что в `api/`, кроме AniList, Shikimori, Anime365, Animethemes, Aniliberty
-  и Kodik, к манге не относится.
-- `data-hentai` — синоним `adult` во всём коде.
