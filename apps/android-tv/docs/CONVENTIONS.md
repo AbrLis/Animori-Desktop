@@ -2,16 +2,16 @@
 
 ## Слои
 
-Ядро (`src/shared/`) не знает о надстройке (`src/app/`) и об оболочке
+Ядро (`packages/core/src/`) не знает о надстройке (`src/app/`) и об оболочке
 (`src-tauri/`). Границу проверяет `npm run typecheck:shared`.
 
-Мост — одна точка входа: из кода вне `src/shared/bridge` импортируют только
+Мост — одна точка входа: из кода вне `packages/core/src/bridge` импортируют только
 `@/bridge`. Реализацию подставляет сборка псевдопутём `@bridge-impl`, который
 прописан в трёх файлах: `vite.config.ts`, `tsconfig.json`,
 `tsconfig.shared.json`. Пропустить один — получить расхождение между сборкой и
 проверкой типов.
 
-Файлы внутри `src/shared/bridge` импортирует только `TauriBridge.ts`.
+Файлы внутри `packages/core/src/bridge` импортирует только `TauriBridge.ts`.
 
 ## Комментарии
 

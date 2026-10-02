@@ -1,13 +1,13 @@
 <div align="center">
 
-<img src="https://raw.githubusercontent.com/foulnike/Animori-TV/main/src-tauri/icons/128x128@2x.png" width="128" alt="AniMori">
+<img src="https://raw.githubusercontent.com/foulnike/Animori/main/apps/android-tv/src-tauri/icons/128x128@2x.png" width="128" alt="AniMori">
 
 # AniMori — приложение для AniList на Android TV
 
 **Плеер, русские названия и списки AniList на приставке. Без рекламы, телеметрии и своих серверов.**
 
-[![Версия](https://img.shields.io/badge/%D0%B2%D0%B5%D1%80%D1%81%D0%B8%D1%8F-3.0.2-02A9FF?style=flat-square&labelColor=0B1622)](https://github.com/foulnike/Animori-TV/releases/latest)
-[![Загрузка](https://img.shields.io/badge/APK-3.0.2-02A9FF?style=flat-square&labelColor=0B1622)](https://github.com/foulnike/Animori-TV/releases/latest)
+[![Версия](https://img.shields.io/badge/%D0%B2%D0%B5%D1%80%D1%81%D0%B8%D1%8F-3.0.2-02A9FF?style=flat-square&labelColor=0B1622)](https://github.com/foulnike/Animori/releases/latest)
+[![Загрузка](https://img.shields.io/badge/APK-3.0.2-02A9FF?style=flat-square&labelColor=0B1622)](https://github.com/foulnike/Animori/releases/latest)
 [![Лицензия](https://img.shields.io/badge/%D0%BB%D0%B8%D1%86%D0%B5%D0%BD%D0%B7%D0%B8%D1%8F-MIT-02A9FF?style=flat-square&labelColor=0B1622)](LICENSE)
 
 ![TypeScript](https://img.shields.io/badge/TypeScript-3178C6?style=flat-square&logo=typescript&logoColor=white)
@@ -30,8 +30,8 @@
 > Рекламы, телеметрии и своих серверов нет. Токен, настройки и кэш лежат на устройстве.
 
 > [!NOTE]
-> У проекта три продукта. Этот репозиторий — приставка. Десктоп —
-> `foulnike/Animori`, юзерскрипт — `foulnike/Animori-Script`.
+> Приложение живёт в общем репозитории [`foulnike/Animori`](https://github.com/foulnike/Animori),
+> каталог `apps/android-tv`. Настольное — `apps/windows`, общее ядро — `packages/core`.
 
 ## Как выглядит
 
@@ -48,7 +48,7 @@
 
 ## Установка
 
-Файл — на [странице выпусков](https://github.com/foulnike/Animori-TV/releases/latest):
+Файл — на [странице выпусков](https://github.com/foulnike/Animori/releases/latest):
 `AniMori_3.0.2_armv7.apk` для 32-разрядных приставок, `AniMori_3.0.2_arm64.apk`
 для 64-разрядных. Разрядность — `adb shell getprop ro.product.cpu.abi`.
 

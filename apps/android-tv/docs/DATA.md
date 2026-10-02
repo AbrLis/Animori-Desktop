@@ -12,7 +12,7 @@
 | Яндекс Диск               | облачная копия списка                                        |
 | `animori-data`            | датасет русских названий и карта MAL ↔ AniList               |
 
-Клиенты — `src/shared/api/`, стратегия — `src/shared/core/`. Зависимости идут
+Клиенты — `packages/core/src/api/`, стратегия — `packages/core/src/core/`. Зависимости идут
 из `api` в `core`, не наоборот.
 
 ## Номера
