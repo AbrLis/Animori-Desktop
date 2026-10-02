@@ -3,6 +3,7 @@
 
 # Исходники проекта хранятся в LF.
 *.ts   text eol=lf
+*.mjs  text eol=lf
 *.vue  text eol=lf
 *.scss text eol=lf
 *.css  text eol=lf

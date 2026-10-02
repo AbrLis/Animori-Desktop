@@ -1,0 +1,58 @@
+# Проверки на каждый пуш. Ни Rust, ни сборщик пакетов здесь не трогаются: это
+# чтение файлов и vitest, поэтому запрет на полную сборку по пушу остаётся в
+# силе — полная сборка живёт в release.yml и ходит по тегу.
+#
+# Пока эти задачи не существовали, наборы vitest не гонял вообще никто: проверки
+# краснели и тихо ждали ручного прогона. Так в приставке и дожили до семнадцати
+# падений, которые заметили через две ревизии.
+
+name: ci
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+jobs:
+  # Сторож общего кода: ловит правку `src/shared/` или наборов, которая не
+  # доехала до соседнего продукта. Эталон лежит в репозитории — токен и сеть
+  # не нужны.
+  core:
+    runs-on: windows-latest
+
+    steps:
+      - name: Исходный код
+        uses: actions/checkout@v4
+
+      - name: Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      # Сторож, который всегда зелёный, хуже отсутствия: сначала убеждаемся,
+      # что он вообще ловит расхождение, и только потом верим его вердикту.
+      - name: Сторож проверяет сторожа
+        run: node scripts/check-shared.mjs --selftest
+
+      - name: Ядро и наборы не разошлись с эталоном
+        run: node scripts/check-shared.mjs
+
+  tests:
+    runs-on: windows-latest
+
+    steps:
+      - name: Исходный код
+        uses: actions/checkout@v4
+
+      - name: Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Зависимости
+        run: npm ci
+
+      - name: Наборы vitest
+        run: npm test
