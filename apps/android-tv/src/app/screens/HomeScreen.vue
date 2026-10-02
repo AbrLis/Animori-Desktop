@@ -28,7 +28,7 @@ import {
   type PlayAsk,
   type PlayState,
 } from '@/core/playable'
-import { feedMore, hideRec, motifShelf, newFeed, packShelf, tasteShelf } from '@/core/recs'
+import { feedMore, hideRec, newFeed, shelfFill, type ShelfName } from '@/core/recs'
 import type { SnapshotEntry } from '@/core/snapshot'
 import { Logger } from '@/utils/logger'
 
@@ -137,11 +137,11 @@ interface Shelf {
   rows: TileRow[]
 }
 
-/** Описание полки витрины: что грузить и как назвать. */
+/** Описание полки витрины: что показать и как назвать. Какой запрос уйдёт — решает ядро
+ * по ключу, поэтому своей функции загрузки у полки нет: их было пять на одно и то же. */
 interface ShelfDef {
-  key: string
+  key: ShelfName
   title: string
-  load: () => Promise<MediaBrief[]>
 }
 
 /** Условие отбора в строке под шапкой: нажатие снимает именно его. */
@@ -444,11 +444,11 @@ function shelfDefs(): ShelfDef[] {
   if (picked.value) return []
 
   return [
-    { key: 'taste', title: 'Под ваш вкус', load: () => tasteShelf() },
-    { key: 'motif', title: 'По мотивам вашего списка', load: () => motifShelf() },
-    { key: 'airing', title: 'Сейчас выходит', load: () => packShelf('airing') },
-    { key: 'trending', title: 'В тренде', load: () => packShelf('trending') },
-    { key: 'top', title: 'Лучшее за всё время', load: () => packShelf('top') },
+    { key: 'taste', title: 'Под ваш вкус' },
+    { key: 'motif', title: 'По мотивам вашего списка' },
+    { key: 'airing', title: 'Сейчас выходит' },
+    { key: 'trending', title: 'В тренде' },
+    { key: 'top', title: 'Лучшее за всё время' },
   ]
 }
 
@@ -651,8 +651,7 @@ function loadRecs(): void {
   recsPending.value = activeDefs.length > 0
 
   const tasks = activeDefs.map((def) =>
-    def
-      .load()
+    shelfFill(def.key, SHELF_SIZE)
       .then((items) => {
         if (mine !== recsRun || items.length === 0) return
         staged.set(def.key, items)

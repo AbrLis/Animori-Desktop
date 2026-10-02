@@ -16,7 +16,7 @@ import {
 import { datasetStatus, initDatasetNames } from '@/core/dataset-names'
 import { clearCache, getDbStats } from '@/core/db'
 import { adultByBirth } from '@/core/adult'
-import { forgetRecs } from '@/core/recs'
+import { clearHidden } from '@/core/recs'
 import { saveSetting, settings } from '@/core/settings'
 import { APPEARANCES, appearance, setAppearance } from '../appearance'
 import { checkUpdate, installUpdate, updateOffer } from '../update'
@@ -344,11 +344,11 @@ function onDropList(): void {
 
 /** Переключение показа взрослого: отбор читает ключ в момент вопроса, перезапуск не нужен.
  * Исключение — полки витрины: состав собран заранее, поэтому тумблер выбрасывает его
- * через forgetRecs. Включение спрашивает дату рождения: проверка формальная. */
+   * через clearHidden. Включение спрашивает дату рождения: проверка формальная. */
 function onAdult(): void {
   if (!adult.value) {
     void saveSetting('showAdult', 'set_adult', false)
-    forgetRecs()
+    void clearHidden()
     closeAge()
     return
   }
@@ -383,7 +383,7 @@ function onBirth(value: string): void {
   closeAge()
   adult.value = true
   void saveSetting('showAdult', 'set_adult', true)
-  forgetRecs()
+  void clearHidden()
 }
 
 /** Отказ от вопроса: тумблер остаётся выключенным, и это его настоящее состояние. */
