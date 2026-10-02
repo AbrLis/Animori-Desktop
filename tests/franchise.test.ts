@@ -163,8 +163,9 @@ function stagesOf(works: FranchiseWork[] | null, malId: number): FranchiseWork[]
   return (works ?? []).filter((work) => work.malId === malId)
 }
 
-/** Номера записей этих строк: по ним видно и состав, и порядок. */
-function idsOf(works: FranchiseWork[] | null, malId: number): number[] {
+/** Номера записей этих строк: по ним видно и состав, и порядок. У строки без номера
+ * AniList mediaId пуст, и молча выкидывать его отсюда нельзя — состав виден целиком. */
+function idsOf(works: FranchiseWork[] | null, malId: number): (number | null)[] {
   return stagesOf(works, malId).map((work) => work.mediaId)
 }
 

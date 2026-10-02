@@ -12,6 +12,17 @@ function built(text: string): QrCode {
   return done.value
 }
 
+/** Клетка сетки.
+ *
+ * `noUncheckedIndexedAccess` правдиво предупреждает, что индекс может уйти за сетку, а
+ * читать клетку двойным индексом вслепую нельзя: `undefined` прошёл бы как «светлая клетка» и
+ * проверка молча потеряла бы смысл. Отсутствие клетки здесь — ошибка фикстуры, а не факт
+ * о коде, поэтому сравнение строгое, а не приведение к типу.
+ */
+function darkAt(dark: readonly (readonly boolean[])[], row: number, col: number): boolean {
+  return dark[row]?.[col] === true
+}
+
 /** У верно собранных сведений о формате и версии он нулевой — это и есть независимая проверка
  * самого кодирования, а не повтор его логики. */
 function bchRest(code: number, gen: number, degree: number, width: number): number {
@@ -39,7 +50,7 @@ function formatBits(code: QrCode, second: boolean): number {
 
   let bits = 0
   spots.forEach(([row, col], i) => {
-    if (dark[row][col]) bits |= 1 << i
+    if (darkAt(dark, row, col)) bits |= 1 << i
   })
 
   return bits
@@ -51,7 +62,7 @@ function versionBits(code: QrCode): number {
   for (let i = 0; i < 18; i++) {
     const far = code.size - 11 + (i % 3)
     const near = Math.floor(i / 3)
-    if (code.dark[near][far]) bits |= 1 << i
+    if (darkAt(code.dark, near, far)) bits |= 1 << i
   }
 
   return bits
@@ -100,16 +111,16 @@ describe('свой QR', () => {
     // Искатель — не узор выравнивания: у него тёмное ядро 3×3 целиком, потом светлое кольцо, потом
     // внешнее тёмное и светлая кайма.
     for (const [row, col] of eyes) {
-      expect(dark[row][col]).toBe(true)
-      expect(dark[row - 1][col]).toBe(true)
-      expect(dark[row - 1][col - 1]).toBe(true)
+      expect(darkAt(dark, row, col)).toBe(true)
+      expect(darkAt(dark, row - 1, col)).toBe(true)
+      expect(darkAt(dark, row - 1, col - 1)).toBe(true)
 
-      expect(dark[row - 2][col]).toBe(false)
-      expect(dark[row + 2][col + 2]).toBe(false)
+      expect(darkAt(dark, row - 2, col)).toBe(false)
+      expect(darkAt(dark, row + 2, col + 2)).toBe(false)
 
-      expect(dark[row - 3][col]).toBe(true)
-      expect(dark[row][col - 3]).toBe(true)
-      expect(dark[row + 3][col + 3]).toBe(true)
+      expect(darkAt(dark, row - 3, col)).toBe(true)
+      expect(darkAt(dark, row, col - 3)).toBe(true)
+      expect(darkAt(dark, row + 3, col + 3)).toBe(true)
     }
   })
 
@@ -117,24 +128,24 @@ describe('свой QR', () => {
     const { size, dark } = built('a')
 
     for (let i = 8; i < size - 8; i++) {
-      expect(dark[6][i]).toBe(i % 2 === 0)
-      expect(dark[i][6]).toBe(i % 2 === 0)
+      expect(darkAt(dark, 6, i)).toBe(i % 2 === 0)
+      expect(darkAt(dark, i, 6)).toBe(i % 2 === 0)
     }
   })
 
   it('клетка над левым нижним искателем всегда тёмная', () => {
     const code = built('a')
 
-    expect(code.dark[code.size - 8][8]).toBe(true)
+    expect(darkAt(code.dark, code.size - 8, 8)).toBe(true)
   })
 
   it('узор выравнивания второй версии стоит один', () => {
     const { dark } = built('a'.repeat(15))
 
-    expect(dark[18][18]).toBe(true)
-    expect(dark[17][18]).toBe(false)
-    expect(dark[16][18]).toBe(true)
-    expect(dark[20][20]).toBe(true)
+    expect(darkAt(dark, 18, 18)).toBe(true)
+    expect(darkAt(dark, 17, 18)).toBe(false)
+    expect(darkAt(dark, 16, 18)).toBe(true)
+    expect(darkAt(dark, 20, 20)).toBe(true)
   })
 
   it('сведения о формате сходятся в двух копиях и проходят проверку', () => {

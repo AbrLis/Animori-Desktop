@@ -1,9 +1,12 @@
 import { beforeEach, describe, expect, it } from 'vitest'
 
+import type { MediaBrief } from '@/api/anilist-media'
+
 import { installMockBridge, resetMockBridge } from './mocks/bridge-module'
 
 const GRAPHQL_URL = 'https://graphql.anilist.co'
 
+/** Узел GraphQL, каким его отдаёт сервер. */
 function brief(id: number, malId = id) {
   return {
     id,
@@ -21,6 +24,33 @@ function brief(id: number, malId = id) {
   }
 }
 
+/** Выписка после разбора — форма, которую ждёт ядро. Узел GraphQL сюда не годится:
+ * `fetchStudioWorks` сверяет известные тайтлы по `mediaId` и `malId` и по остальным полям
+ * тоже, а лишние и недостающие просто молча разъезжаются. */
+function briefOf(id: number, malId: number | null = id): MediaBrief {
+  return {
+    mediaId: id,
+    malId,
+    type: 'ANIME',
+    format: 'TV',
+    status: 'FINISHED',
+    episodes: 12,
+    chapters: null,
+    duration: 24,
+    seasonYear: 2020,
+    averageScore: 70,
+    isAdult: false,
+    romaji: `Title ${id}`,
+    english: `Title ${id}`,
+    native: `原題 ${id}`,
+    cover: null,
+    color: '#123',
+    airingEpisode: null,
+    airingAt: null,
+    ownEntry: null,
+  }
+}
+
 function response(page: number, ids: number[], hasNext: boolean, total: number) {
   return {
     status: 200,
@@ -33,7 +63,7 @@ function response(page: number, ids: number[], hasNext: boolean, total: number) 
           id: 7,
           name: 'Studio',
           media: {
-            pageInfo: { hasNextPage: hasNext, total },
+            pageInfo: { currentPage: page, hasNextPage: hasNext, total },
             nodes: ids.map(brief),
           },
         },
@@ -82,7 +112,7 @@ describe('studio works', () => {
     mock.bridge.anilist.query = async () => response(2, [1], true, 500)
 
     const { fetchStudioWorks } = await import('@/api/anilist-media')
-    const page = await fetchStudioWorks(7, 2, [{ ...brief(1), mediaId: 1 }])
+    const page = await fetchStudioWorks(7, 2, [briefOf(1)])
     expect(page?.hasNext).toBe(false)
     expect(page?.known).toBe(1)
   })

@@ -21,6 +21,10 @@ function entry(mediaId: number, isAdult: boolean): SnapshotEntry {
     notes: null,
     updatedAt: 0,
     isAdult,
+    // Названия латиницей в отборе не участвуют, но поле обязательное: запись снимка
+    // обязана быть такой же формы, как настоящая, иначе проверка отсекает не то.
+    romaji: null,
+    english: null,
   }
 }
 

@@ -110,6 +110,25 @@ export function createMockBridge(options: { filesAvailable?: boolean } = {}): Mo
           return true
         },
       },
+      // Выгрузка файлом: окна выбора папки в проверках нет, поэтому оба вопроса отвечают null
+      // (отмена), а запись возвращает собранный путь — проверять, куда уехало, удобнее по нему.
+      exportFile: {
+        get available() {
+          return options.filesAvailable ?? true
+        },
+        async pickDir() {
+          return null
+        },
+        async write(dir, name) {
+          return `${dir}/${name}`
+        },
+        async pickTrackDir() {
+          return null
+        },
+        async writeTrack(dir, name) {
+          return `${dir}/${name}`
+        },
+      },
       http: {
         async request(request) {
           handle.calls.http.push({ url: request.url, method: request.method })

@@ -49,9 +49,6 @@
       "@bridge-impl": ["src/shared/bridge/TauriBridge"]
     }
   },
-  "include": ["src/**/*.ts", "src/**/*.d.ts", "src/**/*.vue", "vite.config.ts"],
-  // Наборы из проверки типов исключены намеренно: в них 25 ошибок, существовавших
-  // до этого, и `build:app` гоняет `typecheck:all` — включение сломало бы выпуск.
-  // Долг разобран отдельно, см. план: PWN-SHARED-6.
+  "include": ["src/**/*.ts", "src/**/*.d.ts", "src/**/*.vue", "tests/**/*.ts", "vite.config.ts"],
   "exclude": ["node_modules", "dist", "src-tauri"]
 }

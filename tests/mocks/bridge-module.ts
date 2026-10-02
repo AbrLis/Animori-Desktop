@@ -1,5 +1,10 @@
 import { createMockBridge, type MockBridgeHandle } from './bridge'
 
+/** Наборы берут отсюда и `Bridge`, и тип заглушки: разводить их по двум адресам незачем,
+ * а молчащий `undefined` вместо типа поймал бы только проверка типов — то есть после того,
+ * как набор уже признан зелёным. */
+export type { MockBridgeHandle } from './bridge'
+
 /** Подменяет весь модуль `@/bridge`, поэтому обязан повторять его вывеску: код, который берёт
  * отсюда не только `Bridge`, получит `undefined` и упадёт на первом же `instanceof`. */
 export { BridgeHttpError } from '../../src/shared/bridge/IBridge'

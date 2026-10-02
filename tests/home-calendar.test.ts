@@ -15,9 +15,6 @@ type Looks = typeof import('@/core/media-looks')
 
 const GRAPHQL_URL = 'https://graphql.anilist.co'
 
-/** Понедельник недели, вокруг которой идут проверки: 14 сентября 2026. */
-const MONDAY = new Date(2026, 8, 14)
-
 /** Среда той же недели — «сегодня» для большинства случаев. */
 const WEDNESDAY = new Date(2026, 8, 16, 15, 4)
 
@@ -42,7 +39,9 @@ function secs(stamp: number): number {
 
 /** Выход так, как его держит разбор: срок в секундах, название с сервера. */
 function airing(mediaId: number, episode: number, airingAt: number, romaji: string | null = null) {
-  return { mediaId, episode, airingAt, romaji, english: null }
+  // isAdult обязателен у AiringEntry: без метки календарь не знает, прятать ли выход.
+  // Пустой тут означает «не взрослый», и это состояние по умолчанию у большинства тайтлов.
+  return { mediaId, episode, airingAt, romaji, english: null, isAdult: false }
 }
 
 /**

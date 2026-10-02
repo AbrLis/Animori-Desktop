@@ -40,11 +40,12 @@ describe('счёт серий', () => {
   })
 
   it('ноль не подменяется итогом, а итог — нулём', () => {
-    // Вторая серия на подходе, первая вышла: ровно одна.
-    expect(partsAired({ episodes: 11, airingEpisode: 2 })).toBe(1)
+    // Вторая серия на подходе, первая вышла: ровно одна. partsAired итог не читает — он и не
+    // должен: вышедшие серии считаются по номеру на экране, а объявленный итог им не мешает.
+    expect(partsAired({ airingEpisode: 2 })).toBe(1)
 
     // Анонс без объявленного итога: знаменателя нет, вышедших ноль.
     expect(partsCeiling({ episodes: null, airingEpisode: 1 })).toBeNull()
-    expect(partsAired({ episodes: null, airingEpisode: 1 })).toBe(0)
+    expect(partsAired({ airingEpisode: 1 })).toBe(0)
   })
 })

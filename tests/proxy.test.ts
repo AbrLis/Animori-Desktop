@@ -165,15 +165,15 @@ describe('нужен ли перезапуск', () => {
   })
 
   it('настройка снята и движок без прокси — не нужен', () => {
-    expect(proxyRestartNeeded({ outcome: 'off', server: null }, config({ enabled: false }))).toBe(
-      false,
-    )
+    // Адрес при выключенном движке пустой строкой, а не null: так его отдаёт Rust,
+    // и `server` в мосте объявлен строкой именно поэтому.
+    expect(proxyRestartNeeded({ outcome: 'off', server: '' }, config({ enabled: false }))).toBe(false)
   })
 
   it('негодная настройка при пустом движке перезапуска не просит', () => {
     // Включённый тумблер с недонабранным адресом — обычное состояние на полпути:
     // приложение поднималось бы с негодной настройкой и просило перезапуск снова.
-    expect(proxyRestartNeeded({ outcome: 'off', server: null }, config({ host: '' }))).toBe(false)
+    expect(proxyRestartNeeded({ outcome: 'off', server: '' }, config({ host: '' }))).toBe(false)
   })
 
   it('негодная настройка при живом прокси перезапуск просит', () => {

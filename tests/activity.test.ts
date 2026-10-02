@@ -16,7 +16,7 @@ import {
   activityWeekdays,
   activityYearStep,
 } from '@/app/screens/home-activity'
-import { activityOf, activityYear, dayTitle, type ActivityDay, type ActivityEvent } from '@/core/activity'
+import { dayTitle, type ActivityDay, type ActivityEvent } from '@/core/activity'
 
 import type { MockBridgeHandle } from './mocks/bridge'
 
