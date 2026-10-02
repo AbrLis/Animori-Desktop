@@ -63,7 +63,7 @@ vi.mock('@/api/anilist-catalog', () => ({
   }),
 }))
 
-type Recs = typeof import('../src/shared/core/recs')
+type Recs = typeof import('../src/core/recs')
 type Mocks = typeof import('./mocks/bridge-module')
 
 let recs: Recs
@@ -81,7 +81,7 @@ beforeEach(async () => {
   for (const key of Object.keys(pages)) delete pages[key]
   asked.length = 0
 
-  recs = await import('../src/shared/core/recs')
+  recs = await import('../src/core/recs')
 })
 
 describe('полка витрины', () => {

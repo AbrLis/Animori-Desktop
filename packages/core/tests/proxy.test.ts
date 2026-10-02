@@ -13,12 +13,12 @@ import {
   proxyBypassList,
   proxyUrl,
   type ProxyConfig,
-} from '../src/shared/core/proxy'
+} from '../src/core/proxy'
 import {
   proxyRestartNeeded,
   readProxyConfig,
   saveProxyField,
-} from '../src/shared/core/proxy-settings'
+} from '../src/core/proxy-settings'
 
 /** Настройка со всеми полями на месте: тест меняет только то, что проверяет. */
 function config(over: Partial<ProxyConfig> = {}): ProxyConfig {

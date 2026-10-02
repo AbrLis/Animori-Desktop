@@ -18,7 +18,7 @@ import {
 } from '@/app/screens/home-activity'
 import { dayTitle, type ActivityDay, type ActivityEvent } from '@/core/activity'
 
-import type { MockBridgeHandle } from './mocks/bridge'
+import type { MockBridgeHandle } from '@core-tests/bridge'
 
 type Activity = typeof import('@/core/activity')
 
@@ -409,7 +409,7 @@ describe('календарик активности: журнал', () => {
 
     // Мост ставится в том же поколении реестра, что и проверяемый модуль: иначе `@/bridge`
     // внутри activity оказался бы другим экземпляром и писал бы мимо подмены.
-    const mocks = await import('./mocks/bridge-module')
+    const mocks = await import('@core-tests/bridge-module')
     mock = mocks.installMockBridge()
     act = await import('@/core/activity')
     await act.whenActivityReady()
@@ -523,7 +523,7 @@ describe('календарик активности: журнал', () => {
     vi.resetModules()
 
     // Свежее поколение реестра с тем же хранилищем: так выглядит обычный перезапуск приложения.
-    const fresh = await import('./mocks/bridge-module')
+    const fresh = await import('@core-tests/bridge-module')
     const handle = fresh.installMockBridge()
     await handle.bridge.storage.set('AM_ACTIVITY', [
       {

@@ -1,19 +1,19 @@
 import { fileURLToPath, URL } from 'node:url'
 import { defineConfig } from 'vitest/config'
 
+// Наборы общего ядра: одни на оба продукта. Копий больше нет, поэтому идут отдельно от
+// экранов — экран у каждого продукта свой, а проверять его над `@/app` своего продукта.
+// Заглушка моста лежит рядом с ядром: она проверяет контракт моста, а не экран.
 export default defineConfig({
   resolve: {
     alias: {
-      // Общее ядро лежит в packages/core. Алиасы те же по имени, что и были: правки в
-      // коде ядра и экранов от переезда не потребовались ни одной.
       '@/api': fileURLToPath(new URL('./packages/core/src/api', import.meta.url)),
+      // Ключ повторён намеренно, как и раньше: последнее совпадение побеждает, и `@/bridge`
+      // в проверках ведёт в заглушку, а не в настоящий мост.
       '@/bridge': fileURLToPath(new URL('./packages/core/src/bridge', import.meta.url)),
       '@/core': fileURLToPath(new URL('./packages/core/src/core', import.meta.url)),
       '@/utils': fileURLToPath(new URL('./packages/core/src/utils', import.meta.url)),
-      '@': fileURLToPath(new URL('./src', import.meta.url)),
-      // Заглушка моста живёт с ядром: она проверяет контракт, а не экран. Экранные наборы
-      // достают её через этот псевдоним — своей копии у них нет и быть не должно.
-      '@core-tests': fileURLToPath(new URL('./packages/core/tests/mocks', import.meta.url)),
+      '@': fileURLToPath(new URL('./packages/core/src', import.meta.url)),
       '@bridge-impl': fileURLToPath(new URL('./packages/core/tests/mocks/bridge.ts', import.meta.url)),
       '@/bridge': fileURLToPath(new URL('./packages/core/tests/mocks/bridge-module.ts', import.meta.url)),
     },
@@ -24,6 +24,6 @@ export default defineConfig({
   },
   test: {
     environment: 'happy-dom',
-    include: ['tests/**/*.test.ts'],
+    include: ['packages/core/tests/**/*.test.ts'],
   },
 })

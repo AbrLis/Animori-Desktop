@@ -9,9 +9,9 @@ import {
   malScore,
   malStatus,
   parseMalXml,
-} from '../src/shared/core/mal-xml'
+} from '../src/core/mal-xml'
 
-import type { SnapshotEntry } from '../src/shared/core/snapshot'
+import type { SnapshotEntry } from '../src/core/snapshot'
 
 /** Запись со всеми полями на месте: тест меняет только то, что проверяет. */
 function entry(over: Partial<SnapshotEntry> = {}): SnapshotEntry {

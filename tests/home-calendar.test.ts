@@ -6,9 +6,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { MediaBrief } from '@/api/anilist-media'
 import type { PlayAsk } from '@/core/playable'
 
-import { type MockBridgeHandle } from './mocks/bridge'
+import { type MockBridgeHandle } from '@core-tests/bridge'
 
-type Mocks = typeof import('./mocks/bridge-module')
+type Mocks = typeof import('@core-tests/bridge-module')
 type Calendar = typeof import('../src/app/screens/home-calendar')
 type Titles = typeof import('@/core/media-title')
 type Looks = typeof import('@/core/media-looks')
@@ -183,7 +183,7 @@ beforeEach(async () => {
 
   // Мост ставится в том же поколении реестра, что и проверяемый модуль:
   // иначе `@/bridge` внутри него окажется другим экземпляром.
-  mocks = await import('./mocks/bridge-module')
+  mocks = await import('@core-tests/bridge-module')
   bridge = mocks.installMockBridge()
   cal = await import('../src/app/screens/home-calendar')
   titles = await import('@/core/media-title')
@@ -546,7 +546,7 @@ describe('метки доступности', () => {
     })
 
     vi.resetModules()
-    mocks = await import('./mocks/bridge-module')
+    mocks = await import('@core-tests/bridge-module')
     bridge = mocks.installMockBridge()
 
     return { cal: await import('../src/app/screens/home-calendar'), asked }

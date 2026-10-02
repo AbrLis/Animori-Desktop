@@ -7,7 +7,7 @@ export type { MockBridgeHandle } from './bridge'
 
 /** Подменяет весь модуль `@/bridge`, поэтому обязан повторять его вывеску: код, который берёт
  * отсюда не только `Bridge`, получит `undefined` и упадёт на первом же `instanceof`. */
-export { BridgeHttpError } from '../../src/shared/bridge/IBridge'
+export { BridgeHttpError } from '../../src/bridge/IBridge'
 
 export let currentMock: MockBridgeHandle | null = null
 

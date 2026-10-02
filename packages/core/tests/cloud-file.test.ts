@@ -9,9 +9,9 @@ import {
   CLOUD_FORMAT,
   buildCloudFile,
   parseCloudFile,
-} from '../src/shared/core/cloud-file'
+} from '../src/core/cloud-file'
 
-import type { SnapshotEntry } from '../src/shared/core/snapshot'
+import type { SnapshotEntry } from '../src/core/snapshot'
 
 /** Версия формы записей в проверках: тот же SNAPSHOT_VERSION, только прямо. */
 const LIST = 6

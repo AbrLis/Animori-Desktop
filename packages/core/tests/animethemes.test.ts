@@ -5,7 +5,7 @@ import { beforeEach, describe, expect, it } from 'vitest'
 
 import { installMockBridge, type MockBridgeHandle } from './mocks/bridge-module'
 
-import { fetchMalThemes } from '../src/shared/api/animethemes'
+import { fetchMalThemes } from '../src/api/animethemes'
 
 /** Адрес обязан совпадать с тем, что в модуле: заглушка ищет ответ по строке. */
 const API_URL = 'https://graphql.animethemes.moe/'

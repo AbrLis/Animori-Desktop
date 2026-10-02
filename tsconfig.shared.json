@@ -2,7 +2,7 @@
   // Пункт 1.5: сторож границы ядра. Запускается как typecheck:shared.
   //
   // Смысл один: в этой проверке кода надстройки не существует вообще.
-  // Если файл из src/shared потянется в src/app — хоть алиасом, хоть
+  // Если файл из packages/core/src потянется в src/app — хоть алиасом, хоть
   // относительным путём — модуль не найдётся и проверка упадёт.
   // Общая проверка (typecheck) такую стрелку пропускает: там видно всё дерево.
   //
@@ -15,23 +15,23 @@
   "extends": "./tsconfig.json",
   "compilerOptions": {
     "baseUrl": ".",
-    // Список умышленно короче общего: только алиасы, ведущие в src/shared.
+    // Список умышленно короче общего: только алиасы, ведущие в packages/core/src.
     // Нет общего @/* — именно он раньше позволял ядру дотянуться
     // до надстройки незаметно.
     //
     // Две строки блокировщика убраны вместе с самим блокировщиком: он жил
     // в ядре ради гибридного окна с чужим сайтом.
     "paths": {
-      "@/api/*": ["src/shared/api/*"],
-      "@/bridge": ["src/shared/bridge/index"],
-      "@/bridge/*": ["src/shared/bridge/*"],
-      "@/core/*": ["src/shared/core/*"],
-      "@/utils/*": ["src/shared/utils/*"],
-      "@bridge-impl": ["src/shared/bridge/TauriBridge"]
+      "@/api/*": ["packages/core/src/api/*"],
+      "@/bridge": ["packages/core/src/bridge/index"],
+      "@/bridge/*": ["packages/core/src/bridge/*"],
+      "@/core/*": ["packages/core/src/core/*"],
+      "@/utils/*": ["packages/core/src/utils/*"],
+      "@bridge-impl": ["packages/core/src/bridge/TauriBridge"]
     }
   },
   // vite-env.d.ts нужен ради объявлений подставляемых сборкой значений:
   // это описание типов, а не код надстройки.
-  "include": ["src/shared/**/*.ts", "src/shared/**/*.d.ts", "src/vite-env.d.ts"],
+  "include": ["packages/core/src/**/*.ts", "packages/core/src/**/*.d.ts", "src/vite-env.d.ts"],
   "exclude": ["node_modules", "dist", "src-tauri", "src/app"]
 }

@@ -4,9 +4,9 @@
 
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-import { type MockBridgeHandle } from './mocks/bridge'
+import { type MockBridgeHandle } from '@core-tests/bridge'
 
-type Mocks = typeof import('./mocks/bridge-module')
+type Mocks = typeof import('@core-tests/bridge-module')
 type Splash = typeof import('../src/app/splash')
 
 /** Ключ круга: проверки смотрят в тот же ключ, что и модуль. */
@@ -27,7 +27,7 @@ function stored(rest: Array<number | string>, last: unknown): void {
 async function launch(): Promise<void> {
   vi.resetModules()
 
-  const mocks: Mocks = await import('./mocks/bridge-module')
+  const mocks: Mocks = await import('@core-tests/bridge-module')
   mocks.resetMockBridge()
   bridge = mocks.installMockBridge()
   for (const [key, value] of disk) await bridge.bridge.storage.set(key, value)

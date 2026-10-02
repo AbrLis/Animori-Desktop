@@ -1,5 +1,5 @@
 import { vi } from 'vitest'
-import type { IBridge } from '../../src/shared/bridge/IBridge'
+import type { IBridge } from '../../src/bridge/IBridge'
 
 export interface MockBridgeHandle {
   bridge: IBridge
