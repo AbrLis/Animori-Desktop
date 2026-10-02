@@ -37,17 +37,17 @@
       // чужого SPA, словарь и его загрузчик, фичи надстройки, блокировщик рекламы.
       // Проверка типов теперь сама найдёт любой оставшийся импорт в те места:
       // имя перестало разрешаться — именно это и нужно перед вычисткой файлов.
-      "@/api/*": ["packages/core/src/api/*"],
-      "@/bridge": ["packages/core/src/bridge/index"],
-      "@/bridge/*": ["packages/core/src/bridge/*"],
-      "@/core/*": ["packages/core/src/core/*"],
-      "@/utils/*": ["packages/core/src/utils/*"],
-      "@core-tests/*": ["packages/core/tests/mocks/*"],
+      "@/api/*": ["../../packages/core/src/api/*"],
+      "@/bridge": ["../../packages/core/src/bridge/index"],
+      "@/bridge/*": ["../../packages/core/src/bridge/*"],
+      "@/core/*": ["../../packages/core/src/core/*"],
+      "@/utils/*": ["../../packages/core/src/utils/*"],
+      "@core-tests/*": ["../../packages/core/tests/mocks/*"],
       "@/*": ["src/*"],
       // Этап 3.4: реальную цель '@bridge-impl' выбирает resolve.alias в vite.config.ts.
       // Прежде там было две реализации на три режима, и тайпчекеру приходилось
       // давать одну из них по выбору; теперь цель одна и совпадает со сборкой.
-      "@bridge-impl": ["packages/core/src/bridge/TauriBridge"]
+      "@bridge-impl": ["../../packages/core/src/bridge/TauriBridge"]
     }
   },
   "include": ["src/**/*.ts", "src/**/*.d.ts", "src/**/*.vue", "tests/**/*.ts", "vite.config.ts"],

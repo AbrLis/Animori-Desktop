@@ -1,9 +1,14 @@
 // Проверки россыпи на плашке приветствия (`app/screens/home-spray`): число цветков обязано расти
 // вместе со свободным местом, цветок не обязан залезать на строку или на розетку.
 
-import { describe, expect, it } from 'vitest'
+import { beforeEach, describe, expect, it } from 'vitest'
 
-import { sprayGrains, type KeepOut } from '@/app/screens/home-spray'
+import { setSpraySalt, sprayGrains, type KeepOut } from '@/app/screens/home-spray'
+
+/** Соль рисунка. Россыпь по замыслу новая при каждом запуске, поэтому без соли проверки
+ *  меряют случайность: рано или поздно сравнение даст ничью и покрасит конвейер. Соль одна
+ *  на все проверки — тогда каждая мерает ровно то, о чём говорит. Число длинной строки выходит всегда одно,`n  * а короткой гуляет на две-три штуки: без закреплённой соли сравнение рано или поздно`n  * даст ничью и покрасит конвейер. */
+const SALT = 42
 
 /** Плашка широкого окна: 1760 × 210. */
 const WIDE_W = 1760
@@ -17,6 +22,10 @@ const TIGHT_H = 197
 const TEXT: KeepOut = { x: 44, y: 40, w: 592, h: 90 }
 
 describe('sprayGrains', () => {
+  beforeEach(() => {
+    setSpraySalt(SALT)
+  })
+
   it('гуще там, где больше свободного места', () => {
     const wide = sprayGrains(WIDE_W, WIDE_H, [TEXT])
     const tight = sprayGrains(TIGHT_W, TIGHT_H, [TEXT])

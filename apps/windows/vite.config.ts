@@ -23,13 +23,13 @@ export default defineConfig({
       'hls.js': fileURLToPath(new URL('./node_modules/hls.js/dist/hls.light.mjs', import.meta.url)),
       // Пункт 3.4: реализация моста подставляется сборкой; шов оставлен — он ничего не стоит.
       // Вырезание потребовало бы правок импортов (Android из планов). Ключ обязан идти до '@'.
-      '@bridge-impl': fileURLToPath(new URL('./packages/core/src/bridge/TauriBridge.ts', import.meta.url)),
+      '@bridge-impl': fileURLToPath(new URL('../../packages/core/src/bridge/TauriBridge.ts', import.meta.url)),
       // Пункт 1.3: имена модулей при переезде в shared не менялись — старые сведены здесь.
       // Порядок обязателен: побеждает первое совпадение. Те же соответствия — в tsconfig.json.
-      '@/api': fileURLToPath(new URL('./packages/core/src/api', import.meta.url)),
-      '@/bridge': fileURLToPath(new URL('./packages/core/src/bridge', import.meta.url)),
-      '@/core': fileURLToPath(new URL('./packages/core/src/core', import.meta.url)),
-      '@/utils': fileURLToPath(new URL('./packages/core/src/utils', import.meta.url)),
+      '@/api': fileURLToPath(new URL('../../packages/core/src/api', import.meta.url)),
+      '@/bridge': fileURLToPath(new URL('../../packages/core/src/bridge', import.meta.url)),
+      '@/core': fileURLToPath(new URL('../../packages/core/src/core', import.meta.url)),
+      '@/utils': fileURLToPath(new URL('../../packages/core/src/utils', import.meta.url)),
       '@': fileURLToPath(new URL('./src', import.meta.url)),
     },
   },

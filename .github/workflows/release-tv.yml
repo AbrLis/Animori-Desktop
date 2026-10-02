@@ -27,6 +27,12 @@ permissions:
 
 jobs:
   build:
+    # Код приставки лежит в apps/android-tv, а конвейер — в корне: GitHub читает
+    # .github/workflows только оттуда. Поэтому каталог задаётся здесь, а не путями в командах.
+    defaults:
+      run:
+        working-directory: apps/android-tv
+
     # Разрядность — отдельным прогоном: Rust компилируется под каждую цель
     # заново, и в одном прогоне вторая сборка не взяла бы ничего из первой.
     strategy:
@@ -182,6 +188,11 @@ jobs:
           if-no-files-found: error
 
   publish:
+    # Каталог тот же, что и в задаче сборки: шаги читают package.json и CHANGELOG.
+    defaults:
+      run:
+        working-directory: apps/android-tv
+
     # Отдельной задачей, а не шагом внутри сборки: релиз один на две
     # разрядности, и создавать его должен тот, кто дождался обеих сборок.
     needs: build

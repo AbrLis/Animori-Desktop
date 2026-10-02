@@ -22,16 +22,16 @@
     // Две строки блокировщика убраны вместе с самим блокировщиком: он жил
     // в ядре ради гибридного окна с чужим сайтом.
     "paths": {
-      "@/api/*": ["packages/core/src/api/*"],
-      "@/bridge": ["packages/core/src/bridge/index"],
-      "@/bridge/*": ["packages/core/src/bridge/*"],
-      "@/core/*": ["packages/core/src/core/*"],
-      "@/utils/*": ["packages/core/src/utils/*"],
-      "@bridge-impl": ["packages/core/src/bridge/TauriBridge"]
+      "@/api/*": ["../../packages/core/src/api/*"],
+      "@/bridge": ["../../packages/core/src/bridge/index"],
+      "@/bridge/*": ["../../packages/core/src/bridge/*"],
+      "@/core/*": ["../../packages/core/src/core/*"],
+      "@/utils/*": ["../../packages/core/src/utils/*"],
+      "@bridge-impl": ["../../packages/core/src/bridge/TauriBridge"]
     }
   },
   // vite-env.d.ts нужен ради объявлений подставляемых сборкой значений:
   // это описание типов, а не код надстройки.
-  "include": ["packages/core/src/**/*.ts", "packages/core/src/**/*.d.ts", "src/vite-env.d.ts"],
+  "include": ["../../packages/core/src/**/*.ts", "../../packages/core/src/**/*.d.ts", "src/vite-env.d.ts"],
   "exclude": ["node_modules", "dist", "src-tauri", "src/app"]
 }

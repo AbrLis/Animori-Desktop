@@ -1,9 +1,9 @@
 {
-  "name": "@animori/android-tv",
+  "name": "@animori/windows",
   "private": true,
-  "version": "3.0.2",
+  "version": "3.0.4",
   "type": "module",
-  "description": "AniMori — Toolkit for AniList. Приложение для Android TV.",
+  "description": "AniMori — Toolkit for AniList. Настольное приложение.",
   "license": "MIT",
   "author": "foulnike",
   "scripts": {
@@ -14,6 +14,7 @@
     "typecheck:shared": "vue-tsc --noEmit -p tsconfig.shared.json",
     "typecheck:all": "npm run typecheck:shared && vue-tsc --noEmit",
     "test": "vitest run",
+    "test:core": "vitest run --config vitest.core.config.ts",
     "tauri": "tauri",
     "tauri:dev": "tauri dev",
     "tauri:build": "tauri build"

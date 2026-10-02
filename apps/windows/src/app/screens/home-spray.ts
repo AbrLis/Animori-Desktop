@@ -66,6 +66,12 @@ function seasoning(): number {
   return salt
 }
 
+/** Задать соль рисунка заранее: рисунок по замыслу новый при каждом запуске, и проверка
+ *  без соли меряет случайность — рано или поздно она даст ничью и покрасит конвейер. */
+export function setSpraySalt(value: number): void {
+  salt = value
+}
+
 /** Шум от 0 до 1 по номеру клетки и каналу. */
 function noise(at: number, channel: number): number {
   const raw = Math.sin((at + 1) * 12.9898 + (channel + 1) * 78.233 + seasoning()) * 43758.5453
