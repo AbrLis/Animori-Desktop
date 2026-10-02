@@ -251,6 +251,66 @@ describe('parseCloudFile', () => {
     expect(row?.isAdult).toBe(false)
     expect(row?.romaji).toBeNull()
   })
+it('копию, записанную другим продуктом, читает целиком', () => {
+    // Десктоп пишет в копию четыре поля, и приставка обязана их прочесть. Раньше она
+    // их отбрасывала, и человек терял часть списка молча — без единого сообщения.
+    const foreign = JSON.stringify({
+      format: CLOUD_FORMAT,
+      listVersion: LIST,
+      device: 'Windows',
+      entries: [
+        {
+          mediaId: 7,
+          status: 'COMPLETED',
+          score10: 9,
+          progress: 12,
+          repeat: 0,
+          startedAt: '2026-01-05',
+          completedAt: '2026-02-05',
+          notes: null,
+          updatedAt: 1000,
+          isAdult: false,
+          romaji: 'Kimi no Na wa.',
+          english: 'A Winter Story',
+          format: 'TV',
+          seasonYear: 2026,
+          episodes: 12,
+          duration: 24,
+        },
+      ],
+    })
+
+    const done = parseCloudFile(foreign, LIST)
+
+    expect(done.ok).toBe(true)
+    if (!done.ok) return
+
+    const row = done.file.entries[0]
+    expect(row?.format).toBe('TV')
+    expect(row?.seasonYear).toBe(2026)
+    expect(row?.episodes).toBe(12)
+    expect(row?.duration).toBe(24)
+  })
+
+  it('те же поля переживают круг: сборка и разбор ничего не теряют', () => {
+    const round = buildCloudFile({
+      entries: [entry({ mediaId: 9, format: 'TV', seasonYear: 2026, episodes: 12, duration: 24 })],
+      listVersion: LIST,
+      device: 'ТВ',
+      savedAt: 1000,
+    })
+
+    const back = parseCloudFile(round.text, LIST)
+
+    expect(back.ok).toBe(true)
+    if (!back.ok) return
+
+    const row = back.file.entries[0]
+    expect(row?.format).toBe('TV')
+    expect(row?.seasonYear).toBe(2026)
+    expect(row?.episodes).toBe(12)
+    expect(row?.duration).toBe(24)
+  })
 })
 
 describe('имена в облаке', () => {
