@@ -1,4 +1,5 @@
 import { readFileSync } from 'node:fs'
+import { createRequire } from 'node:module'
 import { fileURLToPath, URL } from 'node:url'
 import { defineConfig } from 'vite'
 import vue from '@vitejs/plugin-vue'
@@ -7,6 +8,10 @@ import vue from '@vitejs/plugin-vue'
 // а не import: импорт потребовал бы resolveJsonModule и втянул файлы в проверку типов.
 const readJson = (name: string) =>
   JSON.parse(readFileSync(fileURLToPath(new URL(name, import.meta.url)), 'utf-8'))
+
+// Пути до пакетов ищем через require, а не складываем руками './node_modules': рабочие
+// области поднимают пакет в корень репозитория, и жёсткий путь перестаёт существовать.
+const require = createRequire(import.meta.url)
 
 const { version } = readJson('./package.json') as { version: string }
 
@@ -20,7 +25,7 @@ export default defineConfig({
     alias: {
       // Плеер берёт лёгкую сборку hls.js: полная приносила в экран просмотра
       // около 594 КБ. Шов, а не импорт 'hls.js/light': нет своего .d.ts — TS7016.
-      'hls.js': fileURLToPath(new URL('./node_modules/hls.js/dist/hls.light.mjs', import.meta.url)),
+      'hls.js': require.resolve('hls.js/dist/hls.light.mjs'),
       // Пункт 3.4: реализация моста подставляется сборкой. Шов оставлен: вырезание
       // потребовало бы правки импортов. Ключ идёт до '@': совпадение по порядку.
       '@bridge-impl': fileURLToPath(new URL('../../packages/core/src/bridge/TauriBridge.ts', import.meta.url)),
