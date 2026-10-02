@@ -11,7 +11,6 @@
 браузер и менеджер скриптов не нужны.
 
 [![Версия](https://img.shields.io/badge/версия-3.0.4-02A9FF?style=flat-square&labelColor=0B1622)](https://github.com/foulnike/Animori/releases)
-[![Сборка](https://github.com/foulnike/Animori/actions/workflows/ci.yml/badge.svg)](https://github.com/foulnike/Animori/actions/workflows/ci.yml)
 [![Лицензия](https://img.shields.io/badge/лицензия-MIT-02A9FF?style=flat-square&labelColor=0B1622)](LICENSE)
 [![Windows](https://img.shields.io/badge/Windows%2010%2F11-0078D4?style=flat-square&logo=windows&logoColor=white)](apps/windows)
 [![Android TV](https://img.shields.io/badge/Android%20TV%207.0%2B-3DDC84?style=flat-square&logo=androidtv&logoColor=black)](apps/android-tv)
@@ -34,7 +33,7 @@
 - **Продолжение в один клик.** История помнит, где вы остановились.
 - **Русские названия подставляет сама программа.** AniList даёт карточку,
   Shikimori и anime365 — русский тайтл и описание.
-- **Своего плеера внутри.** Серия, озвучка, качество, два источника.
+- **Свой плеер внутри.** Серия, озвучка, качество, два источника.
 - **Ни рекламы, ни телеметрии, ни своих серверов.** Токен, настройки и кэш лежат
   на вашей машине.
 - **Список никуда не отправляется.** Изменения не уходят ни в AniList, ни в
@@ -78,19 +77,6 @@ APK в [выпусках](https://github.com/foulnike/Animori/releases):
 `AniMori_3.0.3_armv7.apk` для 32-разрядных приставок и `AniMori_3.0.3_arm64.apk`
 для 64-разрядных. Установка из неизвестных источников, ставится с пульта.
 Подробности — в [apps/android-tv](apps/android-tv).
-
-## Чем приложения отличаются
-
-| | Windows | Android TV |
-| :--- | :--- | :--- |
-| Вход в AniList | есть | нет |
-| Статистика по коллекции | есть | нет |
-| Окно поверх других программ и трансляция на телевизор | есть | нет |
-| Выгрузка списка в XML | есть | есть |
-| Копия в облако | есть | есть |
-| Перенос с Шикимори по нику | есть | есть |
-
-Списки, снимок, датасет, плеер и русские названия у приложений общие: ядро одно.
 
 ## Сборка
 
