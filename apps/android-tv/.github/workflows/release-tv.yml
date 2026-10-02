@@ -1,0 +1,270 @@
+# Запуск только по тегу `android-tv-v<версия>`. Номер сверяется с package.json. Имена файлов
+# обязательны: AniMori_<версия>_armv7.apk и _arm64.apk. Отмена: сначала Cancel.
+
+name: release-tv
+
+on:
+  push:
+    tags:
+      - 'android-tv-v*'
+
+  # Ручной запуск — для прогона без выпуска: конвейер стоит проверить заранее
+  # (sdkmanager, платформа, NDK, npm ci). Пробный прогон публикацию пропускает.
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Тег выпуска'
+        required: true
+        default: 'android-tv-v3.0.2'
+      dry:
+        description: 'Пробный прогон: собрать и подписать, но релиз не публиковать'
+        type: boolean
+        default: true
+
+# Без этого токен прогона только читает, и создание релиза упадёт на 403.
+permissions:
+  contents: write
+
+jobs:
+  build:
+    # Разрядность — отдельным прогоном: Rust компилируется под каждую цель
+    # заново, и в одном прогоне вторая сборка не взяла бы ничего из первой.
+    strategy:
+      fail-fast: false
+      matrix:
+        # abi — приставка в имени файла (её ищет src/app/update.ts по разрядности
+        # устройства); target — тройка Rust; cli — имя цели для `tauri android build`.
+        include:
+          - abi: armv7
+            target: armv7-linux-androideabi
+            cli: armv7
+          - abi: arm64
+            target: aarch64-linux-android
+            cli: aarch64
+
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Исходный код
+        uses: actions/checkout@v5
+
+      - name: Node.js
+        uses: actions/setup-node@v5
+        with:
+          # Node 20 вне поддержки с апреля 2026: в релиз собираем на 22.
+          node-version: 22
+          cache: npm
+
+      # Номер версии из имени тега и сверка с package.json. Номер берётся образцом,
+      # а не отрезанием приставки: тег android-tv-v3.0 тихо дал бы странное имя файла.
+      - name: Номер версии из тега
+        id: ver
+        run: |
+          set -euo pipefail
+          tag='${{ inputs.tag || github.ref_name }}'
+          if [[ ! "$tag" =~ ^android-tv-v([0-9]+\.[0-9]+\.[0-9]+)$ ]]; then
+            echo "::error::Имя тега '$tag' не подходит под android-tv-v<версия>"
+            exit 1
+          fi
+          version="${BASH_REMATCH[1]}"
+          declared="$(node -p "require('./package.json').version")"
+          if [[ "$version" != "$declared" ]]; then
+            echo "::error::Номер в теге ($version) расходится с package.json ($declared)"
+            exit 1
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "Выпуск приставки: $version (тег $tag)"
+
+      - name: Окружение Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+
+      # Компиляция зависимостей Tauri с нуля — это минуты. Кэш привязан к
+      # Cargo.lock, который у нас закоммичен, поэтому попадание стабильно.
+      - name: Кэш Cargo
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+
+      # Java 17: его требует Android Gradle Plugin 8.x. Более новый не нужен,
+      # а более старый Gradle 8.14 не примет вовсе.
+      - name: Java
+        uses: actions/setup-java@v5
+        with:
+          java-version: 17
+          distribution: temurin
+
+      - name: Android SDK
+        uses: android-actions/setup-android@v4
+
+      # Пакеты ставятся явно: без NDK Rust не соберётся, а расхождение версий NDK
+      # между сборками даёт разные .so.
+      - name: Пакеты SDK
+        run: |
+          set -euo pipefail
+
+          # Лицензии принимаются ответом из файла, а не трубой `yes | …`: на свежем
+          # образе раннера `yes` получает broken pipe, и под pipefail шаг падает.
+          printf 'y\ny\ny\ny\ny\ny\ny\ny\ny\ny\n' > "$RUNNER_TEMP/sdk-yes.txt"
+          sdkmanager --licenses < "$RUNNER_TEMP/sdk-yes.txt" > /dev/null 2>&1 || true
+
+          sdkmanager --install "platforms;android-36" "build-tools;35.0.0" "ndk;30.0.15729638"
+
+          sdk="${ANDROID_HOME:-${ANDROID_SDK_ROOT:-}}"
+          if [[ -z "$sdk" ]]; then
+            echo "::error::Ни ANDROID_HOME, ни ANDROID_SDK_ROOT не заданы"
+            exit 1
+          fi
+          {
+            echo "ANDROID_HOME=$sdk"
+            echo "ANDROID_NDK_HOME=$sdk/ndk/30.0.15729638"
+            echo "NDK_HOME=$sdk/ndk/30.0.15729638"
+          } >> "$GITHUB_ENV"
+
+      # Нужны для beforeBuildCommand: сборку переднего края (npm run build:app)
+      # запускает сам tauri перед компиляцией Rust.
+      - name: Зависимости npm
+        run: npm ci
+
+      # Сборка. Файл выходит неподписанным — так делает Tauri и на компьютере:
+      # ключа выпуска у него нет. Подписываем следующим шагом.
+      - name: Сборка APK
+        run: npm run tauri -- android build -t ${{ matrix.cli }}
+
+      # Порядок обязателен: zipalign до подписи, а подписанный файл трогать нельзя —
+      # выравнивание сдвинет содержимое, и подпись перестанет сходиться.
+      - name: Подпись APK
+        env:
+          KS_BASE64: ${{ secrets.ANIMORI_KEYSTORE_BASE64 }}
+          KS_PASSWORD: ${{ secrets.ANIMORI_KEYSTORE_PASSWORD }}
+          KS_ALIAS: ${{ secrets.ANIMORI_KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.ANIMORI_KEY_PASSWORD }}
+        run: |
+          set -euo pipefail
+          version='${{ steps.ver.outputs.version }}'
+          abi='${{ matrix.abi }}'
+          tools="$ANDROID_HOME/build-tools/35.0.0"
+
+          # Один файл, а не «первый попавшийся»: два APK в выводе означают,
+          # что сборка положила рядом остаток прежней, и подписать можно не то.
+          mapfile -t found < <(find src-tauri/gen/android/app/build/outputs/apk -name '*.apk')
+          if [[ "${#found[@]}" -ne 1 ]]; then
+            echo "::error::В выводе сборки не один APK: ${found[*]}"
+            exit 1
+          fi
+
+          mkdir -p out
+          echo "$KS_BASE64" | base64 -d > out/animori.jks
+
+          "$tools/zipalign" -p -f 4 "${found[0]}" out/aligned.apk
+
+          java -jar "$tools/lib/apksigner.jar" sign \
+            --ks out/animori.jks \
+            --ks-key-alias "$KS_ALIAS" \
+            --ks-pass "pass:$KS_PASSWORD" \
+            --key-pass "pass:$KEY_PASSWORD" \
+            --out "out/AniMori_${version}_${abi}.apk" \
+            out/aligned.apk
+
+          # Проверка перед выкладкой: неподписанный или битый файл приставка
+          # не поставит, а поймёт это человек лишь нажав «Установить».
+          java -jar "$tools/lib/apksigner.jar" verify "out/AniMori_${version}_${abi}.apk"
+
+          rm -f out/animori.jks out/aligned.apk
+          ls -l "out/AniMori_${version}_${abi}.apk"
+
+      - name: Артефакт прогона
+        uses: actions/upload-artifact@v4
+        with:
+          name: apk-${{ matrix.abi }}
+          path: out/AniMori_${{ steps.ver.outputs.version }}_${{ matrix.abi }}.apk
+          if-no-files-found: error
+
+  publish:
+    # Отдельной задачей, а не шагом внутри сборки: релиз один на две
+    # разрядности, и создавать его должен тот, кто дождался обеих сборок.
+    needs: build
+    runs-on: ubuntu-latest
+
+    # Пробный прогон сюда не доходит: сборки уже проверили ключ и подпись,
+    # а выпускать нечего.
+    if: ${{ github.event_name == 'push' || !inputs.dry }}
+
+    steps:
+      - name: Исходный код
+        uses: actions/checkout@v5
+
+      - name: Номер версии из тега
+        id: ver
+        run: |
+          set -euo pipefail
+          tag='${{ inputs.tag || github.ref_name }}'
+          if [[ ! "$tag" =~ ^android-tv-v([0-9]+\.[0-9]+\.[0-9]+)$ ]]; then
+            echo "::error::Имя тега '$tag' не подходит под android-tv-v<версия>"
+            exit 1
+          fi
+          echo "version=${BASH_REMATCH[1]}" >> "$GITHUB_OUTPUT"
+
+      # Описание релиза берётся из ведущего абзаца раздела: подробности лежат
+      # в CHANGELOG.md, а в окно обновления целиком раздел не лезет.
+      - name: Описание релиза из CHANGELOG
+        id: notes
+        run: |
+          python3 - <<'PY' >> "$GITHUB_OUTPUT"
+          import pathlib
+
+          lines = pathlib.Path('CHANGELOG.md').read_text(encoding='utf-8').splitlines()
+
+          # Заголовок раздела — «## [версия]». Редактор умеет экранировать скобку
+          # («## \[3.0.2]»), и такой заголовок разделом тоже считаем: выпуск не должен
+          # падать из-за одной кавычки в заголовке.
+          def is_section(line):
+              return line.startswith('## ') and line.replace('\\', '').lstrip('#').strip().startswith('[')
+
+          marks = [i for i, line in enumerate(lines) if is_section(line)]
+          if not marks:
+              raise SystemExit('В CHANGELOG.md не найдено ни одного раздела вида "## [версия]"')
+
+          start = marks[0] + 1
+          end = marks[1] if len(marks) > 1 else len(lines)
+
+          # Ведущий абзац: до первого подзаголовка любого уровня.
+          stop = end
+          for i in range(start, end):
+              if lines[i].lstrip().startswith('#'):
+                  stop = i
+                  break
+
+          body = '\n'.join(lines[start:stop]).strip()
+          if not body:
+              raise SystemExit('У раздела нет ведущего абзаца: нечего показать в окне обновления')
+
+          # Окно обновления урежет текст само (NOTES_LIMIT в src/app/update.ts),
+          # но длинное описание не нужно и на странице выпуска.
+          if len(body) > 1200:
+              body = body[:1200].rstrip() + '…'
+
+          print('body<<ANIMORI_NOTES')
+          print(body)
+          print('ANIMORI_NOTES')
+          PY
+
+      - name: Собрать файлы выпуска
+        uses: actions/download-artifact@v4
+        with:
+          pattern: apk-*
+          path: dist
+          merge-multiple: true
+
+      # Черновик и предварительный выключены осознанно: приложение берёт первый
+      # выпуск с приставкой tv- и не отличает черновик от опубликованного.
+      - name: Релиз
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ inputs.tag || github.ref_name }}
+          name: AniMori ${{ steps.ver.outputs.version }}
+          body: ${{ steps.notes.outputs.body }}
+          draft: false
+          prerelease: false
+          files: dist/*.apk

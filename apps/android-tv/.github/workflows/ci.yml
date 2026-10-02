@@ -1,0 +1,58 @@
+# Проверки на каждый пуш. Ни NDK, ни Gradle, ни сборщик APK здесь не трогаются:
+# это чтение файлов, vitest и npm ci. Полная сборка живёт в release-tv.yml и
+# ходит по тегу.
+#
+# Пока эти задачи не существовали, наборы vitest не гонял вообще никто: проверки
+# краснели и тихо ждали ручного прогона. Так здесь и дожили до семнадцати падений,
+# которые заметили через две ревизии.
+
+name: ci
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+jobs:
+  # Сторож общего кода: сверяет `src/shared/` и `tests/` с эталоном из
+  # Animori-Desktop. Зеркало эталона лежит в репозитории, токен и сеть не нужны.
+  core:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Исходный код
+        uses: actions/checkout@v5
+
+      - name: Node.js
+        uses: actions/setup-node@v5
+        with:
+          # Как и в выпуске: 20 вне поддержки с апреля 2026.
+          node-version: 22
+
+      # Сторож, который всегда зелёный, хуже отсутствия: сначала убеждаемся,
+      # что он вообще ловит расхождение, и только потом верим его вердикту.
+      - name: Сторож проверяет сторожа
+        run: node scripts/check-shared.mjs --selftest
+
+      - name: Ядро и наборы не разошлись с Animori-Desktop
+        run: node scripts/check-shared.mjs
+
+  tests:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Исходный код
+        uses: actions/checkout@v5
+
+      - name: Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Зависимости
+        run: npm ci
+
+      - name: Наборы vitest
+        run: npm test
