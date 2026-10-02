@@ -15,7 +15,6 @@
     "typecheck:all": "npm run typecheck:shared && vue-tsc --noEmit",
     "test": "vitest run",
     "test:core": "vitest run --config ../../vitest.core.config.ts",
-    "test:core": "vitest run --config ../../vitest.core.config.ts",
     "tauri": "tauri",
     "tauri:dev": "tauri dev",
     "tauri:build": "tauri build"
