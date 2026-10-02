@@ -13,6 +13,7 @@
     "typecheck:windows": "npm --prefix apps/windows run typecheck:all",
     "typecheck:android-tv": "npm --prefix apps/android-tv run typecheck:all",
     "build:windows": "npm --prefix apps/windows run build:app",
-    "build:android-tv": "npm --prefix apps/android-tv run build:app"
+    "build:android-tv": "npm --prefix apps/android-tv run build:app",
+    "fix:lock": "node scripts/fix-lock-optional.mjs"
   }
 }

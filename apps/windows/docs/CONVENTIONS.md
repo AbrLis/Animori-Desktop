@@ -157,6 +157,12 @@ packages/core/src/          api → bridge, core, utils
 в `vite.config.ts`, `paths` в `tsconfig.json` и в `tsconfig.shared.json`.
 Расхождение даёт зелёную сборку при красном тайпчеке или наоборот.
 
+`npm run fix:lock` возвращает признак `optional` платформенным пакетам в
+`package-lock.json`. npm ставит его только вариантам, совпавшим с его
+собственной платформой, поэтому после любого `npm install`, перезаписавшего
+замок, Linux-сборка падает на `npm ci` с `EBADPLATFORM`. Скрипт запускают
+сразу после такого `npm install` и до коммита замка.
+
 ---
 
 ## Документация
