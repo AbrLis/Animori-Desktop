@@ -130,6 +130,29 @@ jobs:
 
       # Нужны для beforeBuildCommand: сборку переднего края (npm run build:app)
       # запускает сам tauri перед компиляцией Rust.
+      # Проверка до сборки. Без неё пустой секрет всплывает через семь минут
+      # компиляции и валит apksigner ошибкой про DER («Tag number over 30»), из
+      # которой ключа не видно: ключа там и не было. Имена секретов — те же, что
+      # ждут шаги ниже; значения скопированы из Animori-TV вручную, API их не
+      # отдаёт.
+      - name: Проверка секретов подписи
+        env:
+          KS_BASE64: ${{ secrets.ANIMORI_KEYSTORE_BASE64 }}
+          KS_PASSWORD: ${{ secrets.ANIMORI_KEYSTORE_PASSWORD }}
+          KS_ALIAS: ${{ secrets.ANIMORI_KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.ANIMORI_KEY_PASSWORD }}
+        run: |
+          set -euo pipefail
+          missing=()
+          for v in KS_BASE64 KS_PASSWORD KS_ALIAS KEY_PASSWORD; do
+            [[ -n "${!v}" ]] || missing+=("$v")
+          done
+          if (( ${#missing[@]} )); then
+            echo "::error::Пустые секреты подписи: ${missing[*]}. Задать в Settings → Secrets and variables → Actions репозитория Animori"
+            exit 1
+          fi
+          echo "Все четыре секрета подписи на месте."
+
       - name: Зависимости npm
         # Установка из корня: замок один на репозиторий, в каталоге приложения его нет.
         working-directory: .
@@ -164,6 +187,16 @@ jobs:
 
           mkdir -p out
           echo "$KS_BASE64" | base64 -d > out/animori.jks
+
+          # PKCS12 начинается с 0x30 — DER-метка SEQUENCE. Пустой секрет или мусор
+          # в base64 дают другой файл, и apksigner уходит в криптографию вместо
+          # внятного отказа. Здесь ловим раньше него.
+          size=$(stat -c%s out/animori.jks)
+          tag=$(od -An -tx1 -N1 out/animori.jks | tr -d ' ')
+          if [[ "$size" -lt 100 || "$tag" != "30" ]]; then
+            echo "::error::Хранилище ключа не декодировалось: ${size} байт, первая метка 0x${tag}"
+            exit 1
+          fi
 
           "$tools/zipalign" -p -f 4 "${found[0]}" out/aligned.apk
 
