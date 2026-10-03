@@ -216,6 +216,15 @@ jobs:
           $channel = 'windows-latest'
           $sha = '${{ github.sha }}'
 
+          # Манифест ищем ДО удаления прежнего канала, а не после. Порядок
+          # обязателен: шаг снимает канал целиком вместе с тегом, и если
+          # манифеста не окажется, обновления у людей пропадут до ручной починки.
+          # Проверить, что заменять есть чем, надо раньше, чем ломать.
+          $manifest = Get-ChildItem -Path src-tauri/target -Recurse -Filter latest.json |
+            Sort-Object LastWriteTime -Descending |
+            Select-Object -First 1
+          if (-not $manifest) { throw 'latest.json не найден после сборки — канал нечем наполнить' }
+
           # Прежний канал снимаем целиком вместе с тегом: оставить его — значит онить на
           # странице Releases выпуск с чужим манифестом.
           gh release delete $channel --yes --cleanup-tag 2>$null
@@ -226,11 +235,6 @@ jobs:
 
           # Манифест берём из вывода сборки того же прогона: он подписан тем же ключом, что и
           # сам установщик, и подменять его своим нельзя.
-          $manifest = Get-ChildItem -Path src-tauri/target -Recurse -Filter latest.json |
-            Sort-Object LastWriteTime -Descending |
-            Select-Object -First 1
-          if (-not $manifest) { throw 'latest.json не найден после сборки — канал нечем наполнить' }
-
           gh release upload $channel $manifest.FullName --clobber
           Write-Host "Манифест канала взят из $($manifest.FullName)"
 
