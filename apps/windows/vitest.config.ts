@@ -21,6 +21,15 @@ export default defineConfig({
   define: {
     __ANIMORI_PLATFORM__: JSON.stringify('app'),
     __ANIMORI_VERSION__: JSON.stringify('test'),
+    // Мост в проверках подменён заглушкой, но объявление остаётся: файл моста общий,
+    // и ключ читается из него же. Значение — как в настоящей сборке этого продукта.
+    __ANIMORI_SHELL_CAN__: JSON.stringify({
+      browser: true,
+      history: true,
+      fullscreen: true,
+      cast: true,
+      devtools: true,
+    }),
   },
   test: {
     environment: 'happy-dom',

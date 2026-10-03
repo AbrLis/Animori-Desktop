@@ -5,7 +5,6 @@ import { computed, nextTick, onScopeDispose, ref, type ComputedRef, type Ref } f
 
 import { fetchMediaCard, type MediaCard } from '@/api/anilist-media'
 import { setupVideoSources } from '@/api/video-sources'
-import { Bridge } from '@/bridge'
 import { hiddenCount, keepAllowed } from '@/core/adult'
 import { editEntry, getEntry, type EntryLook } from '@/core/collection'
 import { fetchFranchise, type FranchiseWork } from '@/core/franchise'
@@ -30,8 +29,7 @@ import { studioLogos } from '@/core/studio-logos'
 import { Logger } from '@/utils/logger'
 
 import { formatWord, statusWord } from '../labels'
-import { mediaLinks, type MediaLink } from '../media-links'
-import { canOpenOutside } from '../platform'
+import { mediaSourceName } from '../media-links'
 import { navigate } from '../router'
 
 /** Пауза перед заказом меток показанным частям франшизы: прокрутка приводит их по несколько разом,
@@ -108,7 +106,8 @@ export interface MediaCardView {
   about: ComputedRef<string>
   /** Описание ещё не приехало: вместо текста показывается заглушка. */
   aboutWait: ComputedRef<boolean>
-  aboutLinks: ComputedRef<MediaLink[]>
+  /** Название источника описания текстом: пустая строка — источник не назван. */
+  aboutSource: ComputedRef<string>
   facts: ComputedRef<string[]>
   ratings: ComputedRef<Rating[]>
   mineFacts: ComputedRef<MineFact[]>
@@ -123,7 +122,6 @@ export interface MediaCardView {
   onPartSeen: (work: FranchiseWork) => void
   openFranchiseWork: (work: FranchiseWork) => void
   openStudio: (studioId: number) => void
-  onOpen: (url: string) => void
   onPickStatus: (value: string) => void
   onPickScore: (value: number) => void
   onPickProgress: (value: number) => void
@@ -341,22 +339,15 @@ export function useMediaCard(mediaId: Ref<number>): MediaCardView {
    *  «описаний нет». */
   const aboutWait = computed<boolean>(() => ruState.value === 'wait')
 
-  /** Бледный хвост под описанием: номера каталогов и источник текста ссылками. Сборка адресов —
-   *  в media-links.ts. */
-  const aboutLinks = computed<MediaLink[]>(() => {
-    // На телевизоре браузера нет: ряд ссылок, которые никуда не ведут, только занимает место под описанием.
-    if (!canOpenOutside()) return []
-
-    const found = card.value
-    if (found === null) return []
-
-    return mediaLinks({
-      mediaId: found.mediaId,
-      malId: found.malId,
+  /** Бледная строка под описанием: откуда взят текст. Названием, а не ссылкой —
+   *  открывать адрес на телевизоре нечем, а подчёркнутая подпись, которая ничего не
+   *  делает, читается как поломка. Сбор названия — в media-links.ts. */
+  const aboutSource = computed<string>(() =>
+    mediaSourceName({
       sourceUrl: russian.value?.url ?? null,
       sourceName: russian.value?.sourceName ?? null,
-    })
-  })
+    }),
+  )
 
   /** Факты пилюлями под названием: только то, что сервер впрямь назвал. */
   const facts = computed<string[]>(() => {
@@ -718,14 +709,6 @@ export function useMediaCard(mediaId: Ref<number>): MediaCardView {
     }
   }
 
-  /** Уводит наружу через оболочку: в WebView2 переход в новом окне молча отбрасывается, а в том же окне
-   *  унёс бы само приложение. */
-  function onOpen(url: string): void {
-    void Bridge.shell.openExternal(url).catch((e) => {
-      Logger('WARN', `Карточка: внешняя ссылка не открылась (${url})`, e)
-    })
-  }
-
   function openStudio(studioId: number): void {
     navigate('studio', { id: String(studioId) })
   }
@@ -838,7 +821,7 @@ export function useMediaCard(mediaId: Ref<number>): MediaCardView {
     progressText,
     about,
     aboutWait,
-    aboutLinks,
+    aboutSource,
     facts,
     ratings,
     mineFacts,
@@ -853,7 +836,6 @@ export function useMediaCard(mediaId: Ref<number>): MediaCardView {
     onPartSeen,
     openFranchiseWork,
     openStudio,
-    onOpen,
     onPickStatus,
     onPickScore,
     onPickProgress,

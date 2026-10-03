@@ -45,6 +45,17 @@ export default defineConfig({
     // Пункт 5.3.5: номер версии нужен рантайму для заголовка User-Agent
     // нашего канала (packages/core/src/bridge/TauriBridge.ts) и для экранов приложения.
     __ANIMORI_VERSION__: JSON.stringify(version),
+    // Умения оболочки объявляет сборка, а не мост: файл моста общий у двух продуктов.
+    // У телевизора нет ни одного: браузер, историю окна, полный экран, панель трансляции
+    // и консоль. Объявление обязано быть честным — по нему экраны решают, показывать ли
+    // то, что открыть нечем (ссылки под описанием, трейлер, репозиторий датасета).
+    __ANIMORI_SHELL_CAN__: JSON.stringify({
+      browser: false,
+      history: false,
+      fullscreen: false,
+      cast: false,
+      devtools: false,
+    }),
     // Этап 2: флаги сборки Vue. Без них рантаим сыплет предупреждения в консоль.
     // Options API нигде не используется — только Composition API, поэтому false.
     __VUE_OPTIONS_API__: 'false',

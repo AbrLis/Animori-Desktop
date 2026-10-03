@@ -225,10 +225,6 @@
   border-top: 1px solid color-mix(in srgb, var(--am-on-art) 12%, transparent);
 }
 
-.am-about__tail--art .am-about__link {
-  color: color-mix(in srgb, var(--am-on-art) 78%, transparent);
-}
-
 .am-pills {
   display: flex;
   flex-wrap: wrap;
@@ -447,30 +443,12 @@
   width: 62%;
 }
 
-/* Справка хвостом описания сидит у низа панели, где бы ни кончился текст. */
+/* Справка под описанием: откуда взят текст. Названием, а не ссылкой — открывать на
+   телевизоре нечем, и подчёркнутая подпись читалась бы как поломка. */
 .am-about__tail {
   margin: 14px 0 0;
   font-size: 12.5px;
   color: var(--am-faint);
-}
-
-/* Номера в хвосте — ссылки наружу. Подчёркивание появляется под мышью:
-   бледная справка не должна рябить линиями в покое. */
-.am-about__link {
-  color: var(--am-dim);
-  text-decoration: none;
-  border-bottom: 1px solid transparent;
-  cursor: pointer;
-}
-
-.am-about__link:hover:where(:not(.am-lite *)),
-.am-about__link:focus-visible {
-  color: var(--am-accent);
-  border-bottom-color: currentcolor;
-}
-
-.am-about__dot {
-  margin: 0 7px;
 }
 
 .am-about-box {

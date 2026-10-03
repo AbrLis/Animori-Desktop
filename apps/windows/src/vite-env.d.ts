@@ -7,3 +7,13 @@ declare const __ANIMORI_PLATFORM__: 'app'
 // Номер версии из package.json (см. define в vite.config.ts).
 // Пункт 5.3.5: нужен рантайму для заголовка User-Agent нашего канала.
 declare const __ANIMORI_VERSION__: string
+
+// Умения оболочки (см. define в vite.config.ts). Файл моста общий у двух продуктов,
+// поэтому набор умений объявляет сборка: у окна Windows их пять, у телевизора — ни одного.
+declare const __ANIMORI_SHELL_CAN__: {
+  browser: boolean
+  history: boolean
+  fullscreen: boolean
+  cast: boolean
+  devtools: boolean
+}

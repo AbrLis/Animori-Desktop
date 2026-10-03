@@ -72,7 +72,7 @@ const {
   heroStyle,
   about,
   aboutWait,
-  aboutLinks,
+  aboutSource,
   facts,
   ratings,
   franchiseRows,
@@ -86,7 +86,6 @@ const {
   onPartSeen,
   openFranchiseWork,
   openStudio,
-  onOpen,
   onPickStatus,
   onPickScore,
   onPickProgress,
@@ -291,17 +290,8 @@ watch(card, (now) => {
                 <p v-else class="am-hero__sub">Описания ни один источник не дал.</p>
               </div>
 
-              <p v-if="aboutLinks.length > 0" class="am-about__tail am-about__tail--art">
-                <template v-for="(link, at) in aboutLinks" :key="link.key">
-                  <span v-if="at > 0" class="am-about__dot" aria-hidden="true">·</span>
-                  <a
-                    v-tip="link.hint"
-                    class="am-about__link"
-                    :href="link.url"
-                    @click.prevent="onOpen(link.url)"
-                    >{{ link.text }}</a
-                  >
-                </template>
+              <p v-if="aboutSource !== ''" class="am-about__tail am-about__tail--art">
+                Описание отсюда: {{ aboutSource }}
               </p>
             </div>
           </div>
@@ -330,17 +320,8 @@ watch(card, (now) => {
               </div>
               <p v-else class="am-dim">Описания ни один источник не дал.</p>
 
-              <p v-if="aboutLinks.length > 0" class="am-about__tail">
-                <template v-for="(link, at) in aboutLinks" :key="link.key">
-                  <span v-if="at > 0" class="am-about__dot" aria-hidden="true">·</span>
-                  <a
-                    v-tip="link.hint"
-                    class="am-about__link"
-                    :href="link.url"
-                    @click.prevent="onOpen(link.url)"
-                    >{{ link.text }}</a
-                  >
-                </template>
+              <p v-if="aboutSource !== ''" class="am-about__tail">
+                Описание отсюда: {{ aboutSource }}
               </p>
             </div>
           </div>

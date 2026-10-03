@@ -30,6 +30,12 @@ const KEY_PROXY_PASSWORD: &str = "set_proxy_pass";
 /// Потолок ожидания ответа. AniList отвечает за секунды, всё дольше — авария.
 const TIMEOUT_SECS: u64 = 30;
 
+/// Потолок ожидания соединения. Короче общего таймаута намеренно: у AniList два адреса,
+/// и DNS нередко отдаёт мёртвым первым. Без своего потолка клиент висит на нём все
+/// тридцать секунд и умирает вместе с запросом, не дойдя до живого. С ним отказ обрывается
+/// за секунды, и reqwest берёт следующий адрес.
+const CONNECT_TIMEOUT_SECS: u64 = 5;
+
 struct CachedClient {
     key: String,
     client: reqwest::Client,
@@ -147,7 +153,9 @@ fn user_agent() -> String {
 /// Клиент на один запрос: прокси читается каждый раз, и смена настройки
 /// действует сразу — в отличие от окна, где адрес живёт до перезапуска.
 fn build_client(app: &AppHandle) -> Result<reqwest::Client, String> {
-    let mut builder = reqwest::Client::builder().timeout(Duration::from_secs(TIMEOUT_SECS));
+    let mut builder = reqwest::Client::builder()
+        .timeout(Duration::from_secs(TIMEOUT_SECS))
+        .connect_timeout(Duration::from_secs(CONNECT_TIMEOUT_SECS));
 
     if let Some((url, login, password)) = read_proxy(app) {
         let mut proxy = reqwest::Proxy::all(&url)

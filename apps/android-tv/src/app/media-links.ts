@@ -29,6 +29,13 @@ export interface MediaLink {
   hint: string
 }
 
+/** Название источника описания текстом: подпись без адреса, по клику никуда. */
+export interface MediaSource {
+  /** Ключ для перебора в разметке. */
+  key: string
+  text: string
+}
+
 /** Всё, из чего собирается хвост. Вида тайтла здесь нет: только аниме. */
 interface MediaLinksInput {
   mediaId: number
@@ -107,4 +114,26 @@ export function mediaLinks(input: MediaLinksInput): MediaLink[] {
   }
 
   return list
+}
+
+/**
+ * Название источника описания текстом — то, чем хвост под описанием стал на телевизоре.
+ *
+ * Ссылок здесь нет намеренно: адрес открывать нечем, а подчёркнутая подпись, которая
+ * ничего не делает, читается как поломка. Остаётся честная подпись: откуда взят текст.
+ * Пустая строка — источник не назван, и хвост молча не рисуется.
+ */
+export function mediaSourceName(input: {
+  sourceUrl?: string | null
+  sourceName?: string | null
+}): string {
+  const sourceUrl = (input.sourceUrl ?? '').trim()
+  const sourceName = (input.sourceName ?? '').trim()
+
+  if (sourceUrl === '') return sourceName
+
+  if (atDomain(sourceUrl, SHIKI_DOMAINS)) return 'Шикимори'
+  if (atDomain(sourceUrl, ANIME365_DOMAINS)) return 'Anime365'
+
+  return sourceName === '' ? 'Источник описания' : sourceName
 }
