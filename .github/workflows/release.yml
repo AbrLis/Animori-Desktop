@@ -111,7 +111,20 @@ jobs:
 
       # Собирает приложение, создаёт релиз по тегу, подписывает установщик и сам генерирует
       # latest.json. Писать манифест вручную не надо.
+      # Пробный прогон: сборка и подпись без публикации. tauri-action создаёт релиз
+      # сам, поэтому в пробном режиме он не идёт вовсе, а сборка идёт напрямую через
+      # tauri build. Отдельный шаг, а не флаг внутри: у tauri-action нет «собрать, не
+      # выкладывая», и забытая отсечка публикует выпуск молча.
+      - name: Пробный прогон, сборка и подпись без публикации
+        if: github.event_name != 'push' && inputs.dry
+        shell: pwsh
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        run: npx tauri build
+
       - name: Сборка приложения и публикация релиза
+        if: github.event_name == 'push' || !inputs.dry
         uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -121,7 +134,9 @@ jobs:
           # Проект переехал в apps/windows: без этого tauri-action искал бы его в корне
           # и не нашёл, то есть выпуск падал бы на самом первом шаге.
           projectPath: apps/windows
-          tagName: ${{ github.ref_name }}
+          # Ручной запуск идёт не по тегу: ref у него — ветка, и без подстановки
+          # tauri-action выпустил бы релиз с тегом `main`.
+          tagName: ${{ inputs.tag || github.ref_name }}
           releaseName: AniMori ${{ steps.ver.outputs.version }}
           releaseBody: ${{ steps.notes.outputs.body }}
           # Черновик и предварительный релиз оба выключены: оба делают релиз невидимым для
