@@ -314,7 +314,10 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ inputs.tag || github.ref_name }}
-          name: AniMori ${{ steps.ver.outputs.version }}
+          # Платформа в названии: оба продукта живут в одном репозитории, и без неё
+          # на странице Releases две строки «AniMori 3.1.0» не отличить. Апдейтер
+          # приставки название не читает вовсе — он смотрит на tag_name и body.
+          name: AniMori ${{ steps.ver.outputs.version }} — Android TV
           body: ${{ steps.notes.outputs.body }}
           draft: false
           prerelease: false

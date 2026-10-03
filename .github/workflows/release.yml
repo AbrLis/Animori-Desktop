@@ -137,7 +137,10 @@ jobs:
           # Ручной запуск идёт не по тегу: ref у него — ветка, и без подстановки
           # tauri-action выпустил бы релиз с тегом `main`.
           tagName: ${{ inputs.tag || github.ref_name }}
-          releaseName: AniMori ${{ steps.ver.outputs.version }}
+          # Платформа в названии: оба продукта живут в одном репозитории, и без неё
+          # на странице Releases две строки «AniMori 3.1.0» не отличить. Название
+          # ничего не ломает — апдейтеры смотрят на тег, а не на него.
+          releaseName: AniMori ${{ steps.ver.outputs.version }} — Windows
           releaseBody: ${{ steps.notes.outputs.body }}
           # Черновик и предварительный релиз оба выключены: оба делают релиз невидимым для
           # подписчиков, а подписчик на Releases их не получает. Адрес `releases/latest`
