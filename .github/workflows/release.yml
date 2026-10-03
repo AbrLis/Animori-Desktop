@@ -215,15 +215,24 @@ jobs:
         run: |
           $channel = 'windows-latest'
           $sha = '${{ github.sha }}'
+          $tag = '${{ inputs.tag || github.ref_name }}'
 
-          # Манифест ищем ДО удаления прежнего канала, а не после. Порядок
-          # обязателен: шаг снимает канал целиком вместе с тегом, и если
-          # манифеста не окажется, обновления у людей пропадут до ручной починки.
-          # Проверить, что заменять есть чем, надо раньше, чем ломать.
-          $manifest = Get-ChildItem -Path src-tauri/target -Recurse -Filter latest.json |
-            Sort-Object LastWriteTime -Descending |
-            Select-Object -First 1
-          if (-not $manifest) { throw 'latest.json не найден после сборки — канал нечем наполнить' }
+          # Манифест берём из выпуска, а не ищем по файловой системе. tauri-action
+          # выкладывает latest.json прямо в релиз и не оставляет его в src-tauri/target:
+          # боевой прогон падал с «latest.json не найден», хотя манифест лежал в
+          # выпуске и был подписан тем же ключом, что и установщик.
+          #
+          # Ищем его ДО удаления прежнего канала: заменять есть чем — проверяем раньше,
+          # чем ломаем, иначе обновления у людей пропадут до ручной починки.
+          New-Item -ItemType Directory -Force -Path manifest | Out-Null
+          gh release download $tag --pattern 'latest.json' --dir 'manifest' --clobber
+          if ($LASTEXITCODE -ne 0) {
+            throw "Не удалось скачать latest.json из выпуска ${tag} — канал нечем наполнить"
+          }
+          $manifest = Get-ChildItem 'manifest' -Filter 'latest.json' | Select-Object -First 1
+          if (-not $manifest) {
+            throw 'Манифест не скачался — канал нечем наполнить'
+          }
 
           # Прежний канал снимаем целиком вместе с тегом: оставить его — значит онить на
           # странице Releases выпуск с чужим манифестом.
