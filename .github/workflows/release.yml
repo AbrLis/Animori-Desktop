@@ -193,10 +193,15 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ inputs.tag || github.ref_name }}
+          # Пути от корня репозитория: JavaScript-шаги не знают про
+          # defaults.run.working-directory, а копирующие шаги выше кладут файлы
+          # в apps/windows/artifacts. Без префикса шаг искал бы их в корне и
+          # выпустил бы релиз без переименованного установщика и портабла.
           files: |
-            artifacts/AniMori_Setup.exe
-            artifacts/AniMori_*_x64-portable.zip
-# Канал обновлений Windows: отдельный релиз с постоянным именем, всегда указывающий на
+            apps/windows/artifacts/AniMori_Setup.exe
+            apps/windows/artifacts/AniMori_*_x64-portable.zip
+
+      # Канал обновлений Windows: отдельный релиз с постоянным именем, всегда указывающий на
       # последнюю сборку. Зачем он нужен: апдейтер читает адрес по имени, а `releases/latest`
       # после появления выпусков приставки в этом же репозитории уезжал бы на них — и Windows
       # молча перестал бы находить обновление. Свой канал от такого не зависит.

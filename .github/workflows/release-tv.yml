@@ -220,7 +220,11 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: apk-${{ matrix.abi }}
-          path: out/AniMori_${{ steps.ver.outputs.version }}_${{ matrix.abi }}.apk
+          # Путь от корня репозитория, а не от каталога приложения: у
+          # upload-artifact нет параметра working-directory, и defaults.run его
+          # не подставляет. Шаг выше пишет в apps/android-tv/out, а загрузчик искал
+          # в корне и рапортовал «No files were found» при живом файле.
+          path: apps/android-tv/out/AniMori_${{ steps.ver.outputs.version }}_${{ matrix.abi }}.apk
           if-no-files-found: error
 
   publish:
