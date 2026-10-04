@@ -6,6 +6,7 @@ import { markFirstPaint } from '@/core/playable'
 
 import { refreshAuth, watchAuth } from './auth/session'
 import AppShell from './components/AppShell.vue'
+import NetToast from './components/NetToast.vue'
 import UpdateBox from './components/UpdateBox.vue'
 import { closePerson, shownPerson } from './person-layer'
 import { currentRoute, startRouter } from './router'
@@ -82,4 +83,7 @@ onBeforeUnmount(() => {
   <!-- Окно обновления уводится в body само (Teleport). Открыто оно бывает редко,
        но открыть его могут откуда угодно, поэтому стоит здесь, в корне. -->
   <UpdateBox :open="updateOpen" @close="updateOpen = false" />
+
+  <!-- Вне рамки: плашка лежит поверх всего экрана и не должна попадать под блюр рельса. -->
+  <NetToast />
 </template>

@@ -15,6 +15,7 @@
     "components/FilterSheet.vue": 84,
     "components/MediaRow.vue": 27,
     "components/MediaTile.vue": 71,
+    "components/NetToast.vue": 0,
     "components/PeopleBox.vue": 87,
     "components/PersonSheet.vue": 275,
     "components/PickBox.vue": 16,

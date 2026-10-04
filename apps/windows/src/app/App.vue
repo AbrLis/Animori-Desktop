@@ -7,6 +7,7 @@ import { Logger } from '@/utils/logger'
 
 import { refreshAuth, watchAuth } from './auth/session'
 import AppShell from './components/AppShell.vue'
+import NetToast from './components/NetToast.vue'
 import { closePerson, shownPerson } from './person-layer'
 import { currentRoute, startRouter } from './router'
 import type { ScreenName } from './router/routes'
@@ -74,6 +75,9 @@ onBeforeUnmount(() => {
   <AppShell>
     <component :is="screen" />
   </AppShell>
+
+  <!-- Вне рамки: плашка лежит поверх всего окна и не должна попадать под блюр рельса. -->
+  <NetToast />
 
   <!-- Рядом с рамкой, а не внутри неё: блюр рельса создаёт свой контекст
        наложения, и окошко внутри него прижалось бы к содержимому. -->
