@@ -214,7 +214,7 @@ export async function fetchAnime365ByMal(
 
         // Всё прочее, кроме 200 и 404, уходит в catch этого же зеркала.
         if (res.status !== 200 && res.status !== 404) {
-          throw new Error(`anime365 HTTP ${res.status}`)
+          throw new Error(`anime365 ответил отказом (${res.status}).`)
         }
 
         anime365FailStreak = 0 // успех или 404 — сброс

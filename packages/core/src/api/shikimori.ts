@@ -194,7 +194,7 @@ async function askMirrors<T>(
       }
 
       if (r.status !== 200) {
-        throw new Error(`Shikimori HTTP ${r.status}`)
+        throw new Error(`Шикимори ответил отказом (${r.status}).`)
       }
 
       const data = read(r.text)
@@ -235,7 +235,8 @@ async function askMirrors<T>(
   }
 
   Logger('ERROR', `Все зеркала Shikimori недоступны для ${req.path}`, { mirrorFailures })
-  throw new Error(`Все зеркала Shikimori недоступны для ${req.path}`)
+  // Путь уходит в журнал: в полосе он читался бы как служебная абракадавра.
+  throw new Error('Все зеркала Шикимори недоступны. Проверьте интернет или включите VPN.')
 }
 
 /**
@@ -270,7 +271,7 @@ export async function fetchShikiGraphql<T = unknown>(
     (text) => {
       const reply = JSON.parse(text) as GraphqlReply<T>
       if (reply.data === undefined || reply.data === null) {
-        throw new Error('Shikimori GraphQL: ответ без данных')
+        throw new Error('Шикимори вернул пустой ответ. Попробуйте позже.')
       }
       return reply.data
     },

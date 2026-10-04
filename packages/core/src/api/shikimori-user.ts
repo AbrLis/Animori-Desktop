@@ -95,7 +95,8 @@ export async function shikiUserGet<T>(path: string): Promise<ShikiUserResponse<T
     }
   }
 
-  throw lastError instanceof Error
-    ? lastError
-    : new Error('Shikimori: ни одно зеркало не ответило.')
+  // Наружу — текст для человека: сырое «Bridge HTTP network error: https://...» в полосе
+  // читалось как абракадавра и ничего не объясняло. Сама ошибка уже записана в журнал выше.
+  if (lastError) Logger('ERROR', 'Shikimori: ни одно зеркало не ответило', lastError)
+  throw new Error('Все зеркала Шикимори недоступны. Проверьте интернет или включите VPN.')
 }

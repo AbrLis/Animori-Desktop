@@ -339,7 +339,9 @@ export async function anilistQuery<T = unknown>(
   if (remaining > 0) {
     // Длинную паузу не высиживаем внутри вызова — см. MAX_INLINE_WAIT_MS.
     if (remaining > MAX_INLINE_WAIT_MS) {
-      throw new Error(`AniList недоступен, повтор через ${Math.ceil(remaining / 1000)}с`)
+      throw new Error(
+        `AniList: после прошлых отказов ждём ${Math.ceil(remaining / 1000)}с. Попробуйте позже.`,
+      )
     }
     await sleep(remaining + Math.floor(Math.random() * 500))
   }
@@ -378,8 +380,11 @@ export async function anilistQuery<T = unknown>(
     // Сеть упала — тот же отступ, иначе очередь крутит пачки вхолостую всё время без сети.
     reportError(NET_SOURCE_ANILIST, NET_LABEL_ANILIST, e, Date.now() - startedAt)
     backOffAfterServerFailure(0)
+    // Текст для человека: что отказало и что делать. Сама ошибка с адресом уходит в журнал.
     Logger('ERROR', 'AniList Network Error', e)
-    throw new Error('AniList Network Error')
+    throw new Error(
+      'AniList недоступен: нет связи с сервером. Проверьте интернет или включите VPN.',
+    )
   }
 
   // Учёт состояния до разбора кодов: факт ответа важен сам по себе.
@@ -400,14 +405,16 @@ export async function anilistQuery<T = unknown>(
     // Пауза ставится даже при исчерпанных повторах: остальные вызовы не должны добивать сервер.
     if (attempt >= MAX_RATE_RETRIES) {
       Logger('ERROR', `AniList Rate Limit 429: повторы исчерпаны (${MAX_RATE_RETRIES})`, res)
-      throw new Error('AniList Rate Limit: повторы исчерпаны')
+      throw new Error(
+        'AniList: запросов слишком много, сервер просит подождать. Повторите через минуту.',
+      )
     }
 
     // Назначенный срок длиннее порога — не высиживаем: пауза уже стоит, а висящее полминуты обещание выглядит зависанием.
     if (waitTime > MAX_INLINE_WAIT_MS) {
       const seconds = Math.ceil(waitTime / 1000)
       Logger('ERROR', `AniList Rate Limit 429: сервер назвал ${seconds}с — ждём вне запроса`, res)
-      throw new Error(`AniList Rate Limit: повтор через ${seconds}с`)
+      throw new Error(`AniList: запросов слишком много. Повторите через ${seconds}с.`)
     }
 
     Logger(
@@ -426,11 +433,13 @@ export async function anilistQuery<T = unknown>(
       Logger('ERROR', `AniList ${res.status}: заголовки отказа`, failureDetails(res.headers))
 
       const pause = backOffAfterServerFailure(res.status)
-      throw new Error(`AniList недоступен (${res.status}), пауза ${Math.round(pause / 1000)}с`)
+      throw new Error(
+        `AniList отвечает ошибкой ${res.status}. Повторите через ${Math.round(pause / 1000)}с.`,
+      )
     }
 
     Logger('ERROR', `AniList API Error HTTP ${res.status}`, res.text)
-    throw new Error(`Error ${res.status}`)
+    throw new Error(`AniList ответил отказом (${res.status}). Попробуйте позже.`)
   }
 
   // Сервер ответил — серия прервана; запись обновляется тут же, чтобы завтрашний запуск не отступал от вчерашней аварии.
@@ -449,13 +458,14 @@ export async function anilistQuery<T = unknown>(
     payload = JSON.parse(res.text) as GraphQLResponse<T>
   } catch (e) {
     Logger('ERROR', 'AniList: не удалось разобрать ответ', e)
-    throw new Error('AniList: некорректный ответ сервера')
+    throw new Error('AniList вернул ответ, который не читается. Обновите карточку.')
   }
 
   if (payload.errors) {
-    const message = JSON.stringify(payload.errors)
+    // В журнал уходит весь разбор: человеку его показывать незачем. Наружу — только короткое
+    // «сервер не понял запрос», иначе в полосу уходит простыня JSON.
     Logger('ERROR', 'AniList GraphQL Error', payload.errors)
-    throw new Error(`AniList GraphQL Error: ${message}`)
+    throw new Error('AniList не понял запрос. Обновите карточку или попробуйте позже.')
   }
 
   return payload

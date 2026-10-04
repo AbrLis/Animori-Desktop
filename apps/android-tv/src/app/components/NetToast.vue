@@ -91,13 +91,14 @@ onBeforeUnmount(() => {
   flex-wrap: wrap;
   gap: 6px;
   margin: 0;
-  padding: 9px 34px 9px 12px;
+  padding: 9px 34px 9px 14px;
   font-size: 12.5px;
   line-height: 1.45;
   color: var(--am-text);
   background: var(--am-panel);
-  border-left: 2px solid var(--am-bad);
-  border-radius: 0 var(--am-r-m) var(--am-r-m) 0;
+  /* Симметричный обоюдоскруглённый чип: срезанный слева край читался как обрыв вёрстки. */
+  border: 1px solid color-mix(in srgb, var(--am-bad) 42%, transparent);
+  border-radius: var(--am-r-m);
   box-shadow: 0 6px 22px rgb(0 0 0 / 28%);
 }
 
