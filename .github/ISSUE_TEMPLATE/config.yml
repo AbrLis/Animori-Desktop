@@ -1,11 +1,19 @@
 blank_issues_enabled: false
 contact_links:
-  - name: Установка и обновление
+  - name: Установка и обновление на ПК
     url: https://github.com/foulnike/Animori/releases/latest
-    about: Последний выпуск — установщик, подпись и требования к системе.
-  - name: Название или номер не те
+    about: Последний выпуск настольного приложения — установщик, MSI и портативный архив.
+  - name: Установка APK для приставки
+    url: https://github.com/foulnike/Animori/releases
+    about: |
+      Выпуск приставки лежит среди общих, с тегом `android-tv-v` и пометкой «предварительный».
+      Этот статус — не ошибка: он держит `releases/latest` за настольным приложением.
+  - name: Название, описание или номер не те
     url: https://github.com/foulnike/animori-data
-    about: Русские названия и соответствия номеров собирает отдельный репозиторий.
-  - name: Устройство приложения
-    url: https://github.com/foulnike/Animori/blob/main/docs/README.md
-    about: Документация — интерфейс, данные, видео, хранение, сборка.
+    about: Русские названия, описания и соответствия номеров собирает отдельный репозиторий.
+  - name: Устройство приложения на ПК
+    url: https://github.com/foulnike/Animori/blob/main/apps/windows/docs/README.md
+    about: Интерфейс, данные, видео, хранение, сборка.
+  - name: Устройство приложения на приставке
+    url: https://github.com/foulnike/Animori/blob/main/apps/android-tv/docs/README.md
+    about: Интерфейс, пульт и фокус, данные, видео, хранение, сборка APK.

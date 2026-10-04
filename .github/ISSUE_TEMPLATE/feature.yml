@@ -1,11 +1,25 @@
 name: Идея
-description: Предложение по новой возможности или улучшению
+description: Предложение по новой возможности или улучшению — на ПК, на приставке или сразу на обоих
 labels: ['enhancement']
 body:
   - type: markdown
     attributes:
       value: |
         Опишите сначала задачу, а потом желаемое решение: часто у задачи есть путь короче.
+        Приложений два — настольное и приставка, — и одна и та же идея обычно касается обоих.
+  - type: dropdown
+    id: product
+    attributes:
+      label: Где это нужно
+      description: |
+        Общее ядро — то, что в каталоге `packages/core`, — попадает в оба приложения сразу.
+        Если идея касается его, «оба» подходит честнее, чем «наверное, везде».
+      options:
+        - Настольное приложение (Windows)
+        - Приставка (Android TV)
+        - На обоих
+    validations:
+      required: true
   - type: textarea
     id: problem
     attributes:
@@ -20,6 +34,16 @@ body:
       description: Где это живёт в интерфейсе и что происходит по нажатию.
     validations:
       required: true
+  - type: textarea
+    id: controls
+    attributes:
+      label: Чем этим управлять
+      description: |
+        На ПК — мышь и клавиатура: куда встаёт фокус, какая клавиша.
+        На приставке — пульт: какими кнопками и откуда берётся фокус
+        (`apps/android-tv/docs/INTERFACE.md` в этом репозитории).
+        С телевизора экран читают с трёх метров, с монитора — с тридцати сантиметров,
+        и требования к нему разные. Необязательно.
   - type: textarea
     id: extra
     attributes:
