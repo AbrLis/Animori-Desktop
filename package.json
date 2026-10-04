@@ -3,7 +3,10 @@
   "private": true,
   "version": "3.1.0",
   "description": "AniMori: общее ядро и два приложения — настольное и приставка",
-  "workspaces": ["apps/windows", "apps/android-tv"],
+  "workspaces": [
+    "apps/windows",
+    "apps/android-tv"
+  ],
   "scripts": {
     "test": "npm run test:core && npm run test:windows && npm run test:android-tv",
     "test:core": "npm --prefix apps/windows run test:core",
@@ -14,6 +17,21 @@
     "typecheck:android-tv": "npm --prefix apps/android-tv run typecheck:all",
     "build:windows": "npm --prefix apps/windows run build:app",
     "build:android-tv": "npm --prefix apps/android-tv run build:app",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "drift": "node scripts/drift.mjs",
+    "drift:accept": "node scripts/drift.mjs --accept",
     "fix:lock": "node scripts/fix-lock-optional.mjs"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.39.5",
+    "eslint": "^9.39.5",
+    "eslint-config-prettier": "^9.1.2",
+    "eslint-plugin-vue": "^9.33.0",
+    "globals": "^14.0.0",
+    "prettier": "^3.9.9",
+    "typescript-eslint": "^8.71.0"
   }
 }

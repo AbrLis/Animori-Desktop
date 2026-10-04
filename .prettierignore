@@ -1,0 +1,12 @@
+node_modules/
+dist/
+dist-tauri/
+
+# Схемы и сгенерированный Android-код Tauri: их правит сам Tauri, а не мы.
+# Префикс **/ обязателен — без него вложенные пути не находятся.
+**/src-tauri/target/
+**/src-tauri/gen/
+
+packages/core/tests/
+package-lock.json
+*.md

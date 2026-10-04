@@ -1,0 +1,32 @@
+# Content Security Policy
+
+Политика лежит в `app.security.csp` в `apps/windows/src-tauri/tauri.conf.json` и
+`apps/android-tv/src-tauri/tauri.conf.json`. На обеих платформах одинаковая.
+
+Схема читается в конфиге. Здесь только то, без чего политику сломают при правке: ломается
+тихо, окно открывается, а картинки или звук не грузятся.
+
+## Что нельзя убирать
+
+| Директива | Зачем |
+| :--- | :--- |
+| `worker-src blob:` | hls.js поднимает transmuxer как `new Worker(createObjectURL(blob))` (`hls.light.mjs` ~15945, в конфиге `enableWorker: true`). Без `blob:` поток не пойдёт — экран просто останется чёрным |
+| `ipc: http://ipc.localhost` | Служебные каналы Tauri. Tauri их не подставляет сам. Без них пропадает `invoke`, а с ним сеть, хранилище и авторизация |
+| `script-src 'self'` | Без `'unsafe-inline'` и `'unsafe-eval'`. Это смысл всей политики |
+| `style-src 'unsafe-inline'` | Компоненты задают цвета через `:style` |
+| `img-src data:` | Заставка в `index.html` встроена как data-URI, плюс SVG-заглушки и blob-постеры |
+
+## Почему остальное широкое
+
+Приложение не ходит в сеть из webview: `fetch`, `XMLHttpRequest`, `EventSource` и
+`WebSocket` в UI-слое не встречаются, вся сеть идёт через Rust (`tauri-plugin-http`,
+`invoke`). Поэтому сужать `connect-src` бессмысленно, а `img-src` и `media-src` оставлены
+широкими из-за обилия хостов обложек и зеркал.
+
+Белый список хостов живёт в `capabilities/default.json` (`http:default`), и проверяет его
+Rust. В CSP он намеренно не продублирован: два списка в разных местах разъедутся.
+
+## Проверка после правки
+
+Сначала плеер и облако — самое хрупкое. Потом обложки, авторизация AniList, трейлер.
+Пустая консоль обязательна: CSP сам сообщает о запрещённом ресурсе.

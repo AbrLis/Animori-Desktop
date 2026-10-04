@@ -104,7 +104,7 @@ export function activityBands(days: ReadonlyArray<ActivityDay>): ActivityBands {
     distinct[Math.min(distinct.length - 1, Math.floor(distinct.length * part))] ?? 1
 
   // Пороги обязаны идти строго вверх: иначе уровень между ними некуда положить.
-  let first = rank(0.25)
+  const first = rank(0.25)
   let second = rank(0.5)
   let third = rank(0.75)
 

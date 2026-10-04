@@ -35,6 +35,14 @@ jobs:
       - name: Зависимости
         run: npm ci
 
+      - name: Линтер
+        run: npm run lint
+
+      # Расхождение копий между продуктами: ловит правку, доехавшую только до одного края.
+      # Различие само по себе не ошибка — падает лишь рост сверх зафиксированного.
+      - name: Расхождение копий
+        run: npm run drift
+
       - name: Наборы ядра
         run: npm run test:core
 
@@ -63,6 +71,9 @@ jobs:
         working-directory: apps/windows
         run: npm run typecheck:all
 
+      - name: Линтер
+        run: npm run lint
+
       - name: Наборы экранов
         working-directory: apps/windows
         run: npm test
@@ -87,6 +98,9 @@ jobs:
       - name: Проверка типов
         working-directory: apps/android-tv
         run: npm run typecheck:all
+
+      - name: Линтер
+        run: npm run lint
 
       - name: Наборы экранов
         working-directory: apps/android-tv

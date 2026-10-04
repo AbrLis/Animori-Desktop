@@ -251,7 +251,7 @@ const subLine = computed<string>(() => {
 })
 
 const coverStyle = computed<{ backgroundImage: string }>(() => ({
-  backgroundImage: cover.value === null ? 'none' : `url(\"${cover.value}\")`,
+  backgroundImage: cover.value === null ? 'none' : `url("${cover.value}")`,
 }))
 
 /** Заслонка нужна, пока кадра нет: чёрный прямоугольник ничего не говорит. */

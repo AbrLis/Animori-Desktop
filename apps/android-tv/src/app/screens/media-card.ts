@@ -293,7 +293,7 @@ export function useMediaCard(mediaId: Ref<number>): MediaCardView {
   /** Подложка героя: баннер сервера, а без него тон обложки. */
   const heroStyle = computed<{ backgroundImage: string }>(() => {
     const banner = card.value?.banner
-    if (banner) return { backgroundImage: `url(\"${banner}\")` }
+    if (banner) return { backgroundImage: `url("${banner}")` }
 
     const tone = card.value?.color ?? '#1b2534'
     return { backgroundImage: `linear-gradient(120deg, ${tone}, #0b1018)` }
