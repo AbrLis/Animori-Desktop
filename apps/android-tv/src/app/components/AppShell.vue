@@ -1,6 +1,5 @@
 <script setup lang="ts">
-// Пункт 3.2: рамка окна — рельс, шапка, сменный экран внутри; имена и подписи экранов
-// живут в routes.ts. Рельс раскрывается поверх содержимого (fixed, не sticky).
+// Рамка окна — рельс, шапка, сменный экран внутри; имена и подписи экранов живут в routes.ts. Рельс раскрывается поверх содержимого (fixed, не sticky).
 
 import { computed } from 'vue'
 
@@ -24,8 +23,7 @@ const title = computed(() => SCREEN_TITLES[active.value])
 
 type MenuName = (typeof MENU)[number]['name']
 
-// «Назад» нужен только там, куда пришли изнутри: с экранов меню он увёл бы
-// в пустую историю окна. Журнал обязателен: в меню его нет, вход — из настроек.
+// «Назад» нужен только там, куда пришли изнутри: с экранов меню он увёл бы в пустую историю окна. Журнал обязателен: в меню его нет, вход — из настроек.
 const BACK_SCREENS: ReadonlyArray<string> = ['media', 'studio', 'log']
 
 const canGoBack = computed(() => BACK_SCREENS.includes(active.value))

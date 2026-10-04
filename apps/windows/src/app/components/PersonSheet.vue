@@ -1,6 +1,5 @@
 <script setup lang="ts">
-// Окошко персонажа или автора (п. 3.9б): русское докидывается фоном из person-title.ts и media-title.ts.
-// Слой окошка подменяет человека ссылкой из описания, поэтому загрузка висит и на смене свойства.
+// Окошко персонажа или автора: русское докидывается фоном из person-title.ts и media-title.ts. Слой окошка подменяет человека ссылкой из описания, поэтому загрузка висит и на смене свойства.
 import { onBeforeUnmount, onMounted, ref, shallowReactive, watch } from 'vue'
 
 import {
@@ -245,15 +244,13 @@ async function beginWorkNames(mine: number, list: readonly StaffWork[]): Promise
  *  Главному лицу спрашивается полная карточка: имя из списка ролей добирает описание одним запросом. */
 async function beginRussian(mine: number, target: PersonTarget): Promise<void> {
   if (translateAllowed()) {
-    // Ответ раскладывается по двум признакам: карточку можно показать и при недоезде (имя могло
-    // остаться от списка ролей), а «ждать больше нечего» и «надо повторить» — разные вещи.
+    // Ответ раскладывается по двум признакам: карточку можно показать и при недоезде (имя могло остаться от списка ролей), а «ждать больше нечего» и «надо повторить» — разные вещи.
     const answer = await askRussianPersonFull(target.kind, target)
     if (!alive || mine !== run) return
 
     ruWait.value = false
     ruFailed.value = answer.state === 'fail'
-    // Карточка при недоезде бывает частичной: имя есть, описания нет.
-    // Такой ответ не подменяет полный, добытый раньше.
+    // Карточка при недоезде бывает частичной: имя есть, описания нет. Такой ответ не подменяет полный, добытый раньше.
     if (answer.person && !(ruPerson.value && !ruPerson.value.partial)) {
       ruPerson.value = answer.person
     }
@@ -288,8 +285,7 @@ async function load(target: PersonTarget): Promise<void> {
   busy.value = true
   cardFailed.value = false
   ruFailed.value = false
-  // Ждать ли русского: вопрос уйдёт сразу, но при выключенном переводе
-  // ждать нечего, и описание показывается как пришло.
+  // Ждать ли русского: вопрос уйдёт сразу, но при выключенном переводе ждать нечего, и описание показывается как пришло.
   ruWait.value = translateAllowed()
   box.value?.scrollTo({ top: 0 })
 
@@ -326,8 +322,7 @@ async function load(target: PersonTarget): Promise<void> {
   busy.value = false
 
   void beginRussian(mine, target).catch((e) => {
-    // Недоезд русского описания — не повод держать окно в ожидании: разблокируем здесь,
-    // иначе пустая полоса висела бы до закрытия окна.
+    // Недоезд русского описания — не повод держать окно в ожидании: разблокируем здесь, иначе пустая полоса висела бы до закрытия окна.
     if (!alive || mine !== run) return
     ruWait.value = false
     ruFailed.value = true

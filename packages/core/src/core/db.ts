@@ -29,8 +29,7 @@ const DB_MIGRATIONS: Record<number, Migration> = {
   },
 
   /**
-   * Переименование склада: shikiCache -> mediaCache; сначала копия, потом удаление — потеря склада дорога.
-   */
+   * Переименование склада: shikiCache -> mediaCache; сначала копия, потом удаление — потеря склада дорога. */
   6: (db, tx) => {
     if (!db.objectStoreNames.contains('mediaCache'))
       db.createObjectStore('mediaCache', { keyPath: 'key' })
@@ -75,9 +74,8 @@ const DB_MIGRATIONS: Record<number, Migration> = {
   },
 
   /**
-   * Седьмая версия: склад постеров. Обложка в MediaLook — это ссылка на CDN, и без сети сетка
-   * оставалась пустой. Теперь тело картинки лежит рядом, а облик отдаёт локальный адрес.
-   * Переливать нечего: новый стор, и до него постеров на диске просто не было.
+   * Седьмая версия: склад постеров. Обложка в MediaLook — это ссылка на CDN, и без сети сетка оставалась
+   * пустой. Теперь тело картинки лежит рядом, а облик отдаёт локальный адрес. Переливать нечего.
    */
   7: (db) => {
     if (!db.objectStoreNames.contains('posterCache'))
@@ -94,8 +92,7 @@ function physicalStore(store: CacheStoreName): PhysicalStore {
 }
 
 /**
- * Смерть соединения: onversionchange отпускает старую версию, onclose убирает битый экземпляр из globalDbInstance.
- */
+ * Смерть соединения: onversionchange отпускает старую версию, onclose убирает битый экземпляр из globalDbInstance. */
 function attachConnectionHandlers(db: IDBDatabase): void {
   db.onversionchange = () => {
     Logger('WARN', 'IndexedDB: другое окно обновляет схему — закрываем соединение')
@@ -115,8 +112,7 @@ function attachConnectionHandlers(db: IDBDatabase): void {
 }
 
 /**
- * Открывает базу с миграциями; null при сбое. Промис разрешается всегда: работа без кэша — медленно, но работа.
- */
+ * Открывает базу с миграциями; null при сбое. Промис разрешается всегда: работа без кэша — медленно, но работа. */
 export async function openDB(): Promise<IDBDatabase | null> {
   if (globalDbInstance) return globalDbInstance
 
@@ -236,9 +232,8 @@ export async function dbGet<T = unknown>(
 }
 
 /**
- * Читает пачку записей одним заходом: сводке нужен вид всего списка сразу, и заход на каждый
- * ключ — сотни транзакций там, где хватает одной. `null` — склад не открылся; пустая карта
- * значит, что записей нет, — это разные ответы, и путать их нельзя.
+ * Читает пачку записей одним заходом: сводке нужен вид всего списка сразу, и заход на каждый ключ — сотни
+ * транзакций там, где хватает одной. `null` — склад не открылся; пустая карта значит, что записей нет.
  */
 export async function dbGetMany<T = unknown>(
   store: CacheStoreName,
@@ -306,8 +301,7 @@ export async function dbSet(store: CacheStoreName, data: CacheRecord): Promise<v
 }
 
 /**
- * Удаляет запись по ключу. Отсутствие ключа — не ошибка: удалять нечего, и повтор кнопки
- * «очистить» должен оставаться безопасным. Стор `posterCache` без этого не умеет худеть.
+ * Удаляет запись по ключу. Отсутствие ключа — не ошибка: удалять нечего, и повтор кнопки «очистить» должен оставаться безопасным. Стор `posterCache` без этого не умеет худеть.
  */
 export async function dbDelete(store: CacheStoreName, key: IDBValidKey): Promise<void> {
   const name = physicalStore(store)
@@ -367,9 +361,8 @@ export async function clearCache(): Promise<void> {
     return
   }
 
-  // clear() по сторам не отдаёт место — LevelDB ждёт фоновой компакции, и счётчик после
-  // чистки показывал больше, чем до. Удаляем базу целиком: пустая поднимется сама при openDB().
-  // Обработчики сняты, чтобы своё закрытие не писало WARN «закрыто извне».
+  // clear() по сторам не отдаёт место — LevelDB ждёт фоновой компакции. Удаляем базу целиком: пустая поднимется
+  // сама при openDB(). Обработчики сняты, чтобы своё закрытие не писало WARN «закрыто извне».
   db.onversionchange = null
   db.onclose = null
   db.close()
@@ -413,8 +406,7 @@ export async function clearCache(): Promise<void> {
       finish()
     }
 
-    // Удаление ждёт чужого открытого соединения; оно закроется по onversionchange
-    // из attachConnectionHandlers, и запрос пойдёт дальше сам.
+    // Удаление ждёт чужого открытого соединения; оно закроется по onversionchange из attachConnectionHandlers, и запрос пойдёт дальше сам.
     req.onblocked = () => {
       Logger('WARN', 'Сброс кэша: удаление ждёт закрытия другого соединения с базой')
     }

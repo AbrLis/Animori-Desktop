@@ -1,4 +1,4 @@
-// Пункт 3.2: свой маршрутизатор на хэше (страница живёт файлом); свой — на телевизоре нужен контроль над историей.
+// Свой маршрутизатор на хэше (страница живёт файлом); свой — на телевизоре нужен контроль над историей.
 // Замена переписывает текущую запись истории — без неё плеер и карточка образовывали кольцо по «назад».
 import { computed, ref, type ComputedRef } from 'vue'
 
@@ -32,8 +32,7 @@ function isScreenName(value: string): value is ScreenName {
   return (SCREEN_NAMES as readonly string[]).includes(value)
 }
 
-// Неизвестный или битый адрес ведёт на главную: пустого экрана
-// пользователь видеть не должен ни при каком содержимом строки.
+// Неизвестный или битый адрес ведёт на главную: пустого экрана пользователь видеть не должен ни при каком содержимом строки.
 export function parseHash(hash: string): Route {
   const raw = hash.replace(/^#\/?/, '')
   const parts = raw.split('/').filter((part) => part !== '')
@@ -94,8 +93,7 @@ export function navigate(
     return
   }
 
-  // replaceState меняет строку адреса молча: hashchange он не поднимает,
-  // и без своего вызова экран остался бы прежним при новом адресе.
+  // replaceState меняет строку адреса молча: hashchange он не поднимает, и без своего вызова экран остался бы прежним при новом адресе.
   window.history.replaceState(null, '', next)
   land(parseHash(next))
 }
@@ -105,8 +103,7 @@ export function goBack(): void {
   window.history.back()
 }
 
-// Возвращает отключатель: без него горячая замена в разработке
-// накопила бы по подписчику на каждую пересборку.
+// Возвращает отключатель: без него горячая замена в разработке накопила бы по подписчику на каждую пересборку.
 export function startRouter(): () => void {
   const apply = (): void => {
     land(parseHash(window.location.hash))

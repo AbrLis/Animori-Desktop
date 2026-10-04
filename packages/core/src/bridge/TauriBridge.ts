@@ -1,5 +1,4 @@
-// IBridge для десктопной оболочки Tauri. Единственная реализация: псевдопуть '@bridge-impl' из
-// vite.config.ts ведёт сюда.
+// IBridge для десктопной оболочки Tauri. Единственная реализация: псевдопуть '@bridge-impl' из vite.config.ts ведёт сюда.
 
 import { invoke } from '@tauri-apps/api/core'
 import { writeText } from '@tauri-apps/plugin-clipboard-manager'
@@ -34,8 +33,7 @@ import { tauriProxyDiagnostics } from './TauriProxyDiagnostics'
 
 // ==== storage ====
 
-// LazyStore не требует await при создании. autoSave — только сетка безопасности:
-// он пишет файл уже после разрешения set(), это дефект 4.5.
+// LazyStore не требует await при создании. autoSave — только сетка безопасности: он пишет файл уже после разрешения set().
 const store = new LazyStore('animori-settings.json', { autoSave: true })
 
 /** Снимок файла настроек в памяти: один entries() вместо трёх десятков get() на старте. */
@@ -123,8 +121,7 @@ const tauriStorage: IStorage = {
 // ==== files ====
 
 /**
- * Запасная копия снимка файлом в приватном каталоге (пункт 2.5.2); каталог и имена — в files.rs.
- * Отказ не отклоняется: дубль — страховка и портить сохранение в основное хранилище не должен.
+ * Запасная копия снимка файлом в приватном каталоге; каталог и имена — в files.rs. Отказ не отклоняется: дубль — страховка и портить сохранение в основное хранилище не должен.
  */
 const tauriFiles: IFiles = {
   available: true,
@@ -153,8 +150,7 @@ const tauriFiles: IFiles = {
 // ==== выгрузка ====
 
 /**
- * Выгрузка в папку человека (пункт 3.3) и сохранение трека; окно выбора открывает Rust (export.rs).
- * Отказы не глотаются, в отличие от tauriFiles: выгрузку человек затеял руками и ждёт ответа.
+ * Выгрузка в папку человека  и сохранение трека; окно выбора открывает Rust (export.rs). Отказы не глотаются, в отличие от tauriFiles: выгрузку человек затеял руками и ждёт ответа.
  */
 const tauriExport: IExport = {
   available: true,
@@ -171,15 +167,13 @@ const tauriExport: IExport = {
   },
 
   async pickTrackDir(): Promise<string | null> {
-    // Своя команда, а не animori_export_pick_dir: разница в заголовке окна выбора.
-    // Выбранная папка никуда не записывается: спрашиваем каждый раз.
+    // Своя команда, а не animori_export_pick_dir: разница в заголовке окна выбора. Выбранная папка никуда не записывается: спрашиваем каждый раз.
     const picked = await invoke<string | null>('animori_track_pick_dir')
     return picked ?? null
   },
 
   async writeTrack(dir: string, name: string, bytesBase64: string): Promise<string> {
-    // Ключ именно bytes: в export.rs параметр назван одним словом, иначе
-    // пришлось бы помнить про перевод camelCase в snake_case на стороне Tauri.
+    // Ключ именно bytes: в export.rs параметр назван одним словом, иначе пришлось бы помнить про перевод camelCase в snake_case на стороне Tauri.
     return await invoke<string>('animori_track_write', { dir, name, bytes: bytesBase64 })
   },
 }
@@ -187,8 +181,7 @@ const tauriExport: IExport = {
 // ==== прокси ====
 
 /**
- * Прокси нашего канала — запросов из процесса оболочки; страницу в WebView2 настраивает proxy.rs.
- * Запросы к AniList сюда не идут: им прокси собирает anilist.rs из тех же ключей.
+ * Прокси нашего канала — запросов из процесса оболочки; страницу в WebView2 настраивает proxy.rs. Запросы к AniList сюда не идут: им прокси собирает anilist.rs из тех же ключей.
  */
 type TauriFetchOptions = NonNullable<Parameters<typeof tauriFetch>[1]>
 type TauriProxyOption = TauriFetchOptions['proxy']
@@ -197,8 +190,7 @@ type TauriProxyOption = TauriFetchOptions['proxy']
 type TauriResponse = Awaited<ReturnType<typeof tauriFetch>>
 
 /**
- * Подпись последней настройки, о негодности которой уже сказано в журнал; пароля в ней нет.
- * Живёт в памяти до конца сеанса, чтобы не повторять одно и то же на каждый запрос.
+ * Подпись последней настройки, о негодности которой уже сказано в журнал; пароля в ней нет. Живёт в памяти до конца сеанса, чтобы не повторять одно и то же на каждый запрос.
  */
 let warnedBadProxy = ''
 
@@ -216,8 +208,7 @@ function warnBadProxy(config: ProxyConfig): void {
 }
 
 /**
- * Прокси для одного запроса: читается каждый раз, а не однажды за сеанс — иначе смена адреса не
- * доходила бы до перезапуска. Цены нет: значения берутся из снимка настроек в памяти.
+ * Прокси для одного запроса: читается каждый раз, а не однажды за сеанс — иначе смена адреса не доходила бы до перезапуска. Цены нет: значения берутся из снимка настроек в памяти.
  */
 async function readProxyOption(): Promise<TauriProxyOption> {
   try {
@@ -232,8 +223,7 @@ async function readProxyOption(): Promise<TauriProxyOption> {
     ])
 
     const config: ProxyConfig = {
-      // Строго true, как matches!(…, Bool(true)) в proxy.rs: «да» строкой
-      // движок за включение не считает, и мост обязан судить так же.
+      // Строго true, как matches!(…, Bool(true)) в proxy.rs: «да» строкой движок за включение не считает, и мост обязан судить так же.
       enabled: enabled === true,
       kind: normalizeProxyKind(kind),
       host: String(host ?? ''),
@@ -276,8 +266,7 @@ async function readProxyOption(): Promise<TauriProxyOption> {
 const DEFAULT_USER_AGENT = `AniMori/${__ANIMORI_VERSION__} (+https://github.com/foulnike/Animori)`
 
 /**
- * Общая часть обоих запросов: прокси, таймаут на весь запрос и разбор
- * транспортных сбоев. Коды вне 2xx не трогаем: их разбирает вызывающий.
+ * Общая часть обоих запросов: прокси, таймаут на весь запрос и разбор транспортных сбоев. Коды вне 2xx не трогаем: их разбирает вызывающий.
  */
 async function sendRequest(options: HttpRequestOptions): Promise<TauriResponse> {
   const { url, method = 'GET', headers, body, timeoutMs, credentials = 'include' } = options
@@ -315,8 +304,7 @@ async function sendRequest(options: HttpRequestOptions): Promise<TauriResponse> 
     const name = e instanceof Error ? e.name : ''
     if (name === 'AbortError') throw new BridgeHttpError('abort', url)
 
-    // BridgeHttpError несёт только вид сбоя — «проверьте сеть»; в журнал и консоль идёт строка с ошибкой:
-    // адрес не в capabilities/default.json: «url not allowed on the configured scope».
+    // BridgeHttpError несёт только вид сбоя — «проверьте сеть»; в журнал и консоль идёт строка с ошибкой: адрес не в capabilities/default.json: «url not allowed on the configured scope».
     Logger('ERROR', `Запрос не ушёл: ${url}`, e)
 
     throw new BridgeHttpError('network', url)
@@ -386,16 +374,11 @@ const tauriClipboard: IClipboard = {
 // ==== shell ====
 
 /**
- * Оболочка: свои команды из lib.rs плюс история WebView; они требуют разрешений (build.rs и
- * capabilities). Перезагрузка, внешние ссылки, полный экран и трансляция — только командами.
+ * Оболочка: свои команды из lib.rs плюс история WebView; они требуют разрешений (build.rs и capabilities). Перезагрузка, внешние ссылки, полный экран и трансляция — только командами.
  */
 const tauriShell: IShell = {
-  // Умения приходят из сборки, а не живут здесь литералом: файл моста общий у двух
-  // продуктов, а оболочки у них разные. Окно Windows умеет всё пять, телевизор —
-  // ничего: браузера, истории окна, полного экрана, панели трансляции и консоли у него
-  // нет, а объявлять надо честно (define __ANIMORI_SHELL_CAN__ в vite.config.ts).
-  // Пока объявление врало, выключатели в экранах молчали: ключ, ведущий наружу, стоял
-  // «браузер есть», и приставка показывала то, что открыть ей нечем.
+  // Умения приходят из сборки, а не живут здесь литералом: файл моста общий у двух продуктов, оболочки разные.
+  // Окно Windows умеет все пять, телевизор — ни одного (__ANIMORI_SHELL_CAN__ в vite.config.ts).
   can: __ANIMORI_SHELL_CAN__,
 
   async reload(): Promise<void> {
@@ -403,8 +386,7 @@ const tauriShell: IShell = {
   },
 
   restart(): Promise<void> {
-    // Ответа не будет: команда уводит процесс целиком, и обещание invoke не разрешится никогда —
-    // отдаём управление сразу. Отказ не глотается: невыданное разрешение или нет команды.
+    // Ответа не будет: команда уводит процесс целиком, и обещание invoke не разрешится никогда — отдаём управление сразу. Отказ не глотается: невыданное разрешение или нет команды.
     void invoke('animori_restart').catch((e) => {
       Logger('ERROR', 'Перезапуск не удался', e)
     })
@@ -434,8 +416,7 @@ const tauriShell: IShell = {
   },
 
   async castPanel(): Promise<void> {
-    // Своя команда, а не animori_open_external: там разрешены только http и https, а панель
-    // системы живёт по своей схеме. Ответа нет намеренно: какая панель открылась, знает Rust.
+    // Своя команда, а не animori_open_external: там разрешены только http и https, а панель системы живёт по своей схеме. Ответа нет намеренно: какая панель открылась, знает Rust.
     await invoke('animori_cast_panel')
   },
 

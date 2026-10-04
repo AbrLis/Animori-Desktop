@@ -1,5 +1,4 @@
-// Плитка выдачи каталога: сборка строки для MediaTile в одном месте.
-// Появилась со страницей студии (3.10): поиск и она собирали одно и то же дважды.
+// Плитка выдачи каталога: сборка строки для MediaTile в одном месте. Появилась со страницей студии (3.10): поиск и она собирали одно и то же дважды.
 
 import type { MediaBrief } from '@/api/anilist-media'
 import { getEntry } from '@/core/collection'
@@ -56,7 +55,7 @@ function notOut(brief: MediaBrief): boolean {
 }
 
 /** Своя закладка: сначала местный список, потом ответ сервера. Без входа
- *  ownEntry пуст, а свой список есть и так (пункт 3.14). */
+ *  ownEntry пуст, а свой список есть и так. */
 function markText(brief: MediaBrief): string | null {
   const mine = getEntry(brief.mediaId)
   if (mine) return statusWord(mine.status)

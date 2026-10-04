@@ -1,5 +1,4 @@
-// Пункт 2.3: запросы к AniList GraphQL из процесса оболочки. Пропуск в разметку
-// не отдаётся: команда принимает только тело запроса, а заголовок ставит сама.
+// Запросы к AniList GraphQL из процесса оболочки. Пропуск в разметку не отдаётся: команда принимает только тело запроса, а заголовок ставит сама.
 
 use std::collections::HashMap;
 use std::sync::Mutex;
@@ -18,8 +17,7 @@ const STORE_FILE: &str = "animori-settings.json";
 /// Ключ повторяет KEY_TOKEN из auth.rs: пропуск пишет вход, читаем его мы.
 const KEY_TOKEN: &str = "auth_token";
 
-// Ключи прокси повторяют proxy.rs. Общего разбора нет намеренно: тот файл
-// у потолка размера, и переезд разбора отложен до его следующей правки.
+// Ключи прокси повторяют proxy.rs. Общего разбора нет намеренно: тот файл у потолка размера, и переезд разбора отложен до его следующей правки.
 const KEY_PROXY_ENABLED: &str = "set_proxy_on";
 const KEY_PROXY_KIND: &str = "set_proxy_kind";
 const KEY_PROXY_HOST: &str = "set_proxy_host";
@@ -30,10 +28,8 @@ const KEY_PROXY_PASSWORD: &str = "set_proxy_pass";
 /// Потолок ожидания ответа. AniList отвечает за секунды, всё дольше — авария.
 const TIMEOUT_SECS: u64 = 30;
 
-/// Потолок ожидания соединения. Короче общего таймаута намеренно: у AniList два адреса,
-/// и DNS нередко отдаёт мёртвым первым. Без своего потолка клиент висит на нём все
-/// тридцать секунд и умирает вместе с запросом, не дойдя до живого. С ним отказ обрывается
-/// за секунды, и reqwest берёт следующий адрес.
+/// Потолок ожидания соединения. Короче общего таймаута намеренно: у AniList два адреса, и DNS нередко отдаёт
+/// мёртвым первым. Без своего потолка клиент висит на нём все тридцать секунд и не доходит до живого.
 const CONNECT_TIMEOUT_SECS: u64 = 5;
 
 struct CachedClient {
@@ -50,8 +46,7 @@ impl Default for AniListClientState {
     }
 }
 
-/// Ответ в том же виде, что HttpResponse у моста, кроме адреса: он всегда один.
-/// Заголовки идут наверх целиком: по ним ограничитель узнаёт остаток лимита.
+/// Ответ в том же виде, что HttpResponse у моста, кроме адреса: он всегда один. Заголовки идут наверх целиком: по ним ограничитель узнаёт остаток лимита.
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct AniListReply {
@@ -93,8 +88,7 @@ fn read_port(value: Option<serde_json::Value>) -> u16 {
     }
 }
 
-/// Пропуск из файла настроек. None — вход не выполнен либо пропуск стёрт.
-/// Срок здесь не проверяется: об истёкшем пропуске скажет сам AniList отказом.
+/// Пропуск из файла настроек. None — вход не выполнен либо пропуск стёрт. Срок здесь не проверяется: об истёкшем пропуске скажет сам AniList отказом.
 fn read_token(app: &AppHandle) -> Option<String> {
     let store = app.store(STORE_FILE).ok()?;
     let token = read_string(store.get(KEY_TOKEN));
@@ -106,8 +100,7 @@ fn read_token(app: &AppHandle) -> Option<String> {
     }
 }
 
-/// Прокси для НАШЕГО канала: адрес, логин, пароль. None — идём напрямую.
-/// Список исключений не читается: у запроса один адрес, и он не локальный.
+/// Прокси для НАШЕГО канала: адрес, логин, пароль. None — идём напрямую. Список исключений не читается: у запроса один адрес, и он не локальный.
 fn read_proxy(app: &AppHandle) -> Option<(String, String, String)> {
     let store = app.store(STORE_FILE).ok()?;
 
@@ -141,8 +134,7 @@ fn read_proxy(app: &AppHandle) -> Option<(String, String, String)> {
     ))
 }
 
-/// Своё представление: без него reqwest подписывается собой, и это уже давало
-/// отказ 403 у стороннего API. Версия берётся из Cargo, другой в Rust нет.
+/// Своё представление: без него reqwest подписывается собой, и это уже давало отказ 403 у стороннего API. Версия берётся из Cargo, другой в Rust нет.
 fn user_agent() -> String {
     format!(
         "AniMori/{} (+https://github.com/foulnike/Animori)",
@@ -150,8 +142,7 @@ fn user_agent() -> String {
     )
 }
 
-/// Клиент на один запрос: прокси читается каждый раз, и смена настройки
-/// действует сразу — в отличие от окна, где адрес живёт до перезапуска.
+/// Клиент на один запрос: прокси читается каждый раз, и смена настройки действует сразу — в отличие от окна, где адрес живёт до перезапуска.
 fn build_client(app: &AppHandle) -> Result<reqwest::Client, String> {
     let mut builder = reqwest::Client::builder()
         .timeout(Duration::from_secs(TIMEOUT_SECS))
@@ -208,8 +199,7 @@ fn cached_client(app: &AppHandle, state: &AniListClientState) -> Result<reqwest:
     Ok(client)
 }
 
-/// Вид сбоя префиксом в тексте ошибки: кода ответа тут нет, а мосту нужно
-/// поднять свой класс сбоя. Второе место разбора — TauriAniList.ts.
+/// Вид сбоя префиксом в тексте ошибки: кода ответа тут нет, а мосту нужно поднять свой класс сбоя. Второе место разбора — TauriAniList.ts.
 fn classify(error: reqwest::Error) -> String {
     if error.is_timeout() {
         format!("timeout: {error}")
@@ -218,8 +208,7 @@ fn classify(error: reqwest::Error) -> String {
     }
 }
 
-/// Пункт 2.3: один запрос GraphQL к AniList. Адрес и авторизация наше дело, иначе
-/// команда отправила бы пропуск куда угодно; 429 разбирает клиент api/anilist.ts.
+/// Один запрос GraphQL к AniList. Адрес и авторизация наше дело, иначе команда отправила бы пропуск куда угодно; 429 разбирает клиент api/anilist.ts.
 #[tauri::command]
 pub async fn animori_anilist_query(
     app: AppHandle,
@@ -250,8 +239,7 @@ pub async fn animori_anilist_query(
 
     let status = response.status().as_u16();
 
-    // Имена к нижнему регистру, как в обеих реализациях моста: чтение
-    // retry-after не должно зависеть от платформы.
+    // Имена к нижнему регистру, как в обеих реализациях моста: чтение retry-after не должно зависеть от платформы.
     let mut headers: HashMap<String, String> = HashMap::new();
     for (name, value) in response.headers().iter() {
         if let Ok(text) = value.to_str() {

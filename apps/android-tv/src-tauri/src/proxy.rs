@@ -1,5 +1,4 @@
-// Прокси для канала САМОГО ОКНА; наши запросы к API идут мимо, через TauriBridge.ts.
-// WebView2 читает адрес один раз: смена адреса — только перезапуск, ошибки при промахе нет.
+// Прокси для канала САМОГО ОКНА; наши запросы к API идут мимо, через TauriBridge.ts. WebView2 читает адрес один раз: смена адреса — только перезапуск, ошибки при промахе нет.
 
 use std::net::{SocketAddr, TcpStream, ToSocketAddrs};
 use std::sync::Mutex;
@@ -18,8 +17,7 @@ const PROBE_TIMEOUT_MS: u64 = 500;
 /// По кнопке щедрее: удалённый прокси отвечает за секунду и зря счёлся бы мёртвым.
 const PROBE_TIMEOUT_MANUAL_MS: u64 = 2000;
 
-/// У to_socket_addrs() своего таймаута нет: при мёртвом DNS setup() висит
-/// десятки секунд без единого окна на экране.
+/// У to_socket_addrs() своего таймаута нет: при мёртвом DNS setup() висит десятки секунд без единого окна на экране.
 const RESOLVE_TIMEOUT_MS: u64 = 700;
 
 // Ключи повторяют PROXY_KEYS из packages/core/src/core/proxy.ts: Rust к модулям TypeScript не ходит.
@@ -31,27 +29,23 @@ const KEY_LOGIN: &str = "set_proxy_login";
 const KEY_PASSWORD: &str = "set_proxy_pass";
 const KEY_BYPASS: &str = "set_proxy_bypass";
 
-/// Совпадает с DEFAULT_PROXY.bypass в packages/core/src/core/proxy.ts и подставляется только при
-/// отсутствии ключа: пустая строка в файле — осознанный выбор человека.
+/// Совпадает с DEFAULT_PROXY.bypass в packages/core/src/core/proxy.ts и подставляется только при отсутствии ключа: пустая строка в файле — осознанный выбор человека.
 const DEFAULT_BYPASS: &str = "localhost, 127.0.0.1";
 
-/// Applied значит лишь «движок получил адрес»: пускающий соединение, но не наружу,
-/// прокси TCP-щуп не отличит. WindowUnsupported разведён с Unreachable нарочно.
+/// Applied значит лишь «движок получил адрес»: пускающий соединение, но не наружу, прокси TCP-щуп не отличит. WindowUnsupported разведён с Unreachable нарочно.
 #[derive(Clone, Copy, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub enum ProxyOutcome {
     Off,
     Invalid,
     Unreachable,
-    /// Собирается только вне Windows, поэтому на Windows предупреждение
-    /// «никогда не строится» снимается — приём тот же, что у WindowAuth ниже.
+    /// Собирается только вне Windows, поэтому на Windows предупреждение «никогда не строится» снимается — приём тот же, что у WindowAuth ниже.
     #[cfg_attr(windows, allow(dead_code))]
     WindowUnsupported,
     Applied,
 }
 
-/// Как окно живёт с авторизацией у прокси. Accepted косвенный: кода ошибки
-/// в событии нет, и принятие видно лишь по отсутствию повторного запроса.
+/// Как окно живёт с авторизацией у прокси. Accepted косвенный: кода ошибки в событии нет, и принятие видно лишь по отсутствию повторного запроса.
 #[derive(Clone, Copy, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub enum ProxyAuth {
@@ -90,12 +84,10 @@ pub struct ProxyProbe {
     latency_ms: u64,
 }
 
-/// Состояние живёт в приложении: команда status вызывается из окна, а окно
-/// про setup() не знает. Mutex — требование Tauri, запись всё равно одна.
+/// Состояние живёт в приложении: команда status вызывается из окна, а окно про setup() не знает. Mutex — требование Tauri, запись всё равно одна.
 pub struct ProxyState(Mutex<ProxyStatus>);
 
-/// Всё, что нужно обработчику авторизации окна. bypass здесь потому, что на этих
-/// адресах трафик идёт мимо прокси и подставлять учётные данные нельзя.
+/// Всё, что нужно обработчику авторизации окна. bypass здесь потому, что на этих адресах трафик идёт мимо прокси и подставлять учётные данные нельзя.
 #[derive(Clone)]
 #[cfg_attr(not(windows), allow(dead_code))]
 pub struct WindowAuth {
@@ -104,8 +96,7 @@ pub struct WindowAuth {
     pub bypass: Vec<String>,
 }
 
-/// Пароль живёт только в памяти процесса: файл настроек в обработчике события
-/// читать нельзя, а в журнал он не попадает никогда.
+/// Пароль живёт только в памяти процесса: файл настроек в обработчике события читать нельзя, а в журнал он не попадает никогда.
 pub struct ProxyCredentials(Mutex<Option<WindowAuth>>);
 
 /// Разобранная настройка в том виде, в каком её принимает движок окна.
@@ -124,16 +115,14 @@ struct ProxyArgs {
     has_credentials: bool,
 }
 
-/// Три состояния файла настроек: Option не отличал «выключен» от «включён,
-/// но задан негодно», а панели надо сказать про них разное.
+/// Три состояния файла настроек: Option не отличал «выключен» от «включён, но задан негодно», а панели надо сказать про них разное.
 enum Config {
     Off,
     Invalid,
     On(Box<ProxyArgs>),
 }
 
-/// Числа тоже принимаются: файл настроек правят руками, и адрес запросто
-/// окажется числом, а порт — строкой.
+/// Числа тоже принимаются: файл настроек правят руками, и адрес запросто окажется числом, а порт — строкой.
 fn read_string(value: Option<serde_json::Value>) -> String {
     match value {
         Some(serde_json::Value::String(s)) => s.trim().to_string(),
@@ -142,8 +131,7 @@ fn read_string(value: Option<serde_json::Value>) -> String {
     }
 }
 
-/// Пароль без обрезки пробелов, как и в карточке настроек: пробел по краям
-/// законен, а тихая правка дала бы отказ авторизации.
+/// Пароль без обрезки пробелов, как и в карточке настроек: пробел по краям законен, а тихая правка дала бы отказ авторизации.
 fn read_password(value: Option<serde_json::Value>) -> String {
     match value {
         Some(serde_json::Value::String(s)) => s,
@@ -152,8 +140,7 @@ fn read_password(value: Option<serde_json::Value>) -> String {
     }
 }
 
-/// Ноль означает «значения нет», как и в normalizeProxyPort() из packages/core/src/core/proxy.ts:
-/// трактовка обязана совпадать.
+/// Ноль означает «значения нет», как и в normalizeProxyPort() из packages/core/src/core/proxy.ts: трактовка обязана совпадать.
 fn read_port(value: Option<serde_json::Value>) -> u16 {
     let parsed = match value {
         Some(serde_json::Value::Number(n)) => n.as_u64().unwrap_or(0),
@@ -168,8 +155,7 @@ fn read_port(value: Option<serde_json::Value>) -> u16 {
     }
 }
 
-/// Разбор уезжает в поток, потому что таймаут резольверу не навязать; брошенный
-/// поток ничего не держит и дешевле зависшего без окна приложения.
+/// Разбор уезжает в поток, потому что таймаут резольверу не навязать; брошенный поток ничего не держит и дешевле зависшего без окна приложения.
 fn resolve_with_timeout(target: &str, timeout: Duration) -> Option<Vec<SocketAddr>> {
     let (tx, rx) = std::sync::mpsc::channel();
     let owned = target.to_string();
@@ -193,8 +179,7 @@ fn resolve_with_timeout(target: &str, timeout: Duration) -> Option<Vec<SocketAdd
     }
 }
 
-/// Самая грубая проверка: открылось ли TCP-соединение. Цель не «работает ли
-/// прокси», а отсечь опечатки и выключенные клиенты, оставляющие окно пустым.
+/// Самая грубая проверка: открылось ли TCP-соединение. Цель не «работает ли прокси», а отсечь опечатки и выключенные клиенты, оставляющие окно пустым.
 fn probe(host: &str, port: u16, timeout_ms: u64) -> (bool, u64) {
     let target = format!("{host}:{port}");
     let started = Instant::now();
@@ -250,8 +235,7 @@ fn read_config(app: &AppHandle) -> Config {
         Some(value) => read_string(Some(value)),
     };
 
-    // Chromium ждёт список через точку с запятой; записи с пробелом отбрасываем —
-    // в имени хоста его быть не может, а строку аргументов он бы разорвал.
+    // Chromium ждёт список через точку с запятой; записи с пробелом отбрасываем — в имени хоста его быть не может, а строку аргументов он бы разорвал.
     let bypass = raw_bypass
         .split([',', ';', '\n', '\r'])
         .map(|item| item.trim())
@@ -272,11 +256,9 @@ fn read_config(app: &AppHandle) -> Config {
     }))
 }
 
-/// Вызывается ОДИН раз, в начале setup() и до создания окна. Состояние заводится
-/// здесь же: его нельзя забыть, и команда status найдёт готовый ответ.
+/// Вызывается ОДИН раз, в начале setup() и до создания окна. Состояние заводится здесь же: его нельзя забыть, и команда status найдёт готовый ответ.
 pub fn apply_to_webview(app: &AppHandle) {
-    // app.restart() отдаёт потомку окружение родителя: без сноса старый --proxy-server
-    // переживает выключение прокси.
+    // app.restart() отдаёт потомку окружение родителя: без сноса старый --proxy-server переживает выключение прокси.
     #[cfg(windows)]
     std::env::remove_var("WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS");
 
@@ -287,8 +269,7 @@ pub fn apply_to_webview(app: &AppHandle) {
     app.manage(ProxyState(Mutex::new(status)));
 }
 
-/// Складывает учётные данные для обработчика авторизации окна. Только при Applied:
-/// без прокси в окне подставлять их некому и незачем.
+/// Складывает учётные данные для обработчика авторизации окна. Только при Applied: без прокси в окне подставлять их некому и незачем.
 fn remember_credentials(app: &AppHandle, args: &ProxyArgs) {
     if args.login.is_empty() {
         return;
@@ -334,8 +315,7 @@ fn decide(app: &AppHandle) -> ProxyStatus {
         Config::On(args) => args,
     };
 
-    // Страховка от кирпича: с мёртвым адресом вместе с сайтом пропадает панель
-    // настроек — единственный способ выключить прокси обратно.
+    // Страховка от кирпича: с мёртвым адресом вместе с сайтом пропадает панель настроек — единственный способ выключить прокси обратно.
     let (reachable, _) = probe(&args.host, args.port, PROBE_TIMEOUT_MS);
     if !reachable {
         log::warn!(
@@ -361,8 +341,7 @@ fn decide(app: &AppHandle) -> ProxyStatus {
         value.push_str(&format!(" --proxy-bypass-list={}", args.bypass));
     }
 
-    // Только Windows: переменную читает WebView2. Под Linux окно рисует WebKitGTK,
-    // и это работа ветки linux-dev, а не молчаливое бездействие здесь.
+    // Только Windows: переменную читает WebView2. Под Linux окно рисует WebKitGTK, и это работа ветки linux-dev, а не молчаливое бездействие здесь.
     #[cfg(windows)]
     {
         std::env::set_var("WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS", &value);
@@ -384,8 +363,7 @@ fn decide(app: &AppHandle) -> ProxyStatus {
         let _ = remember_credentials;
         log::warn!("Прокси для окна на этой платформе пока не поддержан — страница идёт напрямую");
 
-        // Не Applied: адрес движку никто не отдавал. И не Unreachable: щуп до адреса
-        // достучался, а «не ответил» сказало бы неправду. Беда не в адресе, а в платформе.
+        // Не Applied: адрес движку никто не отдавал. И не Unreachable: щуп до адреса достучался, а «не ответил» сказало бы неправду. Беда не в адресе, а в платформе.
         ProxyStatus {
             outcome: ProxyOutcome::WindowUnsupported,
             server: args.server,
@@ -419,8 +397,7 @@ fn auth_state(has_credentials: bool) -> ProxyAuth {
     }
 }
 
-/// Что действует в окне прямо сейчас: в сеть команда не ходит, адрес неизменен
-/// до перезапуска, а вот авторизация меняется по ходу сеанса.
+/// Что действует в окне прямо сейчас: в сеть команда не ходит, адрес неизменен до перезапуска, а вот авторизация меняется по ходу сеанса.
 #[tauri::command]
 pub fn animori_proxy_status(state: State<'_, ProxyState>) -> ProxyStatus {
     // Отравленный мьютекс не повод отказывать: внутри структура без инвариантов.
@@ -431,9 +408,8 @@ pub fn animori_proxy_status(state: State<'_, ProxyState>) -> ProxyStatus {
     status
 }
 
-/// Учётные данные для обработчика авторизации окна. None — подставлять нечего:
-/// прокси выключен, задан негодно, молчит или логина у него нет.
-// Обработчика нет за пределами Windows, там эта функция никем не зовётся.
+/// Учётные данные для обработчика авторизации окна. None — подставлять нечего: прокси выключен, задан
+/// негодно, молчит или логина у него нет. За пределами Windows обработчика нет.
 #[cfg(windows)]
 pub fn window_auth(app: &AppHandle) -> Option<WindowAuth> {
     let state = app.try_state::<ProxyCredentials>()?;
@@ -441,8 +417,7 @@ pub fn window_auth(app: &AppHandle) -> Option<WindowAuth> {
     guard.clone()
 }
 
-/// Перечитывает файл ЗАНОВО: смысл кнопки — проверить только что введённый адрес.
-/// spawn_blocking обязателен: чтение, разбор имени и соединение блокируют поток.
+/// Перечитывает файл ЗАНОВО: смысл кнопки — проверить только что введённый адрес. spawn_blocking обязателен: чтение, разбор имени и соединение блокируют поток.
 #[tauri::command]
 pub async fn animori_proxy_probe(app: AppHandle) -> Result<ProxyProbe, String> {
     tauri::async_runtime::spawn_blocking(move || {
