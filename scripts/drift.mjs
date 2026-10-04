@@ -17,6 +17,23 @@ const PAIRS = [
 const SNAPSHOT = join(root, 'drift.json')
 const EXT = new Set(['.ts', '.vue', '.mts', '.cts'])
 
+// Копии, которые намеренно держатся одинаковыми. Код у них совпадает, а расходятся
+// пояснения — они описывают одно решение с двух сторон, и это ценность, а не мусор.
+// Перенос в общее место выбрал бы одно из двух и потерял второе; см. docs/DUPLICATES.md.
+const KEPT_IN_SYNC = [
+  'components/crew-words.ts',
+  'date-text.ts',
+  'person-layer.ts',
+  'sakura.ts',
+  'screens/home-keep.ts',
+  'screens/player-hls.ts',
+  'screens/player-keep.ts',
+  'see-tile.ts',
+  'splash.ts',
+  'star.ts',
+  'tag-words.ts',
+]
+
 /** Всё, что не код: комментарии разных стилей и пустые строки. */
 function isNoise(line) {
   const t = line.trim()
@@ -132,6 +149,16 @@ if (gone.length) {
   for (const key of gone) console.log(`  ${key}`)
 }
 
+// Синхронные копии держатся одинаковыми намеренно. Если они разошлись по коду,
+// значит правка попала на один край — и это тот случай, ради которого всё затевалось.
+const syncBroke = KEPT_IN_SYNC.filter((key) => current[key] > 0)
+const syncMissing = KEPT_IN_SYNC.filter((key) => current[key] === undefined)
+console.log(
+  `\nСинхронных копий: ${KEPT_IN_SYNC.length - syncBroke.length - syncMissing.length} из ${KEPT_IN_SYNC.length}.`,
+)
+for (const key of syncBroke) console.log(`  разошёлся по коду: ${key} (${current[key]} строк)`)
+for (const key of syncMissing) console.log(`  пара не найдена, проверь список: ${key}`)
+
 // Расхождение выросло — это подозрение на забытую правку, и оно должно мешать.
 // Остальное (новые пары, сближение) — нормальная работа, её достаточно зафиксировать.
-process.exit(grew.length > 0 ? 1 : 0)
+process.exit(grew.length > 0 || syncBroke.length > 0 || syncMissing.length > 0 ? 1 : 0)
