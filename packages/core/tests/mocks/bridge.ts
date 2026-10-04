@@ -1,11 +1,13 @@
 import { vi } from 'vitest'
-import type { IBridge } from '../../src/bridge/IBridge'
+import { BridgeHttpError, type HttpErrorKind, type IBridge } from '../../src/bridge/IBridge'
 
 export interface MockBridgeHandle {
   bridge: IBridge
   setFile(name: string, text: string | null): void
   getFile(name: string): string | null
   setHttpResponse(url: string, response: unknown): void
+  /** Отказ транспорта вместо ответа: то, что присылает мост при сети, таймауте или отмене. */
+  setHttpError(url: string, kind: HttpErrorKind): void
   setHttpBytes(url: string, bytes: Uint8Array): void
   calls: {
     http: Array<{ url: string; method?: string }>
@@ -74,6 +76,7 @@ function bytesResponse(url: string, bytes: Uint8Array, status = 200) {
 export function createMockBridge(options: { filesAvailable?: boolean } = {}): MockBridgeHandle {
   const files = new Map<string, string>()
   const httpResponses = new Map<string, unknown>()
+  const httpErrors = new Map<string, HttpErrorKind>()
   const byteResponses = new Map<string, Uint8Array>()
   const storage = new Map<string, unknown>()
 
@@ -92,6 +95,9 @@ export function createMockBridge(options: { filesAvailable?: boolean } = {}): Mo
     getFile: (name) => files.get(name) ?? null,
     setHttpResponse: (url, response) => {
       httpResponses.set(url, response)
+    },
+    setHttpError: (url, kind) => {
+      httpErrors.set(url, kind)
     },
     setHttpBytes: (url, bytes) => {
       byteResponses.set(url, bytes)
@@ -133,6 +139,10 @@ export function createMockBridge(options: { filesAvailable?: boolean } = {}): Mo
         async request(request) {
           handle.calls.http.push({ url: request.url, method: request.method })
           handle.calls.httpHeaders.push(request.headers)
+          // Отказ транспорта проверяется раньше ответа: в жизни сбой сети приходит вместо
+          // кода, и подставить 503 вместо обрыва значит проверить не тот случай.
+          const failure = httpErrors.get(request.url)
+          if (failure) throw new BridgeHttpError(failure, request.url)
           const response = httpResponses.get(request.url)
           return textResponse(request.url, response ?? {}, statusOf(response))
         },
