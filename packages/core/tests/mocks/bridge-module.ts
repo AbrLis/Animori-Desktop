@@ -11,8 +11,8 @@ export { BridgeHttpError } from '../../src/bridge/IBridge'
 
 export let currentMock: MockBridgeHandle | null = null
 
-export function installMockBridge(): MockBridgeHandle {
-  currentMock = createMockBridge()
+export function installMockBridge(options: { filesAvailable?: boolean } = {}): MockBridgeHandle {
+  currentMock = createMockBridge(options)
   return currentMock
 }
 
