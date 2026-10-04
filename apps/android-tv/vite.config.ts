@@ -22,7 +22,9 @@ export default defineConfig({
       // Плеер берёт лёгкую сборку hls.js: полная приносила в экран просмотра около 594 КБ. Шов, а не импорт 'hls.js/light': нет своего .d.ts — TS7016.
       'hls.js': require.resolve('hls.js/dist/hls.light.mjs'),
       // Реализация моста подставляется сборкой. Шов оставлен: вырезание потребовало бы правки импортов. Ключ идёт до '@': совпадение по порядку.
-      '@bridge-impl': fileURLToPath(new URL('../../packages/core/src/bridge/TauriBridge.ts', import.meta.url)),
+      '@bridge-impl': fileURLToPath(
+        new URL('../../packages/core/src/bridge/TauriBridge.ts', import.meta.url),
+      ),
       // Имена модулей при переезде в shared не менялись, сменилось только место. Порядок ключей обязателен: побеждает первое совпадение.
       '@/api': fileURLToPath(new URL('../../packages/core/src/api', import.meta.url)),
       '@/bridge': fileURLToPath(new URL('../../packages/core/src/bridge', import.meta.url)),

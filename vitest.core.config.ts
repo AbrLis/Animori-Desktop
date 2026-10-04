@@ -15,8 +15,12 @@ export default defineConfig({
       '@/core': fileURLToPath(new URL('./packages/core/src/core', import.meta.url)),
       '@/utils': fileURLToPath(new URL('./packages/core/src/utils', import.meta.url)),
       '@': fileURLToPath(new URL('./packages/core/src', import.meta.url)),
-      '@bridge-impl': fileURLToPath(new URL('./packages/core/tests/mocks/bridge.ts', import.meta.url)),
-      '@/bridge': fileURLToPath(new URL('./packages/core/tests/mocks/bridge-module.ts', import.meta.url)),
+      '@bridge-impl': fileURLToPath(
+        new URL('./packages/core/tests/mocks/bridge.ts', import.meta.url),
+      ),
+      '@/bridge': fileURLToPath(
+        new URL('./packages/core/tests/mocks/bridge-module.ts', import.meta.url),
+      ),
     },
   },
   define: {

@@ -14,8 +14,12 @@ export default defineConfig({
       // Заглушка моста живёт с ядром: она проверяет контракт, а не экран. Экранные наборы
       // достают её через этот псевдоним — своей копии у них нет и быть не должно.
       '@core-tests': fileURLToPath(new URL('../../packages/core/tests/mocks', import.meta.url)),
-      '@bridge-impl': fileURLToPath(new URL('../../packages/core/tests/mocks/bridge.ts', import.meta.url)),
-      '@/bridge': fileURLToPath(new URL('../../packages/core/tests/mocks/bridge-module.ts', import.meta.url)),
+      '@bridge-impl': fileURLToPath(
+        new URL('../../packages/core/tests/mocks/bridge.ts', import.meta.url),
+      ),
+      '@/bridge': fileURLToPath(
+        new URL('../../packages/core/tests/mocks/bridge-module.ts', import.meta.url),
+      ),
     },
   },
   define: {

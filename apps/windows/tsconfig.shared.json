@@ -15,6 +15,10 @@
     }
   },
   // vite-env.d.ts нужен ради объявлений подставляемых сборкой значений: это описание типов, а не код надстройки.
-  "include": ["../../packages/core/src/**/*.ts", "../../packages/core/src/**/*.d.ts", "src/vite-env.d.ts"],
+  "include": [
+    "../../packages/core/src/**/*.ts",
+    "../../packages/core/src/**/*.d.ts",
+    "src/vite-env.d.ts"
+  ],
   "exclude": ["node_modules", "dist", "src-tauri", "src/app"]
 }

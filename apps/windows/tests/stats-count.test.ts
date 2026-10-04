@@ -649,4 +649,3 @@ describe('легенда кольца', () => {
     expect(splitLegend([])).toEqual({ head: [], tail: null })
   })
 })
-

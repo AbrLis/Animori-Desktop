@@ -98,7 +98,11 @@ describe('обход стрелками в окне', () => {
 describe('ход по панели окна настроек', () => {
   /** Окно как в SettingsSheet, панель — как в ProxyBox: на телевизоре строки панели стоят
    *  колонкой (`.am-lite .am-row`), а верхние цели узки — тумблер и список вида прокси. */
-  function panel(wideToggle: boolean): { toggle: HTMLElement; close: HTMLElement; kind: HTMLElement } {
+  function panel(wideToggle: boolean): {
+    toggle: HTMLElement
+    close: HTMLElement
+    kind: HTMLElement
+  } {
     document.body.innerHTML = `
       <div class="am-sheet__box" role="dialog" aria-modal="true">
         <header><button data-test="close" data-am-last></button></header>
@@ -221,7 +225,6 @@ describe('ход по панели окна настроек', () => {
   })
 })
 
-
 describe('блокировка поля до Enter', () => {
   /** Панель из тумблера и поля: как в ProxyBox. */
   function proxy(): { toggle: HTMLElement; field: HTMLElement } {
@@ -262,7 +265,6 @@ describe('блокировка поля до Enter', () => {
     expect((field as HTMLInputElement).readOnly).toBe(true)
   })
 })
-
 
 describe('прыжок на рельс и между полками', () => {
   /** Главная целиком: полоса дней, две полки постера и рельс с пунктами. */
@@ -330,14 +332,34 @@ describe('прыжок на рельс и между полками', () => {
     place(document.querySelector('[data-test="day-1"]') as HTMLElement, 300, 40, 120, 40)
     place(document.querySelector('[data-test="day-2"]') as HTMLElement, 440, 40, 120, 40)
 
-    const tops = [['top-1', 300], ['top-2', 440], ['top-3', 580]]
+    const tops = [
+      ['top-1', 300],
+      ['top-2', 440],
+      ['top-3', 580],
+    ]
     tops.forEach(function ([name, x]) {
-      place(document.querySelector(`[data-test="${name}"]`) as HTMLElement, x as number, 140, 120, 180)
+      place(
+        document.querySelector(`[data-test="${name}"]`) as HTMLElement,
+        x as number,
+        140,
+        120,
+        180,
+      )
     })
 
-    const bots = [['bot-1', 300], ['bot-2', 440], ['bot-3', 580]]
+    const bots = [
+      ['bot-1', 300],
+      ['bot-2', 440],
+      ['bot-3', 580],
+    ]
     bots.forEach(function ([name, x]) {
-      place(document.querySelector(`[data-test="${name}"]`) as HTMLElement, x as number, 400, 120, 180)
+      place(
+        document.querySelector(`[data-test="${name}"]`) as HTMLElement,
+        x as number,
+        400,
+        120,
+        180,
+      )
     })
 
     // Ряд отбора под полками: «Фильтры» левее чипов, и чипы стоят вровень с ней.
@@ -371,7 +393,9 @@ describe('прыжок на рельс и между полками', () => {
     // Тот же прыжок, но открыт «Списки»: фокус обязан встать на него, а не на верхний пункт.
     const on = document.querySelector('[data-test="menu-home"]') as HTMLElement
     on.classList.remove('am-side__item--on')
-    ;(document.querySelector('[data-test="menu-lists"]') as HTMLElement).classList.add('am-side__item--on')
+    ;(document.querySelector('[data-test="menu-lists"]') as HTMLElement).classList.add(
+      'am-side__item--on',
+    )
 
     focusTest('bot-1')
     press('ArrowLeft')
@@ -471,7 +495,6 @@ describe('прыжок на рельс и между полками', () => {
     expect(focused()).toBe('day-1')
   })
 })
-
 
 describe('посев без помеченного первого', () => {
   it('на экране без метки всё как было: постер предпочтительнее', () => {

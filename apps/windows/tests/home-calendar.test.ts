@@ -461,7 +461,8 @@ describe('состояние недели', () => {
 // Часы настоящие: на замороженных ограничитель AniList ждёт свой промежуток бесконечно, а добор имён ходит тем же мостом.
 describe('имя выхода', () => {
   it('берёт название сервера, когда русского имени нет', async () => {
-    bridge.bridge.anilist.query = async () => schedule([airing(21, 1179, secs(Date.now()), 'One Piece')])
+    bridge.bridge.anilist.query = async () =>
+      schedule([airing(21, 1179, secs(Date.now()), 'One Piece')])
 
     const view = cal.useHomeCalendar()
     mine(view)
@@ -474,7 +475,8 @@ describe('имя выхода', () => {
     // Русское знание главнее: сервер отдаёт ромадзи, а человек читает русское.
     titles.rememberRussianName(21, 'Ван-Пис')
 
-    bridge.bridge.anilist.query = async () => schedule([airing(21, 1179, secs(Date.now()), 'One Piece')])
+    bridge.bridge.anilist.query = async () =>
+      schedule([airing(21, 1179, secs(Date.now()), 'One Piece')])
 
     const view = cal.useHomeCalendar()
     mine(view)
@@ -484,8 +486,7 @@ describe('имя выхода', () => {
   })
 
   it('падает на номер тайтла, когда имени нет нигде', async () => {
-    bridge.bridge.anilist.query = async () =>
-      schedule([airing(21, 1179, secs(Date.now()))])
+    bridge.bridge.anilist.query = async () => schedule([airing(21, 1179, secs(Date.now()))])
 
     const view = cal.useHomeCalendar()
     mine(view)
