@@ -1678,11 +1678,21 @@ watch(
 }
 
 /* Поворот свой у каждого дня: семь одинаковых рамок читались бы штампом, а не календарём. */
-.am-cal__day:nth-child(7n + 2) { --am-cal-turn: -34deg; }
-.am-cal__day:nth-child(7n + 3) { --am-cal-turn: 14deg; }
-.am-cal__day:nth-child(7n + 4) { --am-cal-turn: -48deg; }
-.am-cal__day:nth-child(7n + 5) { --am-cal-turn: 32deg; }
-.am-cal__day:nth-child(7n + 6) { --am-cal-turn: -6deg; }
+.am-cal__day:nth-child(7n + 2) {
+  --am-cal-turn: -34deg;
+}
+.am-cal__day:nth-child(7n + 3) {
+  --am-cal-turn: 14deg;
+}
+.am-cal__day:nth-child(7n + 4) {
+  --am-cal-turn: -48deg;
+}
+.am-cal__day:nth-child(7n + 5) {
+  --am-cal-turn: 32deg;
+}
+.am-cal__day:nth-child(7n + 6) {
+  --am-cal-turn: -6deg;
+}
 
 /* Розетка подложкой. Размер и сдвиг — доли клетки, а не пиксели: на полной ширине клетка
    около 180 пикселей и в неё входит середина розетки в 96 пикселей со сдвигом в 30 — там,
@@ -1733,9 +1743,15 @@ watch(
     rotate(calc(-1 * var(--am-cal-turn)));
 }
 
-.am-cal__day:nth-child(4n + 2) .am-cal__rose { color: var(--am-accent); }
-.am-cal__day:nth-child(4n + 3) .am-cal__rose { color: var(--am-accent-2); }
-.am-cal__day:nth-child(4n + 4) .am-cal__rose { color: var(--am-good); }
+.am-cal__day:nth-child(4n + 2) .am-cal__rose {
+  color: var(--am-accent);
+}
+.am-cal__day:nth-child(4n + 3) .am-cal__rose {
+  color: var(--am-accent-2);
+}
+.am-cal__day:nth-child(4n + 4) .am-cal__rose {
+  color: var(--am-good);
+}
 
 /* Розетка выезжает на выбранном дне: клетка отвечает на нажатие не одной рамкой. Левая
    уезжает из левого края, правая — из правого, поэтому сдвиг у них знаками разный, а

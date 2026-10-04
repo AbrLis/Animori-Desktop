@@ -210,7 +210,7 @@ async function readState(): Promise<void> {
   const got = await getDbStats()
   usedSize.value = 'error' in got ? '' : got.estimatedSize
 
-// Датасет поднимается тем же общим обещанием, что и на старте: второй цены чтения здесь нет.
+  // Датасет поднимается тем же общим обещанием, что и на старте: второй цены чтения здесь нет.
   await initDatasetNames()
   const ds = datasetStatus()
   if (ds.loaded && ds.builtAt !== null) {
@@ -218,7 +218,7 @@ async function readState(): Promise<void> {
     const count = ds.names.toLocaleString('ru-RU')
     const days = daysSince(ds.builtAt)
 
-// Возраст рядом с датой: дата отвечает «когда собран», а возраст — «пора ли дёргать репозиторий».
+    // Возраст рядом с датой: дата отвечает «когда собран», а возраст — «пора ли дёргать репозиторий».
     const age = days === null ? '' : ` · ${ageText(days)}`
     datasetText.value = `${date} · ${count} записей${age}`
     datasetStale.value = days !== null && days > STALE_DAYS
@@ -282,7 +282,7 @@ function onShikiPull(mode: PullMode): void {
     shikiNote.value = ''
 
     try {
-// Ник сохраняется до переноса, а не после: перенос долгий, и уйти с экрана посреди него человек вправе.
+      // Ник сохраняется до переноса, а не после: перенос долгий, и уйти с экрана посреди него человек вправе.
       onShikiNick()
 
       const done = await pullFromShikimori(shikiNick.value, mode)
@@ -430,7 +430,7 @@ onMounted(() => {
 
 <template>
   <section class="am-page">
-<!-- Мозаика плит: шесть плит вместо длинной колонки панелей. Обход пульта получает шесть
+    <!-- Мозаика плит: шесть плит вместо длинной колонки панелей. Обход пульта получает шесть
      остановок вместо пятнадцати, а знакомая панель открывается окном поверх экрана. -->
     <div class="am-doors">
       <button
@@ -450,279 +450,279 @@ onMounted(() => {
       </button>
     </div>
 
-<!-- Окна: по одному на плиту, поднимаются по нажатию. Панели внутри — те же, что стояли колонкой,
+    <!-- Окна: по одному на плиту, поднимаются по нажатию. Панели внутри — те же, что стояли колонкой,
      и заголовок окну даёт заголовок панели. -->
     <SettingsSheet :open="openDoor === 'list'" title="Импорт списка" @close="openDoor = null">
-<!-- Импорт списка. Из двух источников осталась Шикимори: AniList требует входа через окно
+      <!-- Импорт списка. Из двух источников осталась Шикимори: AniList требует входа через окно
      браузера, а браузера на телевизоре нет. Знак берёт components/BrandMark.vue из brand/shikimori.svg. -->
-        <div class="am-panel am-box">
-          <h3 class="am-h3">Импорт списка</h3>
+      <div class="am-panel am-box">
+        <h3 class="am-h3">Импорт списка</h3>
 
-          <div class="am-serv">
-            <div class="am-serv__head">
-              <BrandMark class="am-serv__logo" name="shikimori" />
+        <div class="am-serv">
+          <div class="am-serv__head">
+            <BrandMark class="am-serv__logo" name="shikimori" />
 
-              <span class="am-serv__text">
-                <span class="am-serv__name">Шикимори</span>
-                <span class="am-serv__note">Профиль на Шикимори должен быть открытым.</span>
-              </span>
+            <span class="am-serv__text">
+              <span class="am-serv__name">Шикимори</span>
+              <span class="am-serv__note">Профиль на Шикимори должен быть открытым.</span>
+            </span>
 
-              <span class="am-flag">
-                <span class="am-flag__dot" aria-hidden="true" />
-                вход не нужен
-              </span>
-            </div>
+            <span class="am-flag">
+              <span class="am-flag__dot" aria-hidden="true" />
+              вход не нужен
+            </span>
+          </div>
+
+          <div class="am-row">
+            <label class="am-field">
+              <input
+                v-model="shikiNick"
+                class="am-input"
+                type="text"
+                placeholder="Ник на Шикимори"
+                :disabled="shikiBusy"
+                @change="onShikiNick"
+              />
+            </label>
+            <button
+              v-tip="'Забрать список с Шикимори: слиянием или с заменой'"
+              ref="shikiBtn"
+              class="am-btn"
+              type="button"
+              :disabled="shikiBusy || !shikiNick.trim()"
+              @click="onShikiAsk"
+            >
+              {{ shikiBusy ? 'Переносим…' : 'Перенести список' }}
+            </button>
+          </div>
+
+          <!-- Вопрос перед переносом: замена вычищает список целиком, включая набранное руками, — такое не делают одним промахом пульта. -->
+          <div v-if="askingShiki" class="am-ask">
+            <p class="am-ask__text">Записей: {{ listCount }}.</p>
 
             <div class="am-row">
-              <label class="am-field">
-                <input
-                  v-model="shikiNick"
-                  class="am-input"
-                  type="text"
-                  placeholder="Ник на Шикимори"
-                  :disabled="shikiBusy"
-                  @change="onShikiNick"
-                />
-              </label>
               <button
-                v-tip="'Забрать список с Шикимори: слиянием или с заменой'"
-                ref="shikiBtn"
                 class="am-btn"
                 type="button"
-                :disabled="shikiBusy || !shikiNick.trim()"
-                @click="onShikiAsk"
+                :disabled="shikiBusy"
+                @click="onShikiPull('merge')"
               >
-                {{ shikiBusy ? 'Переносим…' : 'Перенести список' }}
+                Добавить недостающее
               </button>
-            </div>
-
-<!-- Вопрос перед переносом: замена вычищает список целиком, включая набранное руками, — такое не делают одним промахом пульта. -->
-            <div v-if="askingShiki" class="am-ask">
-              <p class="am-ask__text">Записей: {{ listCount }}.</p>
-
-              <div class="am-row">
-                <button
-                  class="am-btn"
-                  type="button"
-                  :disabled="shikiBusy"
-                  @click="onShikiPull('merge')"
-                >
-                  Добавить недостающее
-                </button>
-                <button
-                  class="am-btn am-btn--ghost"
-                  type="button"
-                  :disabled="shikiBusy"
-                  @click="onShikiPull('replace')"
-                >
-                  Заменить целиком
-                </button>
-                <button class="am-btn am-btn--ghost" type="button" @click="onShikiCancel">
-                  Отмена
-                </button>
-              </div>
-            </div>
-
-            <p v-if="shikiNote" class="am-note">{{ shikiNote }}</p>
-            <p v-if="shikiError" class="am-error">{{ shikiError }}</p>
-          </div>
-        </div>
-    </SettingsSheet>
-
-    <SettingsSheet :open="openDoor === 'data'" title="Данные" @close="openDoor = null">
-        <!-- Данные: что лежит на этом диске и что с этим можно сделать. -->
-        <div class="am-panel am-box">
-          <h3 class="am-h3">Данные</h3>
-
-          <ul class="am-facts">
-            <li class="am-fact">
-              <span class="am-fact__name">Записей в списке</span>
-              <span class="am-fact__value">{{ listCount }}</span>
-            </li>
-            <li v-if="usedSize" class="am-fact">
-              <span class="am-fact__name">Занято на диске</span>
-              <span class="am-fact__value">{{ usedSize }}</span>
-            </li>
-          </ul>
-
-<!-- Необратимое одной строкой: сброс памяти и удаление списка стоят рядом, потому что оба про этот диск. -->
-          <div class="am-row">
-            <button
-              v-tip="'Убрать сохранённые названия, описания и обложки'"
-              ref="clearBtn"
-              class="am-btn am-btn--ghost"
-              type="button"
-              :disabled="busy"
-              @click="onClear"
-            >
-              Очистить память
-            </button>
-
-            <button
-              v-if="listCount > 0"
-              v-tip="'Удалить свой список с этого устройства'"
-              class="am-btn am-btn--ghost"
-              type="button"
-              :disabled="busy"
-              @click="onAskDrop"
-            >
-              Удалить мой список
-            </button>
-
-            <button v-if="cleared" class="am-btn am-btn--ghost" type="button" @click="onReload">
-              Перезагрузить
-            </button>
-          </div>
-
-<!-- Удаление списка необратимо для местных записей: спрашиваем всегда. Вопрос коротким: подпись кнопки под ним и есть ответ. -->
-          <div v-if="askingDrop" class="am-ask">
-            <p class="am-ask__text">Удалить список с этого устройства?</p>
-
-            <div class="am-row">
-              <button class="am-btn" type="button" :disabled="busy" @click="onDropList">
-                Удалить список
+              <button
+                class="am-btn am-btn--ghost"
+                type="button"
+                :disabled="shikiBusy"
+                @click="onShikiPull('replace')"
+              >
+                Заменить целиком
               </button>
-              <button class="am-btn am-btn--ghost" type="button" @click="onCancelDrop">
+              <button class="am-btn am-btn--ghost" type="button" @click="onShikiCancel">
                 Отмена
               </button>
             </div>
           </div>
 
-          <p v-if="note" class="am-note">{{ note }}</p>
-          <p v-if="error" class="am-error">{{ error }}</p>
+          <p v-if="shikiNote" class="am-note">{{ shikiNote }}</p>
+          <p v-if="shikiError" class="am-error">{{ shikiError }}</p>
         </div>
+      </div>
     </SettingsSheet>
 
-<!-- Копия списка: на телевизоре от неё остался один путь — забрать копию по ссылке. -->
+    <SettingsSheet :open="openDoor === 'data'" title="Данные" @close="openDoor = null">
+      <!-- Данные: что лежит на этом диске и что с этим можно сделать. -->
+      <div class="am-panel am-box">
+        <h3 class="am-h3">Данные</h3>
+
+        <ul class="am-facts">
+          <li class="am-fact">
+            <span class="am-fact__name">Записей в списке</span>
+            <span class="am-fact__value">{{ listCount }}</span>
+          </li>
+          <li v-if="usedSize" class="am-fact">
+            <span class="am-fact__name">Занято на диске</span>
+            <span class="am-fact__value">{{ usedSize }}</span>
+          </li>
+        </ul>
+
+        <!-- Необратимое одной строкой: сброс памяти и удаление списка стоят рядом, потому что оба про этот диск. -->
+        <div class="am-row">
+          <button
+            v-tip="'Убрать сохранённые названия, описания и обложки'"
+            ref="clearBtn"
+            class="am-btn am-btn--ghost"
+            type="button"
+            :disabled="busy"
+            @click="onClear"
+          >
+            Очистить память
+          </button>
+
+          <button
+            v-if="listCount > 0"
+            v-tip="'Удалить свой список с этого устройства'"
+            class="am-btn am-btn--ghost"
+            type="button"
+            :disabled="busy"
+            @click="onAskDrop"
+          >
+            Удалить мой список
+          </button>
+
+          <button v-if="cleared" class="am-btn am-btn--ghost" type="button" @click="onReload">
+            Перезагрузить
+          </button>
+        </div>
+
+        <!-- Удаление списка необратимо для местных записей: спрашиваем всегда. Вопрос коротким: подпись кнопки под ним и есть ответ. -->
+        <div v-if="askingDrop" class="am-ask">
+          <p class="am-ask__text">Удалить список с этого устройства?</p>
+
+          <div class="am-row">
+            <button class="am-btn" type="button" :disabled="busy" @click="onDropList">
+              Удалить список
+            </button>
+            <button class="am-btn am-btn--ghost" type="button" @click="onCancelDrop">Отмена</button>
+          </div>
+        </div>
+
+        <p v-if="note" class="am-note">{{ note }}</p>
+        <p v-if="error" class="am-error">{{ error }}</p>
+      </div>
+    </SettingsSheet>
+
+    <!-- Копия списка: на телевизоре от неё остался один путь — забрать копию по ссылке. -->
     <SettingsSheet :open="openDoor === 'cloud'" title="Копия списка" @close="openDoor = null">
       <CloudBox :list="listCount" @changed="onCloudChanged" />
     </SettingsSheet>
 
     <SettingsSheet :open="openDoor === 'look'" title="Оформление" @close="openDoor = null">
-        <div class="am-panel am-box">
-          <h3 class="am-h3">Оформление</h3>
+      <div class="am-panel am-box">
+        <h3 class="am-h3">Оформление</h3>
 
-          <div class="am-skins">
-            <button
-              v-for="item in APPEARANCES"
-              :key="item.name"
-              v-tip="item.hint"
-              class="am-skins__btn"
-              :class="{ 'am-skins__btn--on': item.name === appearance }"
-              type="button"
-              @click="setAppearance(item.name)"
-            >
-              <span class="am-skins__mark" aria-hidden="true">{{ item.mark }}</span>
-              <span class="am-skins__name">{{ item.title }}</span>
-            </button>
-          </div>
-
-<!-- Строка-тумблер на телевизоре сама берёт фокус, а галочка внутри из обхода убирается: обход
-     пульта ищет соседа по геометрии, и рядом с тумблером по горизонтали нет ничего, что его перекрывало бы. -->
-          <label
-            class="am-switch"
-            :tabindex="lite ? 0 : -1"
-            role="switch"
-            :aria-checked="adult"
-            @keydown.enter.prevent="onAdultKey"
-            @keydown.space.prevent="onAdultKey"
+        <div class="am-skins">
+          <button
+            v-for="item in APPEARANCES"
+            :key="item.name"
+            v-tip="item.hint"
+            class="am-skins__btn"
+            :class="{ 'am-skins__btn--on': item.name === appearance }"
+            type="button"
+            @click="setAppearance(item.name)"
           >
-            <input
-              v-model="adult"
-              type="checkbox"
-              class="am-switch__box"
-              :tabindex="lite ? -1 : 0"
-              @change="onAdult"
-            />
-            <span class="am-switch__name">Показывать контент для взрослых (18+)</span>
-          </label>
-
-<!-- Вопрос о возрасте стоит под тумблером, а не отдельным окном: он живёт ровно столько,
-     сколько человек его видит. Поле даты своё: системное на тёмных темах выбивалось из стекла. -->
-          <div v-if="askingAge" class="am-age">
-            <p class="am-age__ask">Укажите ваш возраст</p>
-
-            <DateField :value="birth" title="Дата рождения" @pick="onBirth" />
-
-            <p v-if="ageError" class="am-error">{{ ageError }}</p>
-
-            <button class="am-btn am-btn--soft am-age__back" type="button" @click="closeAge">
-              Отмена
-            </button>
-          </div>
+            <span class="am-skins__mark" aria-hidden="true">{{ item.mark }}</span>
+            <span class="am-skins__name">{{ item.title }}</span>
+          </button>
         </div>
+
+        <!-- Строка-тумблер на телевизоре сама берёт фокус, а галочка внутри из обхода убирается: обход
+     пульта ищет соседа по геометрии, и рядом с тумблером по горизонтали нет ничего, что его перекрывало бы. -->
+        <label
+          class="am-switch"
+          :tabindex="lite ? 0 : -1"
+          role="switch"
+          :aria-checked="adult"
+          @keydown.enter.prevent="onAdultKey"
+          @keydown.space.prevent="onAdultKey"
+        >
+          <input
+            v-model="adult"
+            type="checkbox"
+            class="am-switch__box"
+            :tabindex="lite ? -1 : 0"
+            @change="onAdult"
+          />
+          <span class="am-switch__name">Показывать контент для взрослых (18+)</span>
+        </label>
+
+        <!-- Вопрос о возрасте стоит под тумблером, а не отдельным окном: он живёт ровно столько,
+     сколько человек его видит. Поле даты своё: системное на тёмных темах выбивалось из стекла. -->
+        <div v-if="askingAge" class="am-age">
+          <p class="am-age__ask">Укажите ваш возраст</p>
+
+          <DateField :value="birth" title="Дата рождения" @pick="onBirth" />
+
+          <p v-if="ageError" class="am-error">{{ ageError }}</p>
+
+          <button class="am-btn am-btn--soft am-age__back" type="button" @click="closeAge">
+            Отмена
+          </button>
+        </div>
+      </div>
     </SettingsSheet>
 
-<!-- Прокси: у панели своё состояние и свой разговор с оболочкой, потому и своё окно. -->
+    <!-- Прокси: у панели своё состояние и свой разговор с оболочкой, потому и своё окно. -->
     <SettingsSheet :open="openDoor === 'net'" title="Прокси" @close="openDoor = null">
       <ProxyBox />
     </SettingsSheet>
 
-<!-- О программе — последнее окно: здесь только то, что читают один раз, — версия, система,
+    <!-- О программе — последнее окно: здесь только то, что читают один раз, — версия, система,
      датасет и лицензия. -->
     <SettingsSheet :open="openDoor === 'about'" title="О программе" @close="openDoor = null">
-        <div class="am-panel am-box">
-          <h3 class="am-h3">О программе</h3>
+      <div class="am-panel am-box">
+        <h3 class="am-h3">О программе</h3>
 
-          <ul class="am-facts">
-            <li class="am-fact">
-              <span class="am-fact__name">Версия</span>
-              <span class="am-fact__value">{{ version }}</span>
-            </li>
-            <li class="am-fact">
-              <span class="am-fact__name">Система</span>
-              <span class="am-fact__value">{{ system }}</span>
-            </li>
-            <li class="am-fact">
-              <span class="am-fact__name">Датасет названий</span>
-              <span class="am-fact__value" :class="{ 'am-fact__value--stale': datasetStale }">
-                {{ datasetText }}
-              </span>
-            </li>
-          </ul>
+        <ul class="am-facts">
+          <li class="am-fact">
+            <span class="am-fact__name">Версия</span>
+            <span class="am-fact__value">{{ version }}</span>
+          </li>
+          <li class="am-fact">
+            <span class="am-fact__name">Система</span>
+            <span class="am-fact__value">{{ system }}</span>
+          </li>
+          <li class="am-fact">
+            <span class="am-fact__name">Датасет названий</span>
+            <span class="am-fact__value" :class="{ 'am-fact__value--stale': datasetStale }">
+              {{ datasetText }}
+            </span>
+          </li>
+        </ul>
 
-<!-- Проверка обновления кнопкой прямо в панели, а не отдельным окном: окно поверх окна
+        <!-- Проверка обновления кнопкой прямо в панели, а не отдельным окном: окно поверх окна
      на пульте негде развернуть. Одна кнопка ведёт и проверку, и установку — по состоянию. -->
-          <button
-            ref="upBtn"
-            class="am-btn am-btn--soft am-up"
-            :class="{ 'am-up--new': updateOffer !== null }"
-            type="button"
-            :disabled="upBusy"
-            @click="updateOffer !== null ? onUpInstall() : onUpCheck()"
-          >
-            {{
-              upBusy
-                ? 'Спрашиваем GitHub…'
-                : updateOffer
-                  ? `Обновление до ${updateOffer.version}`
-                  : 'Проверить обновление'
-            }}
-          </button>
+        <button
+          ref="upBtn"
+          class="am-btn am-btn--soft am-up"
+          :class="{ 'am-up--new': updateOffer !== null }"
+          type="button"
+          :disabled="upBusy"
+          @click="updateOffer !== null ? onUpInstall() : onUpCheck()"
+        >
+          {{
+            upBusy
+              ? 'Спрашиваем GitHub…'
+              : updateOffer
+                ? `Обновление до ${updateOffer.version}`
+                : 'Проверить обновление'
+          }}
+        </button>
 
-          <p v-if="upNote" class="am-note">{{ upNote }}</p>
+        <p v-if="upNote" class="am-note">{{ upNote }}</p>
 
-<!-- Плашки с просьбой о звезде здесь больше нет: она вела на GitHub, а ссылку наружу на телевизоре открыть нечем. -->
+        <!-- Плашки с просьбой о звезде здесь больше нет: она вела на GitHub, а ссылку наружу на телевизоре открыть нечем. -->
 
-<!-- Имя источника, лицензия и ссылка. Обязанностью строка быть перестала: CC0-1.0 атрибуции
+        <!-- Имя источника, лицензия и ссылка. Обязанностью строка быть перестала: CC0-1.0 атрибуции
      не требует. Манами из цепочки убрана 3 сентября 2026 — номера теперь свои. -->
-          <p class="am-meta am-fine">
-            Русские названия поставляет датасет
-            <button v-if="outside" class="am-link" type="button" @click="onDatasetLink">animori-data</button
-            ><span v-else class="am-meta">animori-data</span>
-            (лицензия CC0-1.0): номера и связки собраны перечислением каталога Шикимори,
-            сами названия — из открытых API Шикимори и anime365.
-          </p>
+        <p class="am-meta am-fine">
+          Русские названия поставляет датасет
+          <button v-if="outside" class="am-link" type="button" @click="onDatasetLink">
+            animori-data</button
+          ><span v-else class="am-meta">animori-data</span>
+          (лицензия CC0-1.0): номера и связки собраны перечислением каталога Шикимори, сами названия
+          — из открытых API Шикимори и anime365.
+        </p>
 
-<!-- Свежесть датасета — единственное, за чем человеку приходится следить руками, поэтому про просрочку говорим словами. -->
-          <p v-if="datasetStale" class="am-stale">
-            Датасет не обновлялся больше {{ STALE_DAYS }} дней. Названия, которых в нём нет,
-            программа добирает из сети по одному — это медленно. Загляните в
-            <button v-if="outside" class="am-link" type="button" @click="onDatasetLink">animori-data</button
-            ><span v-else class="am-meta">animori-data</span>
-            и запустите сборку кнопкой.
-          </p>
-        </div>
+        <!-- Свежесть датасета — единственное, за чем человеку приходится следить руками, поэтому про просрочку говорим словами. -->
+        <p v-if="datasetStale" class="am-stale">
+          Датасет не обновлялся больше {{ STALE_DAYS }} дней. Названия, которых в нём нет, программа
+          добирает из сети по одному — это медленно. Загляните в
+          <button v-if="outside" class="am-link" type="button" @click="onDatasetLink">
+            animori-data</button
+          ><span v-else class="am-meta">animori-data</span>
+          и запустите сборку кнопкой.
+        </p>
+      </div>
     </SettingsSheet>
   </section>
 </template>

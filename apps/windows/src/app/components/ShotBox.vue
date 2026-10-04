@@ -286,7 +286,9 @@ watch(() => [props.mediaId, props.malId], load)
         </button>
       </div>
 
-      <p v-else-if="broken" class="am-meta">Кадры не загрузились: источник их отдал, картинки не приехали.</p>
+      <p v-else-if="broken" class="am-meta">
+        Кадры не загрузились: источник их отдал, картинки не приехали.
+      </p>
     </div>
   </div>
 

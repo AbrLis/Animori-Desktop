@@ -139,7 +139,7 @@ async function load(): Promise<void> {
     crew.value = found.staff
     void beginRussian(mine)
   } catch (e) {
-  // Без людей карточка полноценна: секция просто не появится.
+    // Без людей карточка полноценна: секция просто не появится.
     Logger('WARN', `Люди аниме ${props.mediaId}: добыть не вышло`, e)
   } finally {
     if (mine === run) busy.value = false
@@ -346,20 +346,17 @@ watch(crew, () => {
 .am-folk .am-h3 {
 }
 
-
 /* Мягкий сход у правого края: полка длинная и без подсказки обрывалась бы на полуплитке.
    Размер трека — общий, в `.am-cards` (theme.css): он один на персонажей и на франшизу. */
 .am-folk .am-rail {
   mask-image: linear-gradient(to right, #000 94%, transparent);
 }
 
-
 .am-face__wait {
   width: var(--am-face);
   aspect-ratio: 2 / 3;
   border-radius: var(--am-r-leaf);
 }
-
 
 /* Авторов единицы: полка из четырёх плиток смотрелась бы обрубком. */
 .am-crew {

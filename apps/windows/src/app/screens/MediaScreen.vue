@@ -153,7 +153,9 @@ watch(mediaId, () => {
                   :alt="mainTitle"
                   decoding="async"
                 />
-                <span v-else class="am-hero__cover am-hero__cover--empty" aria-hidden="true">?</span>
+                <span v-else class="am-hero__cover am-hero__cover--empty" aria-hidden="true"
+                  >?</span
+                >
 
                 <!-- Площадка названа знаком, а не словом: так ярлычок вдвое короче,
                      название осталось в подсказке. -->
@@ -298,11 +300,7 @@ watch(mediaId, () => {
 
           <!-- Музыка и франшиза делят ряд поровну. Обёртка сквозная: блок молчит, когда тем нет, и
                пустой колонки после себя не оставляет. -->
-          <ShotBox
-            :media-id="mediaId"
-            :mal-id="card.malId"
-            :trailer="card.trailer"
-          />
+          <ShotBox :media-id="mediaId" :mal-id="card.malId" :trailer="card.trailer" />
 
           <div v-if="franchiseRows.length > 0" class="am-panel am-fran">
             <h3 class="am-h3">Франшиза</h3>

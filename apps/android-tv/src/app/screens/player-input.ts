@@ -348,7 +348,12 @@ export function moveFocus(root: ParentNode, intent: PlayerIntent): boolean {
 
   // Вдоль оси — шаг по зоне; у края шаг переводит в соседнюю зону: кнопка, после которой стрелка не делает
   // ничего, читается как поломка. Шаг считаем только от настоящего номера — фокус бывает вне списка зоны.
-  const walk = intent === (along ? 'focusLeft' : 'focusUp') ? -1 : intent === (along ? 'focusRight' : 'focusDown') ? 1 : 0
+  const walk =
+    intent === (along ? 'focusLeft' : 'focusUp')
+      ? -1
+      : intent === (along ? 'focusRight' : 'focusDown')
+        ? 1
+        : 0
 
   if (walk !== 0 && index >= 0) {
     const next = Math.min(items.length - 1, Math.max(0, index + walk))
@@ -361,4 +366,3 @@ export function moveFocus(root: ParentNode, intent: PlayerIntent): boolean {
   // На краю нажатие всё равно наше: прокрутке страницы здесь делать нечего.
   return goal === null ? true : land(root, goal.name, marks.get(goal.name) ?? 0)
 }
-

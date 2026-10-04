@@ -163,7 +163,10 @@ export function usePlayer(mediaId: Ref<number>): PlayerView {
 
       // Ссылка на исходе срока — чаще невезение, чем приговор: второй вопрос приносит следующий час.
       if (found !== null && !isStreamFresh(found)) {
-        Logger('WARN', `Плеер: источник ${row.sourceId} отдал ссылку на исходе срока, спрашиваю снова`)
+        Logger(
+          'WARN',
+          `Плеер: источник ${row.sourceId} отдал ссылку на исходе срока, спрашиваю снова`,
+        )
 
         const again = await source.resolve(req, row.voiceId, episode.value)
         if (mine !== run) return false

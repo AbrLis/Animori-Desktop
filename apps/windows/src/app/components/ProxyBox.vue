@@ -238,9 +238,7 @@ onMounted(() => {
 
 <template>
   <div class="am-panel am-box">
-    <h3 class="am-h3">
-      <TileMark name="proxy" /> Прокси
-    </h3>
+    <h3 class="am-h3"><TileMark name="proxy" /> Прокси</h3>
 
     <label class="am-switch">
       <input v-model="enabled" type="checkbox" class="am-switch__box" @change="onEnabled" />

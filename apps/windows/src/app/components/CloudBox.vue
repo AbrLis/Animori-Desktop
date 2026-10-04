@@ -464,9 +464,7 @@ onMounted(() => {
 <template>
   <div class="am-panel am-box">
     <div class="am-bar">
-      <h3 class="am-h3">
-        <TileMark name="cloud" /> Облачная копия
-      </h3>
+      <h3 class="am-h3"><TileMark name="cloud" /> Облачная копия</h3>
       <span class="am-bar__gap" />
       <span class="am-flag" :class="{ 'am-flag--on': cloudOn() }">
         <span class="am-flag__dot" aria-hidden="true" />
@@ -545,8 +543,8 @@ onMounted(() => {
          прямо. Подставить другое облако молча программа не вправе. -->
     <p v-if="cloudPlace === 'google'" class="am-meta">
       Google Диск убран из программы: вход с устройства не давал скрытой папки, а без проверки
-      Google пропуск умирал за неделю. Подключите Яндекс Диск — файл копии в Google Диске остался
-      на месте и никуда не денется.
+      Google пропуск умирал за неделю. Подключите Яндекс Диск — файл копии в Google Диске остался на
+      месте и никуда не денется.
     </p>
 
     <!-- Пропуск вставляется руками: готовых Яндекс не выдаёт. Порядок по шагам
@@ -646,7 +644,9 @@ onMounted(() => {
       <ul class="am-facts">
         <li class="am-fact">
           <span class="am-fact__name">Файл копии</span>
-          <span class="am-fact__value"><code>{{ cloudPathText() }}</code></span>
+          <span class="am-fact__value"
+            ><code>{{ cloudPathText() }}</code></span
+          >
         </li>
         <li class="am-fact">
           <span class="am-fact__name">Последняя копия</span>
@@ -787,8 +787,10 @@ onMounted(() => {
 
     <div v-if="linkFound" class="am-ask">
       <p class="am-ask__text">
-        По ссылке лежит копия: {{ sizeText(linkFound.bytes) }}<template v-if="linkFound.modified">
-          · {{ whenText(Date.parse(linkFound.modified)) }}</template>. Здесь записей: {{ list }}.
+        По ссылке лежит копия: {{ sizeText(linkFound.bytes)
+        }}<template v-if="linkFound.modified">
+          · {{ whenText(Date.parse(linkFound.modified)) }}</template
+        >. Здесь записей: {{ list }}.
       </p>
 
       <div class="am-row">

@@ -90,18 +90,11 @@ const repeatHint = computed(() => `Повторных проходов: ${props.
 const playMark = computed<PlayState | null>(() => (props.soon ? null : props.play))
 
 /** Подсказка метки: знак без подписи, всё словами говорится здесь. */
-const playHint = computed(() =>
-  playMark.value === 'yes' ? 'Можно посмотреть' : 'Нет в каталоге',
-)
+const playHint = computed(() => (playMark.value === 'yes' ? 'Можно посмотреть' : 'Нет в каталоге'))
 
 /** Есть ли вообще что показывать в левом верхнем углу. */
 const hasTags = computed(
-  () =>
-    props.mark !== null ||
-    props.adult ||
-    props.soon ||
-    props.repeat > 0 ||
-    props.note !== null,
+  () => props.mark !== null || props.adult || props.soon || props.repeat > 0 || props.note !== null,
 )
 </script>
 
@@ -148,11 +141,7 @@ const hasTags = computed(
           :class="{ 'am-tile__live--low': score !== null }"
         />
 
-        <span
-          v-if="own"
-          class="am-tile__own"
-          :class="{ 'am-tile__own--play': playMark !== null }"
-        >
+        <span v-if="own" class="am-tile__own" :class="{ 'am-tile__own--play': playMark !== null }">
           {{ own }}
         </span>
 

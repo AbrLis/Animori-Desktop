@@ -142,7 +142,9 @@ const caption = computed(() => (wrong.value !== '' ? wrong.value : label.value))
 
 /** Имя поля для чтеца с экрана: пустое значение читать нечем, и без подстановки оставалось бы
  *  «Дата рождения: » с висящим двоеточием. */
-const spoken = computed(() => `${props.title}: ${label.value !== '' ? label.value : 'не заполнено'}`)
+const spoken = computed(
+  () => `${props.title}: ${label.value !== '' ? label.value : 'не заполнено'}`,
+)
 
 // Значение сверху могло измениться мимо поля — «сегодня» по достижению потолка счёта или обновление списка: набранное подхватываем только если оно разошлось.
 watch(
@@ -181,11 +183,7 @@ watch(
     </div>
 
     <div v-if="tools" class="am-date__acts">
-      <button
-        class="am-btn am-btn--ghost am-date__today"
-        type="button"
-        @click="todayPick"
-      >
+      <button class="am-btn am-btn--ghost am-date__today" type="button" @click="todayPick">
         Сегодня
       </button>
 

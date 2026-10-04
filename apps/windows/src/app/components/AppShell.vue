@@ -119,16 +119,24 @@ function onReload(): void {
           type="button"
           @click="onPick(item.name, $event)"
         >
-          <span v-if="item.icon === 'stats'" class="am-side__icon am-side__icon--stats" aria-hidden="true">
+          <span
+            v-if="item.icon === 'stats'"
+            class="am-side__icon am-side__icon--stats"
+            aria-hidden="true"
+          >
             <!-- Столбики нарисованы, а не набраны знаком: готового глифа «диаграмма» нет, а ◔ от ◷
                  истории отличался одной залитой четвертью и в 18 px читался как тот же круг. -->
             <svg class="am-side__mark" viewBox="0 0 20 20" fill="none">
               <path d="M4 16V9.5M10 16V4M16 16v-9.5" />
             </svg>
           </span>
-          <span v-else class="am-side__icon" :class="`am-side__icon--${item.name}`" aria-hidden="true">{{
-            item.icon
-          }}</span>
+          <span
+            v-else
+            class="am-side__icon"
+            :class="`am-side__icon--${item.name}`"
+            aria-hidden="true"
+            >{{ item.icon }}</span
+          >
           <span class="am-side__text">{{ item.title }}</span>
         </button>
       </nav>

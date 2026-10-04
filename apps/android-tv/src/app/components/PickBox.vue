@@ -17,7 +17,7 @@ const props = withDefaults(
     mark?: string | null
     /** Подпись для читалок экрана. */
     label?: string | null
-/** Ширина во всю полосу: для рядов настроек. */
+    /** Ширина во всю полосу: для рядов настроек. */
     wide?: boolean
   }>(),
   { mark: null, label: null, wide: false },

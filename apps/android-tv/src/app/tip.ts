@@ -119,7 +119,11 @@ function onEnter(e: Event): void {
   if (!(aim instanceof Element)) return
 
   // Наводка без свежего движения указателя — призрак: пульт сюда не ходил, и подпись не должна показываться. Фокус и прикосновение не проверяются: они наводкой не бывают.
-  if (e instanceof PointerEvent && e.pointerType !== 'touch' && Date.now() - lastMove > MOVE_GRACE_MS) {
+  if (
+    e instanceof PointerEvent &&
+    e.pointerType !== 'touch' &&
+    Date.now() - lastMove > MOVE_GRACE_MS
+  ) {
     return
   }
 

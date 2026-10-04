@@ -78,7 +78,10 @@ async function start(): Promise<void> {
     Logger('WARN', `Предупреждение Vue: ${message}`, trace)
   }
 
-  app.directive('tip', tip).directive('seen', seen).mount(root as HTMLElement)
+  app
+    .directive('tip', tip)
+    .directive('seen', seen)
+    .mount(root as HTMLElement)
 
   hideBoot()
 

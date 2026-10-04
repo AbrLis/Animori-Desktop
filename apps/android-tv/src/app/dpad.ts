@@ -47,7 +47,12 @@ function candidates(scope: ParentNode): HTMLElement[] {
 
 /// Ближайший элемент в сторону `dir`. Два прохода: сперва с перекрытием по поперечной оси, затем любой в нужную сторону. `soft` добавляет третий: в окне панель стоит колонкой, верхние её строки узки, крестик
 /// с ними не перекрывается.
-function nearest(from: HTMLElement, dir: Dir, items: HTMLElement[], soft = false): HTMLElement | null {
+function nearest(
+  from: HTMLElement,
+  dir: Dir,
+  items: HTMLElement[],
+  soft = false,
+): HTMLElement | null {
   const f = from.getBoundingClientRect()
   const horiz = dir === 'left' || dir === 'right'
   const sign = dir === 'right' || dir === 'down' ? 1 : -1
@@ -116,7 +121,11 @@ function railActive(items: HTMLElement[]): HTMLElement | null {
 
 /// Крайняя левая цель полки при прыжке вверх-вниз: по геометрии выбирался ближайший по высоте, а он уводил в
 /// середину следующей полки. Метку `[data-am-row]` носят и полки, и ряд отбора.
-function rowStart(from: HTMLElement, target: HTMLElement, items: HTMLElement[]): HTMLElement | null {
+function rowStart(
+  from: HTMLElement,
+  target: HTMLElement,
+  items: HTMLElement[],
+): HTMLElement | null {
   const row = target.closest<HTMLElement>(`[${ROW}]`)
   if (row === null) return null
   if (row === from.closest(`[${ROW}]`)) return null
@@ -176,9 +185,7 @@ function nudge(from: HTMLElement, dir: Dir, root: HTMLElement | null): boolean {
   const sign = dir === 'right' || dir === 'down' ? 1 : -1
 
   for (let node = from.parentElement; node; node = node.parentElement) {
-    const overflow = horiz
-      ? getComputedStyle(node).overflowX
-      : getComputedStyle(node).overflowY
+    const overflow = horiz ? getComputedStyle(node).overflowX : getComputedStyle(node).overflowY
     if (overflow !== 'auto' && overflow !== 'scroll') {
       if (node === root) break
       continue
@@ -388,7 +395,7 @@ function pageStart(items: HTMLElement[]): HTMLElement | null {
       return el.closest('.am-tile') !== null || el.closest('.am-door') !== null
     }) ?? null
 
-  return first ?? tile ?? (page.length > 0 ? page[0] ?? null : null)
+  return first ?? tile ?? (page.length > 0 ? (page[0] ?? null) : null)
 }
 
 /// Ставит фокус на первый элемент содержимого: пока фокус ни на ком, стрелки ведёт оболочка. `wait` (сеять некуда)

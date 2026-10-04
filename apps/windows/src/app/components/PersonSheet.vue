@@ -496,9 +496,7 @@ onBeforeUnmount(() => {
                заставлял перезагружать всё окно. -->
           <div v-if="cardFailed || ruFailed" class="am-ps-fail">
             <p class="am-ps-fail__word">
-              {{
-                cardFailed ? 'Карточку загрузить не удалось.' : 'Русское описание не доехало.'
-              }}
+              {{ cardFailed ? 'Карточку загрузить не удалось.' : 'Русское описание не доехало.' }}
             </p>
             <button class="am-btn am-btn--ghost" type="button" @click="retry">Повторить</button>
           </div>

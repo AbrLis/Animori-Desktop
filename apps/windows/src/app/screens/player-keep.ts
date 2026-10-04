@@ -222,9 +222,7 @@ function trim(rows: Record<string, { when: number }>, limit: number): void {
   const keys = Object.keys(rows)
   if (keys.length <= limit) return
 
-  const old = keys
-    .sort((a, b) => (rows[b]?.when ?? 0) - (rows[a]?.when ?? 0))
-    .slice(limit)
+  const old = keys.sort((a, b) => (rows[b]?.when ?? 0) - (rows[a]?.when ?? 0)).slice(limit)
 
   for (const key of old) delete rows[key]
 }

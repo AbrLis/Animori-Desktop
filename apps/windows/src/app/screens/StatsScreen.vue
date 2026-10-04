@@ -271,7 +271,8 @@ const daysTip = computed(() => {
  * подсказки человек
  * их не свяжет — обе считают одно и то же число. */
 const watchedTip = computed(
-  () => 'Начата хотя бы одна серия. Этим же числом считается вкладка «Просмотренное» у кольца по видам',
+  () =>
+    'Начата хотя бы одна серия. Этим же числом считается вкладка «Просмотренное» у кольца по видам',
 )
 
 /**
@@ -310,7 +311,14 @@ interface PlotRow {
 
 /** Данные для StatsPlot: круглые деления, доли от потолка и честная кривая по верхам столбиков. */
 interface PlotData {
-  bars: { key: string; label: string; valueText: string; share: number; tip: string; year: number }[]
+  bars: {
+    key: string
+    label: string
+    valueText: string
+    share: number
+    tip: string
+    year: number
+  }[]
   ticks: { value: number; text: string }[]
   line: string
   area: string
@@ -404,11 +412,7 @@ const releasePlot = computed(() => {
     }
   })
 
-  return buildPlot(
-    rows,
-    (value) => metricTickText(metric, value),
-    metric === 'score' ? 10 : 0,
-  )
+  return buildPlot(rows, (value) => metricTickText(metric, value), metric === 'score' ? 10 : 0)
 })
 
 /** Раскрытый год: ноль — весь ряд по годам, иначе месяцы этого года. */
@@ -472,11 +476,7 @@ const yearPlot = computed(() => {
     }
   })
 
-  return buildPlot(
-    rows,
-    (value) => metricTickText(metric, value),
-    metric === 'score' ? 10 : 0,
-  )
+  return buildPlot(rows, (value) => metricTickText(metric, value), metric === 'score' ? 10 : 0)
 })
 
 /** Отказ подписки на правки списка: зовётся при уходе с экрана. */
@@ -533,7 +533,6 @@ onBeforeUnmount(() => {
 })
 </script>
 
-
 <template>
   <section ref="root" class="am-page">
     <div v-if="busy" class="am-stats__grid">
@@ -563,7 +562,8 @@ onBeforeUnmount(() => {
             <span class="am-stats__value">{{ formatNumber(stats.titles) }}</span>
             <span class="am-stats__name">Аниме в списке</span>
             <span class="am-stats__sub">
-              завершено {{ formatNumber(stats.completed) }}, смотрю {{ formatNumber(stats.running) }}
+              завершено {{ formatNumber(stats.completed) }}, смотрю
+              {{ formatNumber(stats.running) }}
             </span>
           </li>
 
@@ -576,10 +576,7 @@ onBeforeUnmount(() => {
             <span class="am-stats__sub">с хотя бы одной серией</span>
           </li>
 
-          <li
-            v-tip="episodesTip"
-            class="am-stats__tile"
-          >
+          <li v-tip="episodesTip" class="am-stats__tile">
             <span class="am-stats__tile-flower" aria-hidden="true">
               <svg :viewBox="SAKURA_ROSETTE_BOX"><path :d="SAKURA_ROSETTE" /></svg>
             </span>
@@ -760,12 +757,7 @@ onBeforeUnmount(() => {
       <section v-if="stats.years.length > 0" class="am-panel am-stats__card am-stats__card--wide">
         <div class="am-bar am-stats__head">
           <h3 class="am-h3">{{ drilled ? `Месяцы ${drilledYear}` : 'Год просмотра' }}</h3>
-          <button
-            v-if="drilled"
-            class="am-stats__back"
-            type="button"
-            @click="drilledYear = 0"
-          >
+          <button v-if="drilled" class="am-stats__back" type="button" @click="drilledYear = 0">
             ← К годам
           </button>
           <span class="am-bar__gap" />
@@ -787,7 +779,10 @@ onBeforeUnmount(() => {
         <!-- Прокрутку и притухание краёв берёт на себя компонент: ряду не влезает, и он уезжает. -->
         <StatsPlot v-bind="yearPlot" @pick="drillTo" />
       </section>
-      <section v-if="stats.releases.length > 0" class="am-panel am-stats__card am-stats__card--wide">
+      <section
+        v-if="stats.releases.length > 0"
+        class="am-panel am-stats__card am-stats__card--wide"
+      >
         <div class="am-bar am-stats__head">
           <h3 class="am-h3">Год выпуска</h3>
           <span class="am-bar__gap" />

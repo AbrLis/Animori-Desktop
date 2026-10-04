@@ -159,7 +159,9 @@ watch(
     </div>
 
     <div class="am-date__acts">
-      <button class="am-btn am-btn--ghost am-date__today" type="button" @click="today">Сегодня</button>
+      <button class="am-btn am-btn--ghost am-date__today" type="button" @click="today">
+        Сегодня
+      </button>
 
       <button
         class="am-btn am-btn--ghost am-date__wipe"

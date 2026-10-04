@@ -61,11 +61,7 @@
       color-mix(in srgb, var(--am-veil) 78%, transparent) 58%,
       var(--am-bg-2) 100%
     ),
-    linear-gradient(
-      90deg,
-      color-mix(in srgb, var(--am-veil) 72%, transparent) 0%,
-      transparent 62%
-    );
+    linear-gradient(90deg, color-mix(in srgb, var(--am-veil) 72%, transparent) 0%, transparent 62%);
 }
 
 /* Постер с названием по середине баннера: прежние поля были вчетверо больше сверху, и блок оседал на край.
@@ -147,7 +143,8 @@
   gap: 8px;
   align-self: stretch;
   min-width: 0;
-  margin: calc(-1 * var(--am-hero-pad-y)) calc(-1 * var(--am-hero-pad-x)) calc(-1 * var(--am-hero-pad-y)) 0;
+  margin: calc(-1 * var(--am-hero-pad-y)) calc(-1 * var(--am-hero-pad-x))
+    calc(-1 * var(--am-hero-pad-y)) 0;
   padding: 16px var(--am-hero-pad-x) 16px clamp(30px, 3.2vw, 56px);
   isolation: isolate;
 }

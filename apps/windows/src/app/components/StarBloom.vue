@@ -33,7 +33,9 @@ const STAR = starPath()
 }
 
 :where(button, a, [role='button']):has(> .am-bloom.am-star):hover > .am-bloom .am-bloom__bud,
-:where(button, a, [role='button']):has(> .am-bloom.am-star):focus-visible > .am-bloom .am-bloom__bud {
+:where(button, a, [role='button']):has(> .am-bloom.am-star):focus-visible
+  > .am-bloom
+  .am-bloom__bud {
   opacity: 0;
 }
 

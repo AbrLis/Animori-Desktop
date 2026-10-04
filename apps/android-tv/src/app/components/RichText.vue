@@ -10,7 +10,7 @@ import { followRichAim } from '../rich-open'
 import { richLinkLabel, warmRichLink } from '../rich-names'
 
 const props = defineProps<{
-/** Сырое описание; разбирается здесь. */
+  /** Сырое описание; разбирается здесь. */
   text?: string | null
   /** Уже разобранные блоки: так компонент зовёт себя для вложенного уровня. */
   blocks?: RichBlock[]
@@ -118,7 +118,12 @@ async function follow(aim: RichAim): Promise<void> {
           <span>{{ block.label === '' ? 'Спойлер' : block.label }}</span>
         </button>
 
-        <RichText v-if="shown(at)" :blocks="block.blocks" :plain="props.plain" @inside="emit('inside')" />
+        <RichText
+          v-if="shown(at)"
+          :blocks="block.blocks"
+          :plain="props.plain"
+          @inside="emit('inside')"
+        />
       </div>
 
       <blockquote v-else-if="block.kind === 'quote'" class="am-rich__quote">

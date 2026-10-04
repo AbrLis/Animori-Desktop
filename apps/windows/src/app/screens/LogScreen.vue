@@ -282,36 +282,66 @@ onBeforeUnmount(() => {
         </tbody>
       </table>
       <p class="am-meta">
-        Окно учёта — минута. «Ушло всего» считается с запуска программы: это и есть
-        цена сеанса для чужих серверов.
+        Окно учёта — минута. «Ушло всего» считается с запуска программы: это и есть цена сеанса для
+        чужих серверов.
       </p>
     </div>
 
     <div v-if="store" class="am-log__panel">
       <ul class="am-log__store">
-        <li><span>Русские названия</span><b>{{ store.russianTitles }}</b></li>
-        <li><span>Отказы «имени нет»</span><b>{{ store.noRussianNames }}</b></li>
-        <li><span>Облики плиток</span><b>{{ store.looks }}</b></li>
-        <li><span>Метки доступности</span><b>{{ store.playable }}</b></li>
-        <li><span>Соответствия Aniliberty</span><b>{{ store.anilibertyLinks }}</b></li>
-        <li><span>Кадры и ролики</span><b>{{ store.screenshots }}</b></li>
-        <li><span>Персонажи</span><b>{{ store.characters }}</b></li>
-        <li><span>Персонал</span><b>{{ store.staff }}</b></li>
-        <li><span>Темы</span><b>{{ store.themes }}</b></li>
-        <li><span>Оценки площадок</span><b>{{ store.ratings }}</b></li>
-        <li><span>Карточки тайтлов</span><b>{{ store.media }}</b></li>
-        <li><span>Номера MAL</span><b>{{ store.malMappings }}</b></li>
-        <li><span>Франшизы</span><b>{{ store.franchises }}</b></li>
-        <li><span>Прочее</span><b>{{ store.other }}</b></li>
+        <li>
+          <span>Русские названия</span><b>{{ store.russianTitles }}</b>
+        </li>
+        <li>
+          <span>Отказы «имени нет»</span><b>{{ store.noRussianNames }}</b>
+        </li>
+        <li>
+          <span>Облики плиток</span><b>{{ store.looks }}</b>
+        </li>
+        <li>
+          <span>Метки доступности</span><b>{{ store.playable }}</b>
+        </li>
+        <li>
+          <span>Соответствия Aniliberty</span><b>{{ store.anilibertyLinks }}</b>
+        </li>
+        <li>
+          <span>Кадры и ролики</span><b>{{ store.screenshots }}</b>
+        </li>
+        <li>
+          <span>Персонажи</span><b>{{ store.characters }}</b>
+        </li>
+        <li>
+          <span>Персонал</span><b>{{ store.staff }}</b>
+        </li>
+        <li>
+          <span>Темы</span><b>{{ store.themes }}</b>
+        </li>
+        <li>
+          <span>Оценки площадок</span><b>{{ store.ratings }}</b>
+        </li>
+        <li>
+          <span>Карточки тайтлов</span><b>{{ store.media }}</b>
+        </li>
+        <li>
+          <span>Номера MAL</span><b>{{ store.malMappings }}</b>
+        </li>
+        <li>
+          <span>Франшизы</span><b>{{ store.franchises }}</b>
+        </li>
+        <li>
+          <span>Прочее</span><b>{{ store.other }}</b>
+        </li>
         <li class="am-log__store--sum">
           <span>Всего записей</span><b>{{ store.totalCacheRecords }}</b>
         </li>
-        <li class="am-log__store--sum"><span>Занято</span><b>{{ store.estimatedSize }}</b></li>
+        <li class="am-log__store--sum">
+          <span>Занято</span><b>{{ store.estimatedSize }}</b>
+        </li>
       </ul>
       <p class="am-meta">
-        Каждая запись здесь — запрос, которого мы больше не делаем. Ноль у номеров
-        MAL правдив: стор заведён миграцией, но писать в него некому — пары номеров
-        добываются заново при каждом запуске.
+        Каждая запись здесь — запрос, которого мы больше не делаем. Ноль у номеров MAL правдив: стор
+        заведён миграцией, но писать в него некому — пары номеров добываются заново при каждом
+        запуске.
       </p>
     </div>
 

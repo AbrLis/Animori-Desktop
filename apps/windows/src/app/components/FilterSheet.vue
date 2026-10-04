@@ -3,12 +3,7 @@
 // Группы тэгов закрыты (справочник ~1000), взрослое режется в core/adult, у года свои стрелки.
 import { computed, onBeforeUnmount, ref, watch } from 'vue'
 
-import {
-  emptyPick,
-  type CatalogPick,
-  type CatalogTag,
-  type FeedSort,
-} from '@/api/anilist-catalog'
+import { emptyPick, type CatalogPick, type CatalogTag, type FeedSort } from '@/api/anilist-catalog'
 import { genreAllowed, tagAllowed } from '@/core/adult'
 import { tagChoices } from '@/core/recs'
 
@@ -124,9 +119,7 @@ const spans = computed<YearSpan[]>(() => {
 })
 
 /** Жанры под политикой показа взрослого. */
-const genreList = computed<string[]>(() =>
-  GENRE_CHOICES.filter((genre) => genreAllowed(genre)),
-)
+const genreList = computed<string[]>(() => GENRE_CHOICES.filter((genre) => genreAllowed(genre)))
 
 /** Тэги под политикой показа взрослого: метка сервера, закрытые разделы
     справочника и свой список имён — всё решается в core/adult. */

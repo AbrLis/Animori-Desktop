@@ -31,15 +31,20 @@ const STAR = starPath()
     transform var(--am-mid) var(--am-ease);
 }
 
-:where(button, a, [role='button']):has(> .am-bloom.am-star):hover:where(:not(.am-lite *)) > .am-bloom .am-bloom__bud,
-:where(button, a, [role='button']):has(> .am-bloom.am-star):focus-visible > .am-bloom .am-bloom__bud {
+:where(button, a, [role='button']):has(> .am-bloom.am-star):hover:where(:not(.am-lite *))
+  > .am-bloom
+  .am-bloom__bud,
+:where(button, a, [role='button']):has(> .am-bloom.am-star):focus-visible
+  > .am-bloom
+  .am-bloom__bud {
   opacity: 0;
 }
 
 /* Единственное правило слоя — цвет свечения: у звезды он тоном балла, а не розовым сакуры,
    потому что правило цветка общее для всех `.am-bloom`. Селектор с `:has(> .am-bloom.am-star)`
    перевешивает правило сакуры по весу. */
-:where(button, a, [role='button']):has(> .am-bloom.am-star):hover:where(:not(.am-lite *)) > .am-bloom,
+:where(button, a, [role='button']):has(> .am-bloom.am-star):hover:where(:not(.am-lite *))
+  > .am-bloom,
 :where(button, a, [role='button']):has(> .am-bloom.am-star):focus-visible > .am-bloom {
   filter: drop-shadow(var(--am-bloom-shade, 0 2px 5px var(--am-veil)))
     drop-shadow(0 0 9px color-mix(in srgb, var(--am-mark, var(--am-accent)) 50%, transparent));

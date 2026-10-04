@@ -65,7 +65,8 @@ export interface MineFact {
 }
 
 /** Виды правки, доступные с карточки. Удаление записи сюда пока не входит. */
-type CardEdit = 'status' | 'score' | 'progress' | 'repeat' | 'startedAt' | 'completedAt' | 'notes' | 'remove'
+type CardEdit =
+  'status' | 'score' | 'progress' | 'repeat' | 'startedAt' | 'completedAt' | 'notes' | 'remove'
 
 /** Уже открытая карточка целиком: возврат назад показывает её без вопросов. */
 interface Shown {
@@ -816,7 +817,7 @@ export function useMediaCard(mediaId: Ref<number>): MediaCardView {
     listLabel,
     mainTitle,
     heroStyle,
-  heroCover,
+    heroCover,
     donePart,
     progressText,
     about,

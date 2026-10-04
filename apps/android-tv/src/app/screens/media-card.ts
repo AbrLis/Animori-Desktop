@@ -66,14 +66,7 @@ export interface MineFact {
 
 /** Виды правки, доступные с карточки; удаление записи сюда пока не входит. */
 type CardEdit =
-  | 'status'
-  | 'score'
-  | 'progress'
-  | 'repeat'
-  | 'startedAt'
-  | 'completedAt'
-  | 'notes'
-  | 'remove'
+  'status' | 'score' | 'progress' | 'repeat' | 'startedAt' | 'completedAt' | 'notes' | 'remove'
 
 /** Уже открытая карточка целиком: возврат назад показывает её без вопросов. */
 interface Shown {

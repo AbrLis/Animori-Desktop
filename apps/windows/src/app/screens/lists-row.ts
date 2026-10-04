@@ -101,12 +101,7 @@ function titleOf(entry: SnapshotEntry): string {
 /** Чем спрашивать источники: номер MAL и названия по убыванию пригодности (номер снимка не выдумывается).
  * Признак идущего сезона едет с вопросом ради срока ответа «нет»: без него core/playable.ts считал идущим всё за два года. */
 function playAskOf(entry: SnapshotEntry, look: MediaLook | null): PlayAsk {
-  const names = [
-    entry.romaji,
-    entry.english,
-    look?.romaji ?? null,
-    peekRussianName(entry.mediaId),
-  ]
+  const names = [entry.romaji, entry.english, look?.romaji ?? null, peekRussianName(entry.mediaId)]
 
   return {
     mediaId: entry.mediaId,

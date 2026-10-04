@@ -61,11 +61,7 @@
       color-mix(in srgb, var(--am-veil) 78%, transparent) 58%,
       var(--am-bg-2) 100%
     ),
-    linear-gradient(
-      90deg,
-      color-mix(in srgb, var(--am-veil) 72%, transparent) 0%,
-      transparent 62%
-    );
+    linear-gradient(90deg, color-mix(in srgb, var(--am-veil) 72%, transparent) 0%, transparent 62%);
 }
 
 /* Постер с названием стоят по середине баннера. Равные поля плюс center — вся геометрия
@@ -147,7 +143,8 @@
   gap: 8px;
   align-self: stretch;
   min-width: 0;
-  margin: calc(-1 * var(--am-hero-pad-y)) calc(-1 * var(--am-hero-pad-x)) calc(-1 * var(--am-hero-pad-y)) 0;
+  margin: calc(-1 * var(--am-hero-pad-y)) calc(-1 * var(--am-hero-pad-x))
+    calc(-1 * var(--am-hero-pad-y)) 0;
   padding: 16px var(--am-hero-pad-x) 16px clamp(30px, 3.2vw, 56px);
   isolation: isolate;
 }
@@ -492,8 +489,7 @@
    главным признаком части. На телевизоре ту же роль играет `:focus-visible` — ховера там нет. */
 .am-fran__rail .am-face__hit:hover:where(:not(.am-lite *)) .am-part__play,
 .am-fran__rail .am-face__hit:focus-visible .am-part__play {
-  filter:
-    drop-shadow(0 1px 3px rgb(0 0 0 / 0.9))
+  filter: drop-shadow(0 1px 3px rgb(0 0 0 / 0.9))
     drop-shadow(0 0 7px rgb(var(--am-accent-rgb) / 0.8));
 }
 

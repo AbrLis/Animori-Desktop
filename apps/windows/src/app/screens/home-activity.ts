@@ -182,7 +182,10 @@ export function activityWeekdays(): ReadonlyArray<ActivityWeekday> {
 /**
  * Сколько дней года не пустых: подписью «пустых» клеток человек понимает, что приложение живо. Чужие дни в краях сетки и ещё не наступившие в счёт не идут: иначе подпись спорила бы с глазом.
  */
-export function activityTotals(cells: ReadonlyArray<ActivityCell>): { days: number; events: number } {
+export function activityTotals(cells: ReadonlyArray<ActivityCell>): {
+  days: number
+  events: number
+} {
   let days = 0
   let events = 0
 
@@ -205,10 +208,7 @@ export interface ActivityYearStep {
 
 /** Переключатели появляются только там, где есть что показывать: год без единого дела переключать
  * незачем, а кнопка рядом с годом читалась бы как «там что-то есть». Данные начинаются и кончаются 2026 годом. */
-export function activityYearStep(
-  shown: number,
-  years: ReadonlyArray<number>,
-): ActivityYearStep {
+export function activityYearStep(shown: number, years: ReadonlyArray<number>): ActivityYearStep {
   return {
     prev: years.includes(shown - 1),
     next: years.includes(shown + 1),

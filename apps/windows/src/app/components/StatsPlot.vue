@@ -57,7 +57,9 @@ function tickTop(tick: PlotTick): number {
 
 /** Самая высокая колонка: её значение стоит над столбиком, а не над каждым. */
 const peak = computed(() => {
-  const ranked = props.bars.map((bar, at) => ({ bar, at })).sort((a, b) => b.bar.share - a.bar.share)
+  const ranked = props.bars
+    .map((bar, at) => ({ bar, at }))
+    .sort((a, b) => b.bar.share - a.bar.share)
   return ranked[0] ?? null
 })
 
@@ -126,18 +128,10 @@ onBeforeUnmount(() => {
       </span>
     </div>
 
-    <div
-      ref="scroller"
-      class="am-plot__scroll"
-      :class="{ 'am-plot__scroll--more': overflow }"
-    >
+    <div ref="scroller" class="am-plot__scroll" :class="{ 'am-plot__scroll--more': overflow }">
       <div class="am-plot__plot" :style="plotStyle">
         <div class="am-plot__tracks">
-          <span
-            v-if="peak && peak.bar.valueText"
-            class="am-plot__peak"
-            :style="peakStyle"
-          >
+          <span v-if="peak && peak.bar.valueText" class="am-plot__peak" :style="peakStyle">
             {{ peak.bar.valueText }}
           </span>
           <svg
@@ -187,14 +181,19 @@ onBeforeUnmount(() => {
                 :aria-label="bar.year > 0 ? bar.tip : undefined"
                 @click="bar.year > 0 && emit('pick', bar.year)"
               >
-                <span class="am-plot__bar" :style="{ height: `${(bar.share * 100).toFixed(2)}%` }" />
+                <span
+                  class="am-plot__bar"
+                  :style="{ height: `${(bar.share * 100).toFixed(2)}%` }"
+                />
               </component>
             </li>
           </ol>
         </div>
 
         <ol class="am-plot__keys">
-          <li v-for="(bar, at) in bars" :key="bar.key">{{ at % labelStep === 0 ? bar.label : '' }}</li>
+          <li v-for="(bar, at) in bars" :key="bar.key">
+            {{ at % labelStep === 0 ? bar.label : '' }}
+          </li>
         </ol>
       </div>
     </div>
@@ -255,7 +254,13 @@ onBeforeUnmount(() => {
 
 /* Ряд уехал за край — края притухают: иначе про прокрутку никто не знает. */
 .am-plot__scroll--more {
-  mask-image: linear-gradient(90deg, transparent 0, #000 18px, #000 calc(100% - 18px), transparent 100%);
+  mask-image: linear-gradient(
+    90deg,
+    transparent 0,
+    #000 18px,
+    #000 calc(100% - 18px),
+    transparent 100%
+  );
 }
 
 .am-plot__plot {

@@ -4,12 +4,7 @@
 
 import { computed, onBeforeUnmount, ref, watch } from 'vue'
 
-import {
-  emptyPick,
-  type CatalogPick,
-  type CatalogTag,
-  type FeedSort,
-} from '@/api/anilist-catalog'
+import { emptyPick, type CatalogPick, type CatalogTag, type FeedSort } from '@/api/anilist-catalog'
 import { genreAllowed, tagAllowed } from '@/core/adult'
 import { tagChoices } from '@/core/recs'
 
@@ -122,9 +117,7 @@ const spans = computed<YearSpan[]>(() => {
 })
 
 /** Жанры под политикой показа взрослого. */
-const genreList = computed<string[]>(() =>
-  GENRE_CHOICES.filter((genre) => genreAllowed(genre)),
-)
+const genreList = computed<string[]>(() => GENRE_CHOICES.filter((genre) => genreAllowed(genre)))
 
 /** Тэги под политикой показа взрослого: метка сервера, закрытые разделы и свой список имён — всё в core/adult. */
 const pool = computed<CatalogTag[]>(() => tags.value.filter((tag) => tagAllowed(tag)))
@@ -354,7 +347,7 @@ onBeforeUnmount(() => {
           <span v-if="count > 0" v-tip="'Условий в отборе'" class="am-sheet__num">{{ count }}</span>
           <span class="am-bar__gap" />
 
-<!-- Закрытие знаком, как в остальных окнах: слово «Закрыть» рядом с «Готово» читалось
+          <!-- Закрытие знаком, как в остальных окнах: слово «Закрыть» рядом с «Готово» читалось
      как второе действие. Имя кнопке даёт aria-label — знак спрятан от чтецов. -->
           <button
             v-tip="'Закрыть'"
@@ -527,7 +520,7 @@ onBeforeUnmount(() => {
                     {{ groupCount(group) }}
                   </span>
 
-<!-- Знак раскрытия нарисован, а не набран символом: ⌈ из шрифта читался буквой «Г» в конце строки. -->
+                  <!-- Знак раскрытия нарисован, а не набран символом: ⌈ из шрифта читался буквой «Г» в конце строки. -->
                   <span
                     class="am-fold__arrow"
                     :class="{ 'am-fold__arrow--on': openGroup === group.key }"
@@ -783,7 +776,7 @@ onBeforeUnmount(() => {
   background: none;
   border: 0;
 
-/* Скругление строке нужно ради кромки фокуса: форму рисует раскладушка, и
+  /* Скругление строке нужно ради кромки фокуса: форму рисует раскладушка, и
    прямоугольная кромка строки обрезалась бы внутри. */
   border-radius: calc(var(--am-r-m) - 1px);
   transition: background-color var(--am-fast) var(--am-ease);

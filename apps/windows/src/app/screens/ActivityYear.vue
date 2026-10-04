@@ -399,7 +399,11 @@ onBeforeUnmount(() => {
           <button
             v-for="cell in cells"
             :key="cell.day"
-            v-tip="cell.outside ? dayText(cell.day) : `${dayText(cell.day)} — ${activityFacts(cell.count)}`"
+            v-tip="
+              cell.outside
+                ? dayText(cell.day)
+                : `${dayText(cell.day)} — ${activityFacts(cell.count)}`
+            "
             class="am-act__cell"
             :class="{
               'am-act__cell--future': cell.future,
@@ -411,9 +415,11 @@ onBeforeUnmount(() => {
             :data-at="cell.at"
             :data-level="cell.level"
             :disabled="cell.future || cell.outside"
-            :aria-label="cell.outside
-              ? dayText(cell.day)
-              : `${dayText(cell.day)}: ${activityFacts(cell.count)}`"
+            :aria-label="
+              cell.outside
+                ? dayText(cell.day)
+                : `${dayText(cell.day)}: ${activityFacts(cell.count)}`
+            "
             :aria-pressed="cell.day === picked"
             @click="pick(cell.day, cell.future || cell.outside)"
           />
@@ -458,7 +464,13 @@ onBeforeUnmount(() => {
       Закрывается крестиком, щелчком мимо и клавишей Escape.
     -->
     <Teleport to="body">
-      <div v-if="picked > 0" class="am-sheet" role="dialog" aria-modal="true" @click.self="closeDay">
+      <div
+        v-if="picked > 0"
+        class="am-sheet"
+        role="dialog"
+        aria-modal="true"
+        @click.self="closeDay"
+      >
         <div class="am-sheet__box">
           <header class="am-sheet__top">
             <div class="am-sheet__text">
@@ -505,7 +517,6 @@ onBeforeUnmount(() => {
     </Teleport>
   </section>
 </template>
-
 
 <style scoped>
 .am-act {
@@ -643,10 +654,18 @@ onBeforeUnmount(() => {
    плашке приветствия, и на прежних долях просвета пустой день было не отличить от тихого.
    Порядок в приложении держит насыщенность, а не цвет: зелёный и красный не занимаем — там они
    значат «хорошо» и «плохо», а активность не бывает ни тем, ни другим. */
-.am-act__cell[data-level='1'] { background: rgb(var(--am-accent-rgb) / 0.42); }
-.am-act__cell[data-level='2'] { background: rgb(var(--am-accent-rgb) / 0.62); }
-.am-act__cell[data-level='3'] { background: rgb(var(--am-accent-rgb) / 0.84); }
-.am-act__cell[data-level='4'] { background: var(--am-accent); }
+.am-act__cell[data-level='1'] {
+  background: rgb(var(--am-accent-rgb) / 0.42);
+}
+.am-act__cell[data-level='2'] {
+  background: rgb(var(--am-accent-rgb) / 0.62);
+}
+.am-act__cell[data-level='3'] {
+  background: rgb(var(--am-accent-rgb) / 0.84);
+}
+.am-act__cell[data-level='4'] {
+  background: var(--am-accent);
+}
 
 /* Квадрат под курсором приподнимается: в поле из семисот клеток иначе не видно, на что наводишь. */
 .am-act__cell:hover:not(:disabled) {
@@ -983,5 +1002,3 @@ onBeforeUnmount(() => {
   }
 }
 </style>
-
-

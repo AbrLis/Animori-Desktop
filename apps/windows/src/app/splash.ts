@@ -174,5 +174,5 @@ export function initSplash(): Promise<void> {
  * Фраза плашки на этот запуск. Заготовлена initSplash(), сколько бы раз её ни спросили: на плашке строка стоит с первой отрисовки, а не появляется, когда ответит хранилище.
  */
 export function splashLine(): string {
-  return launch === null ? PLAIN : SPLASHES[launch] ?? PLAIN
+  return launch === null ? PLAIN : (SPLASHES[launch] ?? PLAIN)
 }

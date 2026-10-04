@@ -174,8 +174,10 @@ function redraw(): void {
 }
 
 // Доборы обложек, названий и меток доступности живут рядом со сборкой строки: экран отдаёт свои строки и перерисовку. Флажки нужны подвалу и кнопок не держат.
-const { looksBusy, titlesBusy, playBusy, fillLooks, fillTitles, loadMarks, onRowSeen } =
-  useRowWarm(rows, redraw)
+const { looksBusy, titlesBusy, playBusy, fillLooks, fillTitles, loadMarks, onRowSeen } = useRowWarm(
+  rows,
+  redraw,
+)
 
 /** Отрисовка и три добора вслед. Сами доборы зовут только redraw — круга нет. */
 function refill(): void {

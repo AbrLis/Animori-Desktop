@@ -76,9 +76,7 @@ const badConfig = computed(() => enabled.value && !isProxyUsable(currentConfig()
 // Кнопка перезапуска показывается только там, где он что-то изменит. На приставке прокси окну недоступен вовсе (перезапуск лечит ключи WebView2): исход придёт windowUnsupported и кнопка встала бы навечно.
 const needsRestart = computed(
   () =>
-    !isWeakPlatform() &&
-    status.value !== null &&
-    proxyRestartNeeded(status.value, currentConfig()),
+    !isWeakPlatform() && status.value !== null && proxyRestartNeeded(status.value, currentConfig()),
 )
 
 /** Пароль лежит в файле настроек открытым текстом — сказать об этом надо до ввода, а не после.
@@ -101,7 +99,7 @@ const statusText = computed(() => {
   if (s.outcome === 'unreachable')
     return `при запуске ${s.server} не ответил — трафик идёт напрямую`
   if (s.outcome === 'windowUnsupported') {
-// Не «не ответил»: адрес как раз ответил, и врать про него нельзя. Беда в платформе, и сказать надо ещё и о том, что тумблер не впустую: запросы программы через прокси идут, а страница — нет.
+    // Не «не ответил»: адрес как раз ответил, и врать про него нельзя. Беда в платформе, и сказать надо ещё и о том, что тумблер не впустую: запросы программы через прокси идут, а страница — нет.
     return (
       `${s.server} отвечает, но окно на этой платформе прокси не умеет: ` +
       'запросы программы идут через него, страница — напрямую'
@@ -124,7 +122,7 @@ async function loadConfig(): Promise<void> {
     enabled.value = config.enabled
     kind.value = config.kind
     host.value = config.host
-// Ноль значит «значения нет»: показать ноль — соврать про адрес.
+    // Ноль значит «значения нет»: показать ноль — соврать про адрес.
     portDraft.value = config.port === 0 ? '' : String(config.port)
     login.value = config.login
     password.value = config.password
@@ -139,7 +137,7 @@ async function loadStatus(): Promise<void> {
   try {
     status.value = await Bridge.proxyDiagnostics.status()
   } catch (e) {
-// Без снимка строка состояния остаётся на «читаем…» навсегда, а кнопка перезапуска не появится ни при каких правках. Молчать об этом нельзя: человек решит, что настройка применилась.
+    // Без снимка строка состояния остаётся на «читаем…» навсегда, а кнопка перезапуска не появится ни при каких правках. Молчать об этом нельзя: человек решит, что настройка применилась.
     error.value = 'Состояние прокси неизвестно — перезапуск не предлагается. ' + describe(e)
   }
 }

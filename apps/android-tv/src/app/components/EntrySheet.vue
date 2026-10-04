@@ -311,7 +311,7 @@ onBeforeUnmount(() => {
   window.removeEventListener('keydown', onKey)
   stopBack?.()
   stopBack = null
-// Таймер держит ссылку на шторку: без снятия он дотянет до закрытия убранного окна.
+  // Таймер держит ссылку на шторку: без снятия он дотянет до закрытия убранного окна.
   if (hold !== null) clearTimeout(hold)
 
   // Взвод удаления живёт на своём таймере: ушедшее окно он тревожить не должен.
@@ -325,7 +325,7 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-<!-- Перенос в body: fixed внутри экрана мерился от списка, а не от окна браузера. -->
+  <!-- Перенос в body: fixed внутри экрана мерился от списка, а не от окна браузера. -->
   <Teleport to="body">
     <div
       ref="veil"
@@ -342,7 +342,7 @@ onBeforeUnmount(() => {
             <h3 class="am-sheet__name">{{ title }}</h3>
           </div>
 
-<!-- Подпись кнопкам нужна своя: знак спрятан от чтецов, а подсказка именем кнопки
+          <!-- Подпись кнопкам нужна своя: знак спрятан от чтецов, а подсказка именем кнопки
      не становится. Подпись говорит «без сохранения» — крестик выбрасывает правки. -->
           <button
             v-tip="'Закрыть без сохранения'"
@@ -416,16 +416,11 @@ onBeforeUnmount(() => {
           <section class="am-field">
             <span class="am-field__name">{{ partsName }}</span>
 
-<!-- Прыжок к потолку живёт только при известном потолке: без итога кнопка-обманка хуже её отсутствия. -->
+            <!-- Прыжок к потолку живёт только при известном потолке: без итога кнопка-обманка хуже её отсутствия. -->
             <div class="am-step-row am-step-row--ends">
-              <button
-                class="am-step"
-                type="button"
-                aria-label="В начало"
-                @click="resetParts"
-              >
+              <button class="am-step" type="button" aria-label="В начало" @click="resetParts">
                 <SakuraBloom />
-<!-- Свой знак вместо глифа: системный ⇤ живёт по раскладке, а здесь нужно то же, что в прочих
+                <!-- Свой знак вместо глифа: системный ⇤ живёт по раскладке, а здесь нужно то же, что в прочих
      иконках — упор слева и два шеврона влево одним штрихом. -->
                 <span aria-hidden="true">
                   <svg class="am-step__jump" viewBox="0 0 20 20">
@@ -435,22 +430,12 @@ onBeforeUnmount(() => {
                   </svg>
                 </span>
               </button>
-              <button
-                class="am-step"
-                type="button"
-                aria-label="Меньше"
-                @click="bumpProgress(-1)"
-              >
+              <button class="am-step" type="button" aria-label="Меньше" @click="bumpProgress(-1)">
                 <SakuraBloom />
                 <span aria-hidden="true">−</span>
               </button>
               <span class="am-step__value">{{ partsText }}</span>
-              <button
-                class="am-step"
-                type="button"
-                aria-label="Больше"
-                @click="bumpProgress(1)"
-              >
+              <button class="am-step" type="button" aria-label="Больше" @click="bumpProgress(1)">
                 <SakuraBloom />
                 <span aria-hidden="true">+</span>
               </button>
@@ -462,7 +447,7 @@ onBeforeUnmount(() => {
                 @click="fillParts"
               >
                 <SakuraBloom />
-<!-- Тот же знак, что «В начало», зеркальный: упор справа и два шеврона вправо. -->
+                <!-- Тот же знак, что «В начало», зеркальный: упор справа и два шеврона вправо. -->
                 <span aria-hidden="true">
                   <svg class="am-step__jump" viewBox="0 0 20 20">
                     <path d="M16 5.5v9" />
@@ -481,22 +466,12 @@ onBeforeUnmount(() => {
           <section class="am-field">
             <span class="am-field__name">Пересмотры</span>
             <div class="am-step-row">
-              <button
-                class="am-step"
-                type="button"
-                aria-label="Меньше"
-                @click="bumpRepeat(-1)"
-              >
+              <button class="am-step" type="button" aria-label="Меньше" @click="bumpRepeat(-1)">
                 <SakuraBloom />
                 <span aria-hidden="true">−</span>
               </button>
               <span class="am-step__value">{{ pickRepeat }}</span>
-              <button
-                class="am-step"
-                type="button"
-                aria-label="Больше"
-                @click="bumpRepeat(1)"
-              >
+              <button class="am-step" type="button" aria-label="Больше" @click="bumpRepeat(1)">
                 <SakuraBloom />
                 <span aria-hidden="true">+</span>
               </button>
@@ -680,7 +655,7 @@ onBeforeUnmount(() => {
   background: none;
   border: 0;
 
-/* Ничего не красит: держит круглым только кольцо :focus-visible, у которого свой outline-offset. */
+  /* Ничего не красит: держит круглым только кольцо :focus-visible, у которого свой outline-offset. */
   border-radius: var(--am-r-cap);
   transition: color var(--am-fast) var(--am-ease);
 }

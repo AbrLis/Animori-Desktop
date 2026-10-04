@@ -103,12 +103,7 @@ function titleOf(entry: SnapshotEntry): string {
 /** Чем спрашивать источники: номер MAL и названия по убыванию пригодности; номера снимка не выдумываются.
  *  Признак идущего сезона едет ради срока ответа «нет»: у идущего аниме озвучка появляется через день-два. */
 function playAskOf(entry: SnapshotEntry, look: MediaLook | null): PlayAsk {
-  const names = [
-    entry.romaji,
-    entry.english,
-    look?.romaji ?? null,
-    peekRussianName(entry.mediaId),
-  ]
+  const names = [entry.romaji, entry.english, look?.romaji ?? null, peekRussianName(entry.mediaId)]
 
   return {
     mediaId: entry.mediaId,

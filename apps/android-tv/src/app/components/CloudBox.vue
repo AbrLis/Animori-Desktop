@@ -188,8 +188,10 @@ function pullText(got: {
       <!-- Сперва показываем, что нашлось: размер и время говорят, свежее там или старее, решение — за человеком. -->
       <div v-if="linkFound" class="am-ask">
         <p class="am-ask__text">
-          По ссылке лежит копия: {{ sizeText(linkFound.bytes) }}<template v-if="linkFound.modified">
-            · {{ whenText(Date.parse(linkFound.modified)) }}</template>. Здесь записей: {{ list }}.
+          По ссылке лежит копия: {{ sizeText(linkFound.bytes)
+          }}<template v-if="linkFound.modified">
+            · {{ whenText(Date.parse(linkFound.modified)) }}</template
+          >. Здесь записей: {{ list }}.
         </p>
 
         <div class="am-row">

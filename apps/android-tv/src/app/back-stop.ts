@@ -19,9 +19,8 @@ function sync(): void {
   if (now === armed) return
   armed = now
 
-  const bridge = (
-    window as unknown as { AnimoriBack?: { setBackStop?: (on: boolean) => void } }
-  ).AnimoriBack
+  const bridge = (window as unknown as { AnimoriBack?: { setBackStop?: (on: boolean) => void } })
+    .AnimoriBack
   bridge?.setBackStop?.(now)
 }
 

@@ -45,8 +45,8 @@ function railKey(event: KeyboardEvent): void {
   const hit = row.querySelector<HTMLButtonElement>('.am-hist__hit')
   if (hit === null) return
 
-// Фокус переводим сами, синхронно и в фазе перехвата, и глушим событие: spatial nav WebView
-// работает по геометрии и от крестика уводит не туда. С setTimeout мелькала кнопка «Очистить».
+  // Фокус переводим сами, синхронно и в фазе перехвата, и глушим событие: spatial nav WebView
+  // работает по геометрии и от крестика уводит не туда. С setTimeout мелькала кнопка «Очистить».
   const move = (to: HTMLElement | null): void => {
     if (to === null || to === active) return
     event.preventDefault()
@@ -54,8 +54,8 @@ function railKey(event: KeyboardEvent): void {
     to.focus()
   }
 
-// Вправо со строки — на крестик этой же строки; влево с крестика — обратно на строку.
-// Крестик спрятан из обхода значением tabindex, и сама nav к нему не приходит: ставим его мы.
+  // Вправо со строки — на крестик этой же строки; влево с крестика — обратно на строку.
+  // Крестик спрятан из обхода значением tabindex, и сама nav к нему не приходит: ставим его мы.
   if (active === hit && event.key === 'ArrowRight') {
     move(drop)
     return
@@ -66,8 +66,8 @@ function railKey(event: KeyboardEvent): void {
     return
   }
 
-// Вверх и вниз — всегда на соседнюю строку, и со строки, и с крестика: листание не должно
-// зависеть от того, доехал ты до крестика или нет. Считаем по разметке, а не по геометрии.
+  // Вверх и вниз — всегда на соседнюю строку, и со строки, и с крестика: листание не должно
+  // зависеть от того, доехал ты до крестика или нет. Считаем по разметке, а не по геометрии.
   if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
     const rows = [...document.querySelectorAll<HTMLLIElement>('.am-hist__row')]
     const at = rows.indexOf(row)
@@ -313,7 +313,7 @@ async function warmTitles(): Promise<void> {
       await prefetchRussianNames(wanted.slice(from, from + TITLE_CHUNK))
       if (mine !== titleRun) return
 
-// Снимок в записи не трогаем: имя живёт на складе, и показ берёт его оттуда.
+      // Снимок в записи не трогаем: имя живёт на складе, и показ берёт его оттуда.
       redraw()
     }
   } catch (e) {
@@ -324,7 +324,7 @@ async function warmTitles(): Promise<void> {
 }
 
 onMounted(() => {
-// capture: true — запускаемся раньше остальных слушателей keydown, чтобы spatial nav не успела увести фокус.
+  // capture: true — запускаемся раньше остальных слушателей keydown, чтобы spatial nav не успела увести фокус.
   window.addEventListener('keydown', railKey, true)
 
   void (async () => {
@@ -412,13 +412,13 @@ onBeforeUnmount(() => {
                 <span class="am-hist__facts">{{ item.facts }}</span>
               </span>
 
-<!-- Знак при кнопке-строке, а не вторая кнопка: вложить кнопку в кнопку разметка не даёт. -->
+              <!-- Знак при кнопке-строке, а не вторая кнопка: вложить кнопку в кнопку разметка не даёт. -->
               <span class="am-hist__tail">
                 <span class="am-hist__when">{{ item.when }}</span>
                 <span class="am-hist__go">Продолжить</span>
               </span>
 
-<!-- Полоса лежит по нижней кромке строки: шкала во всю ширину сама показывает, где у пройденного конец. -->
+              <!-- Полоса лежит по нижней кромке строки: шкала во всю ширину сама показывает, где у пройденного конец. -->
               <span v-if="item.done > 0" v-tip="item.hint" class="am-line am-hist__line">
                 <span class="am-line__fill" :style="{ width: barWidth(item.done) }" />
               </span>
