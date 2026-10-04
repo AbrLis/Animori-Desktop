@@ -51,8 +51,7 @@ export interface CloudStranger {
 
 /** Исход сохранения: третье состояние у отказа — не ошибка, а вопрос о незнакомой копии. */
 export type CloudSaveDone =
-  | { ok: true; value: CloudSaved }
-  | { ok: false; problem: string; stranger?: CloudStranger }
+  { ok: true; value: CloudSaved } | { ok: false; problem: string; stranger?: CloudStranger }
 
 /** Что лежит в облаке сейчас. Отсутствие копии — нормальный ответ. */
 export interface CloudInfo {

@@ -133,11 +133,7 @@ export interface ShikiMedia {
  * Имена сторов кэша; `shikiCache` — устаревший псевдоним `mediaCache` ради ветки script, db.ts переводит сам.
  */
 export type CacheStoreName =
-  | 'mediaCache'
-  | 'shikiCache'
-  | 'malCache'
-  | 'franchiseCache'
-  | 'posterCache'
+  'mediaCache' | 'shikiCache' | 'malCache' | 'franchiseCache' | 'posterCache'
 
 /**
  * Запись `mediaCache` (keyPath 'key'): карточки тайтлов и людей, темы; различаются префикс и `data`.
@@ -186,10 +182,7 @@ export interface PosterCacheRecord {
 }
 
 export type CacheRecord =
-  | MediaCacheRecord
-  | MalCacheRecord
-  | FranchiseCacheRecord
-  | PosterCacheRecord
+  MediaCacheRecord | MalCacheRecord | FranchiseCacheRecord | PosterCacheRecord
 
 /**
  * Снимок БД для инспектора: поле на каждый вид записи — показанный ноль иначе не отличить от забытого счётчика.

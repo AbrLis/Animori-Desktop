@@ -26,8 +26,11 @@ export function startStamp(date: PartDate | null | undefined): number {
 
   if (typeof year !== 'number' || year <= 0) return Number.MAX_SAFE_INTEGER
 
-  return year * 10000 + (typeof month === 'number' ? month : 12) * 100 +
+  return (
+    year * 10000 +
+    (typeof month === 'number' ? month : 12) * 100 +
     (typeof day === 'number' ? day : 31)
+  )
 }
 
 /** Вышедшая запись впереди обещанной: из двух нужнее та, что открывается. */

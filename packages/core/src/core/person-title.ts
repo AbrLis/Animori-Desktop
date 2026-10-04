@@ -119,7 +119,11 @@ async function readMiss(kind: PersonKind, personId: number): Promise<boolean> {
 /** Кладёт отказ на склад, не роняя добычу: имя уже спрошено, неудачная запись стоит лишь завтрашнего запроса. */
 async function writeMiss(kind: PersonKind, personId: number): Promise<void> {
   try {
-    await dbSet('mediaCache', { key: missKey(kind, personId), data: { miss: true }, ts: Date.now() })
+    await dbSet('mediaCache', {
+      key: missKey(kind, personId),
+      data: { miss: true },
+      ts: Date.now(),
+    })
   } catch (e) {
     Logger('WARN', `Русское имя: склад не принял отказ (${memoryKey(kind, personId)})`, e)
   }

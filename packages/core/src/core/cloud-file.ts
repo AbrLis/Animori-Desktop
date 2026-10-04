@@ -55,8 +55,7 @@ export interface CloudBuildResult {
 
 /** Исход разбора: отказ — не исключение, вызывающему нужен внятный текст для экрана. */
 export type CloudParseResult =
-  | { ok: true; file: CloudFile; dropped: number }
-  | { ok: false; problem: string }
+  { ok: true; file: CloudFile; dropped: number } | { ok: false; problem: string }
 
 /** Строка или «нет значения». Пустая строка равносильна отсутствию. */
 function text(value: unknown): string | null {

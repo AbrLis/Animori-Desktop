@@ -452,11 +452,7 @@ async function loadShelf(kind: ShelfKind, page: number, genres?: string[]): Prom
  * Страница полки: склад, затем сеть, одинаковые вопросы склеиваются; отказ — пустая страница. Первая страница
  * живёт на складе по сроку вида, глубокая в нём не нуждается — её добирают после отметок.
  */
-export async function fetchShelf(
-  kind: ShelfKind,
-  genres?: string[],
-  page = 1,
-): Promise<BriefPage> {
+export async function fetchShelf(kind: ShelfKind, genres?: string[], page = 1): Promise<BriefPage> {
   if (kind === 'genre' && (genres === undefined || genres.length === 0)) {
     return { items: [], hasNext: false }
   }
@@ -531,7 +527,10 @@ export async function fetchShelfPack(): Promise<ShelfPack> {
  * Запрос страницы ленты: объявление переменных собирается вместе с условием — незанятая роняет запрос.
  * Год приходит границами нечёткой даты AniList (ГГГГММДД: «с 2010» → 20100000, «по 2015» → 20151231).
  */
-function feedQuery(pick: CatalogPick, page: number): { query: string; vars: Record<string, unknown> } {
+function feedQuery(
+  pick: CatalogPick,
+  page: number,
+): { query: string; vars: Record<string, unknown> } {
   const decls = ['$page: Int!', '$perPage: Int!']
   const where = ['type: ANIME']
   const vars: Record<string, unknown> = { page, perPage: FEED_PAGE_SIZE }
@@ -799,9 +798,11 @@ export async function fetchGenreMap(ids: number[]): Promise<Map<number, string[]
       // Бессрочная запись о пустоте закрыла бы вопрос навсегда, а жанры у свежего анонса ещё проставят.
       if (genres.length === 0) continue
 
-      void dbSet('mediaCache', { key: `${GENRE_PREFIX}${item.id}`, data: genres, ts }).catch((e) => {
-        Logger('WARN', `Жанры ${item.id}: на склад не легли`, e)
-      })
+      void dbSet('mediaCache', { key: `${GENRE_PREFIX}${item.id}`, data: genres, ts }).catch(
+        (e) => {
+          Logger('WARN', `Жанры ${item.id}: на склад не легли`, e)
+        },
+      )
     }
   }
 

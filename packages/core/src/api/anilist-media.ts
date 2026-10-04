@@ -604,20 +604,21 @@ function textOrNull(value: string | null | undefined): string | null {
 /** Адреса ролика по площадке: страница встраивания и обычная ссылка. Таблица, а не шаблон — вид
  * адреса у каждой
  * площадки свой; незнакомая даёт `null`. */
-const TRAILER_SITES: ReadonlyArray<readonly [string, (id: string) => string, (id: string) => string]> =
+const TRAILER_SITES: ReadonlyArray<
+  readonly [string, (id: string) => string, (id: string) => string]
+> = [
   [
-    [
-      'youtube',
-      (id) => `https://www.youtube.com/embed/${id}`,
-      (id) => `https://www.youtube.com/watch?v=${id}`,
-    ],
-    [
-      'dailymotion',
-      (id) => `https://www.dailymotion.com/embed/video/${id}`,
-      (id) => `https://www.dailymotion.com/video/${id}`,
-    ],
-    ['vimeo', (id) => `https://player.vimeo.com/video/${id}`, (id) => `https://vimeo.com/${id}`],
-  ]
+    'youtube',
+    (id) => `https://www.youtube.com/embed/${id}`,
+    (id) => `https://www.youtube.com/watch?v=${id}`,
+  ],
+  [
+    'dailymotion',
+    (id) => `https://www.dailymotion.com/embed/video/${id}`,
+    (id) => `https://www.dailymotion.com/video/${id}`,
+  ],
+  ['vimeo', (id) => `https://player.vimeo.com/video/${id}`, (id) => `https://vimeo.com/${id}`],
+]
 
 /** Трейлер из ответа или `null`: площадка сверяется целиком — «youtube» и «youtube.com» разные
  * строки, а угадывание

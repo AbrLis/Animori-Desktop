@@ -115,10 +115,7 @@ function nap(ms: number): Promise<void> {
 }
 
 /** Вопрос с повтором на сбое: сбой не ответ, правда выяснится через секунду. */
-async function askWithRetry<T>(
-  tag: string,
-  ask: () => Promise<T | null>,
-): Promise<PersonAsk<T>> {
+async function askWithRetry<T>(tag: string, ask: () => Promise<T | null>): Promise<PersonAsk<T>> {
   for (let tryNo = 1; ; tryNo += 1) {
     try {
       const card = await ask()

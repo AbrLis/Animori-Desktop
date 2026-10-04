@@ -184,9 +184,7 @@ async function load(mediaId: number, malId: number): Promise<FranchiseWork[] | n
 
     // Хвост нужен только раздробленной части: у одиночной записи различать нечего.
     const split = sorted.length > 1
-    const titles = sorted
-      .map((entry) => entry.title?.romaji ?? '')
-      .filter((title) => title !== '')
+    const titles = sorted.map((entry) => entry.title?.romaji ?? '').filter((title) => title !== '')
 
     for (const entry of sorted) {
       const title = entry.title?.romaji ?? null

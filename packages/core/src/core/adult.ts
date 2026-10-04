@@ -10,11 +10,7 @@ const ADULT_GENRES: ReadonlySet<string> = new Set(['Hentai'])
 const ADULT_TAG_GROUPS: ReadonlySet<string> = new Set(['Sexual Content'])
 
 /** Тэги вне закрытых разделов, которым в меню отбора тоже не место. */
-const ADULT_TAG_NAMES: ReadonlySet<string> = new Set([
-  'Hentai',
-  'Nudity',
-  'Prostitution',
-])
+const ADULT_TAG_NAMES: ReadonlySet<string> = new Set(['Hentai', 'Nudity', 'Prostitution'])
 
 /** Показывать ли взрослое сейчас: читается в момент вопроса — тумблер действует сразу. */
 export function adultShown(): boolean {
@@ -87,8 +83,7 @@ export function ageAt(birth: string | null | undefined, now: Date = new Date()):
   if (month < 1 || month > 12 || day < 1 || day > 31) return null
 
   let age = now.getFullYear() - year
-  const before =
-    now.getMonth() + 1 < month || (now.getMonth() + 1 === month && now.getDate() < day)
+  const before = now.getMonth() + 1 < month || (now.getMonth() + 1 === month && now.getDate() < day)
   if (before) age -= 1
 
   return age < 0 ? null : age

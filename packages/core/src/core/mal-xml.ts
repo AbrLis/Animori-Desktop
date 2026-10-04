@@ -110,7 +110,9 @@ export function buildMalXml(input: MalXmlInput): MalXmlResult {
     parts.push('  <anime>')
     parts.push(`    <series_animedb_id>${entry.malId ?? 0}</series_animedb_id>`)
     parts.push(`    <series_title>${cdata(titleOf(entry))}</series_title>`)
-    parts.push(`    <my_watched_episodes>${Math.max(0, Math.round(entry.progress))}</my_watched_episodes>`)
+    parts.push(
+      `    <my_watched_episodes>${Math.max(0, Math.round(entry.progress))}</my_watched_episodes>`,
+    )
     parts.push(`    <my_start_date>${malDate(entry.startedAt)}</my_start_date>`)
     parts.push(`    <my_finish_date>${malDate(entry.completedAt)}</my_finish_date>`)
     parts.push(`    <my_score>${malScore(entry.score10)}</my_score>`)
@@ -262,4 +264,3 @@ export function parseMalXml(xml: string): MalXmlList {
 
   return { rows, noId, oddStatus }
 }
-

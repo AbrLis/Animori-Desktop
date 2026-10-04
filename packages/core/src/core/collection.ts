@@ -18,14 +18,7 @@ import {
 
 /** Что правится в записи; незнакомый вид должен ломать сборку. Томов нет: ушли с мангой. */
 export type EditKind =
-  | 'status'
-  | 'score'
-  | 'progress'
-  | 'repeat'
-  | 'startedAt'
-  | 'completedAt'
-  | 'notes'
-  | 'remove'
+  'status' | 'score' | 'progress' | 'repeat' | 'startedAt' | 'completedAt' | 'notes' | 'remove'
 
 /** Облик тайтла с экрана: имя и метка 18+, которых запись о себе не знает. */
 export type EntryLook = {
@@ -330,8 +323,7 @@ export async function pullFromShikimori(
     // Сначала весь ответ целиком, потом память: обрыв на полпути не должен оставить половину чужого списка.
     const got = await importShikiList(nick)
 
-    const done =
-      mode === 'replace' ? replaceFromServer(got.entries) : mergeFromServer(got.entries)
+    const done = mode === 'replace' ? replaceFromServer(got.entries) : mergeFromServer(got.entries)
 
     await saveSnapshotNow({ backup: true })
     // Список поменялся целиком: сводки считаются заново.
@@ -378,7 +370,10 @@ let malInFlight: Promise<MalPullResult> | null = null
 
 /**
  * Перенос из файла выгрузки MAL/Шикимори; хозяин не меняется. Без метки правки запись старше любой своей. */
-export async function pullFromMalFile(xml: string, mode: PullMode = 'merge'): Promise<MalPullResult> {
+export async function pullFromMalFile(
+  xml: string,
+  mode: PullMode = 'merge',
+): Promise<MalPullResult> {
   if (malInFlight) return malInFlight
 
   malInFlight = (async () => {
@@ -387,8 +382,7 @@ export async function pullFromMalFile(xml: string, mode: PullMode = 'merge'): Pr
     // Сначала файл разобран и сведён с AniList, потом память: обрыв не должен оставить половину чужого списка.
     const got = await importMalList(xml)
 
-    const done =
-      mode === 'replace' ? replaceFromServer(got.entries) : mergeFromServer(got.entries)
+    const done = mode === 'replace' ? replaceFromServer(got.entries) : mergeFromServer(got.entries)
 
     await saveSnapshotNow({ backup: true })
     // Список поменялся целиком: сводки считаются заново.
@@ -400,7 +394,13 @@ export async function pullFromMalFile(xml: string, mode: PullMode = 'merge'): Pr
         `оставлено своих ${done.kept}, без пары ${got.lost}`,
     )
 
-    return { ...done, read: got.read, matched: got.matched, lost: got.lost, lostTitles: got.lostTitles }
+    return {
+      ...done,
+      read: got.read,
+      matched: got.matched,
+      lost: got.lost,
+      lostTitles: got.lostTitles,
+    }
   })()
 
   try {

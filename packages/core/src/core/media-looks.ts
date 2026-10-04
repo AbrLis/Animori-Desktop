@@ -180,10 +180,7 @@ export async function hydrateLooks(mediaIds: readonly number[]): Promise<number>
   for (let from = 0; from < wanted.length; from += STORE_CHUNK) {
     const chunk = wanted.slice(from, from + STORE_CHUNK)
 
-    const records = await dbGetMany<MediaCacheRecord<MediaLook>>(
-      'mediaCache',
-      chunk.map(cacheKey),
-    )
+    const records = await dbGetMany<MediaCacheRecord<MediaLook>>('mediaCache', chunk.map(cacheKey))
 
     // Склад не ответил — «спрашивали» ставить нельзя: иначе запись на нём не найдётся уже никогда.
     if (records === null) {

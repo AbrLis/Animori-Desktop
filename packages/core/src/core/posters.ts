@@ -53,7 +53,6 @@ const listeners = new Set<() => void>()
 /** Незавершённая догрузка: два вызова на старте не качают одно и то же дважды. */
 let warmInFlight: Promise<number> | null = null
 
-
 /**
  * Локальный адрес постера или null, когда своего нет. Синхронно и без ожидания: разметка не умеет ждать, и постер должен появиться тем же кадром, что и плитка.
  */
@@ -153,7 +152,6 @@ async function readAll(): Promise<PosterCacheRecord[]> {
   })
 }
 
-
 /**
  * Поднимает из памяти то, что уже лежит на диске. Курсор, а не getAll: список человека — сотни картинок, и тянуть их все в память разом ради показа незачем, вон и взят предел.
  */
@@ -174,7 +172,12 @@ export async function loadCoversFromStore(): Promise<number> {
         }
 
         const value = cursor.value as PosterCacheRecord
-        if (picked.length < URL_CACHE_LIMIT && value && typeof value.id === 'number' && value.blob) {
+        if (
+          picked.length < URL_CACHE_LIMIT &&
+          value &&
+          typeof value.id === 'number' &&
+          value.blob
+        ) {
           picked.push(value)
         }
 
@@ -227,31 +230,28 @@ async function warmCovers(pairs: readonly CoverPair[]): Promise<number> {
   let from = 0
 
   // Скользящее окно по FETCH_CONCURRENCY: очередь не растёт, а отказ одного адреса не роняет заход.
-  const workers = Array.from(
-    { length: Math.min(FETCH_CONCURRENCY, wanted.length) },
-    async () => {
-      while (from < wanted.length) {
-        const pair = wanted[from]
-        from += 1
-        if (!pair) continue
+  const workers = Array.from({ length: Math.min(FETCH_CONCURRENCY, wanted.length) }, async () => {
+    while (from < wanted.length) {
+      const pair = wanted[from]
+      from += 1
+      if (!pair) continue
 
-        try {
-          const res = await Bridge.http.requestBytes({ url: pair.url, method: 'GET' })
-          if (res.status < 200 || res.status >= 300) continue
+      try {
+        const res = await Bridge.http.requestBytes({ url: pair.url, method: 'GET' })
+        if (res.status < 200 || res.status >= 300) continue
 
-          const bytes = base64ToBytes(res.bytesBase64)
-          // Отказ по размеру важнее ошибки: картинка уже в руках, а место кончиться может.
-          if (bytes.length === 0 || bytes.length > MAX_POSTER_BYTES) continue
+        const bytes = base64ToBytes(res.bytesBase64)
+        // Отказ по размеру важнее ошибки: картинка уже в руках, а место кончиться может.
+        if (bytes.length === 0 || bytes.length > MAX_POSTER_BYTES) continue
 
-          await remember(pair.mediaId, bytes)
-          added++
-        } catch (e) {
-          // Отказ одного постера не обрывает заход: этот адрес сетка отдаст и в следующий раз.
-          Logger('WARN', `Постер: тайтл ${pair.mediaId} не скачан`, e)
-        }
+        await remember(pair.mediaId, bytes)
+        added++
+      } catch (e) {
+        // Отказ одного постера не обрывает заход: этот адрес сетка отдаст и в следующий раз.
+        Logger('WARN', `Постер: тайтл ${pair.mediaId} не скачан`, e)
       }
-    },
-  )
+    }
+  })
 
   await Promise.all(workers)
 

@@ -31,7 +31,11 @@ interface ShikiStudio {
 
 async function load(): Promise<Map<string, string> | null> {
   const cached = await dbGet<MediaCacheRecord<Record<string, string>>>('mediaCache', CACHE_KEY)
-  if (cached?.data && typeof cached.data === 'object' && isFresh(CACHE_KEY, cached.ts, LIFE_FOREVER)) {
+  if (
+    cached?.data &&
+    typeof cached.data === 'object' &&
+    isFresh(CACHE_KEY, cached.ts, LIFE_FOREVER)
+  ) {
     const map = new Map(Object.entries(cached.data))
     if (map.size > 0) return map
   }

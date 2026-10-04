@@ -283,8 +283,7 @@ function toMaterial(results: KodikResult[]): KodikMaterial | null {
       if (name !== null && CYRILLIC.test(name)) found.russianTitle = name
     }
 
-    found.description ??=
-      textOrNull(data.anime_description) ?? textOrNull(data.description)
+    found.description ??= textOrNull(data.anime_description) ?? textOrNull(data.description)
     found.episodesAired ??= countOrNull(data.episodes_aired)
     found.episodesTotal ??= countOrNull(data.episodes_total)
   }

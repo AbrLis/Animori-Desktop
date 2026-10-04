@@ -144,9 +144,7 @@ async function readRates(userId: number): Promise<RateReply[]> {
     if (reply.status === 403 || reply.status === 401) throw new Error(hiddenProfileMessage())
 
     if (reply.status === 429) {
-      throw new Error(
-        'Шикимори просит подождать: слишком много запросов. Повторите через минуту.',
-      )
+      throw new Error('Шикимори просит подождать: слишком много запросов. Повторите через минуту.')
     }
 
     if (reply.status === 404) break
