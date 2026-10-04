@@ -1,10 +1,10 @@
-// Проверки плашки о сети. Разбор отказа проверяется в core/tests/net-toast, здесь — отбор
-// и повторы: какая плашка попадает на экран, а какая остаётся незамеченной.
+// Проверки плашки о сети. Разбор отказа проверяется в core/tests/net-toast, здесь — отбор:
+// какая плашка попадает на экран, а какая остаётся незамеченной.
 
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-import { MAX_TOASTS, pickToasts } from '@/core/net-toast'
-import type { NetSourceHealth } from '@/core/net-health'
+import { pickToasts } from '@/core/net-toast'
+import type { NetSourceHealth, NetState } from '@/core/net-health'
 
 /** Свежий учёт сети: состояние модуля общее, поэтому каждый набор берёт своё. */
 async function freshNet() {
@@ -12,17 +12,22 @@ async function freshNet() {
   return import('@/core/net-health')
 }
 
-/** Запись учёта для отбора: отбору важны состояние и подробности, не возраст. */
-function row(id: string, label: string, detail: string): NetSourceHealth {
+/** Запись учёта для отбора: важны состояние и подробности, не возраст. */
+function row(id: string, state: NetState, detail?: string): NetSourceHealth {
   return {
     id,
-    label,
-    state: 'serverError',
+    label: id.split(':')[0] ?? id,
+    state,
     since: 0,
     lastSeenAt: Date.now(),
-    failStreak: 2,
+    failStreak: state === 'ok' ? 0 : 2,
     lastDetail: detail,
   }
+}
+
+/** Зеркало: идентификатор с доменом — так его и помечает api/shikimori.ts. */
+function mirror(id: string, state: NetState, detail = 'timeout'): NetSourceHealth {
+  return row(id, state, state === 'ok' ? 'HTTP 200' : detail)
 }
 
 describe('плашка о сети: что попадает на экран', () => {
@@ -30,64 +35,105 @@ describe('плашка о сети: что попадает на экран', ()
     vi.resetModules()
   })
 
-  it('один сбой не даёт плашки: сеть моргает', async () => {
-    const net = await freshNet()
-
-    net.reportStatus('anilist', 'AniList', 403)
-    await vi.waitFor(() => {
-      expect(net.listHealth()[0]?.failStreak).toBe(1)
-    })
-
-    expect(pickToasts(net.listHealth(), [])).toHaveLength(1)
-    // Плашка показывается на второй неудаче: решение о пороге принимает подписчик, отбор лишь отдаёт отказы.
+  it('отказ здорового источника не даёт плашки', () => {
+    expect(pickToasts([row('anilist', 'ok', 'HTTP 200')], [])).toHaveLength(0)
   })
 
-  it('уже показанный отвал повторно не выводится', async () => {
-    const net = await freshNet()
-
-    net.reportStatus('anilist', 'AniList', 403)
-    const first = pickToasts(net.listHealth(), [])
-    const again = pickToasts(
-      net.listHealth(),
-      first.map((t) => t.id),
-    )
+  it('уже показанный отвал повторно не выводится', () => {
+    const rows = [row('anilist', 'forbidden', 'HTTP 403')]
+    const first = pickToasts(rows, [])
 
     // Плашка каждые полминуты читалась бы как издёвка.
     expect(first).toHaveLength(1)
-    expect(again).toHaveLength(0)
+    expect(
+      pickToasts(
+        rows,
+        first.map((t) => t.id),
+      ),
+    ).toHaveLength(0)
   })
 
-  it('второй пострадавший источник добавляется, а не теряется', async () => {
-    const net = await freshNet()
+  it('ушедшая с экрана плашка не возвращается', () => {
+    const rows = [row('anilist', 'forbidden', 'HTTP 403')]
+    const announced = pickToasts(rows, []).map((t) => t.id)
 
-    net.reportStatus('anilist', 'AniList', 403)
-    const first = pickToasts(net.listHealth(), [])
+    // Память переживает исчезновение с экрана: иначе тост вернулся бы при следующем отчёте.
+    expect(pickToasts(rows, announced)).toHaveLength(0)
+  })
 
-    net.reportStatus('shiki', 'Шикимори', 500)
+  it('второй пострадавший источник добавляется, а не теряется', () => {
+    const first = pickToasts([row('anilist', 'forbidden', 'HTTP 403')], [])
     const both = pickToasts(
-      net.listHealth(),
+      [row('anilist', 'forbidden', 'HTTP 403'), row('themes', 'serverError', 'HTTP 503')],
       first.map((t) => t.id),
     )
 
-    // Первый отвал не должен вытесняться вторым: пострадавших двое, и обоих надо назвать.
-    expect(both.map((t) => t.id)).toEqual(['shiki'])
-    expect(both[0]?.label).toBe('Шикимори')
+    expect(both.map((t) => t.id)).toEqual(['themes'])
   })
 
-  it('здоровый источник не занимает место на экране', async () => {
+  it('живой учёт без отказов не показывает ничего', async () => {
     const net = await freshNet()
-
     net.reportStatus('anilist', 'AniList', 200)
 
-    // Здесь плашка была бы враньём: источник отвечает.
     expect(pickToasts(net.listHealth(), [])).toHaveLength(0)
   })
+})
 
-  it('показаны не больше трёх: дальше читать невозможно', () => {
-    const many = Array.from({ length: 6 }, (_, i) => row(`s${i}`, 'Shikimori', 'HTTP 500'))
+describe('плашка о сети: зеркала не шумят', () => {
+  it('одно упавшее зеркало при живом втором молчит', () => {
+    // Из жалобы: перевод пришёл с .io, запасной .rip отвалился — сообщать не о чем.
+    const rows = [
+      mirror('shikimori:shikimori.rip', 'unreachable', 'timeout'),
+      mirror('shikimori:shikimori.io', 'ok'),
+    ]
 
-    expect(many.length).toBeGreaterThan(MAX_TOASTS)
-    expect(MAX_TOASTS).toBe(3)
+    expect(pickToasts(rows, [])).toHaveLength(0)
+  })
+
+  it('оба зеркала отпали — плашка появляется', () => {
+    const rows = [
+      mirror('shikimori:shikimori.io', 'unreachable', 'timeout'),
+      mirror('shikimori:shikimori.rip', 'forbidden', 'HTTP 403'),
+    ]
+
+    expect(pickToasts(rows, [])).toHaveLength(1)
+  })
+
+  it('на группу зеркал выходит одна плашка', () => {
+    const rows = [
+      mirror('shikimori:shikimori.io', 'unreachable', 'timeout'),
+      mirror('shikimori:shikimori.rip', 'unreachable', 'timeout'),
+    ]
+
+    // Две одинаковые плашки об одном отвале читались бы двумя рядами текста.
+    expect(pickToasts(rows, [])).toHaveLength(1)
+  })
+
+  it('живое зеркало одного сервиса не оправдывает другой', () => {
+    const rows = [
+      mirror('shikimori:shikimori.io', 'ok'),
+      mirror('anime365:smotret-anime.online', 'unreachable', 'timeout'),
+    ]
+
+    expect(pickToasts(rows, [])).toHaveLength(1)
+  })
+
+  it('ожившее зеркало снимает запрет на повтор', () => {
+    const down = [
+      mirror('shikimori:shikimori.io', 'unreachable', 'timeout'),
+      mirror('shikimori:shikimori.rip', 'unreachable', 'timeout'),
+    ]
+    const announced = pickToasts(down, []).map((t) => t.id)
+
+    const healed = [mirror('shikimori:shikimori.io', 'ok'), mirror('shikimori:shikimori.rip', 'ok')]
+    const downAgain = [
+      mirror('shikimori:shikimori.io', 'unreachable', 'timeout'),
+      mirror('shikimori:shikimori.rip', 'forbidden', 'HTTP 403'),
+    ]
+    // Лечение снимает запрет, новая поломка после него — снова новость.
+    pickToasts(healed, announced)
+
+    expect(pickToasts(downAgain, [])).toHaveLength(1)
   })
 })
 

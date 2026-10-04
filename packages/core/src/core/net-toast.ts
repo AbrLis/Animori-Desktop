@@ -57,8 +57,48 @@ export function toastLine(toast: NetToast): string {
 /** Сколько плашек держим на экране: больше трёх читать уже невозможно. */
 export const MAX_TOASTS = 3
 
-/** Плашки из снимка учёта: только те, чего ещё не показывали. Повтор отвала плашкой не идёт —
- * иначе экран мигал бы каждые полминуты. */
-export function pickToasts(rows: readonly NetSourceHealth[], shown: readonly string[]): NetToast[] {
-  return rows.map(toastFor).filter((t): t is NetToast => t !== null && !shown.includes(t.id))
+/**
+ * Группа источника: зеркала одного сервиса. В идентификаторе после двоеточия стоит домен,
+ * поэтому `shikimori:shikimori.rip` и `shikimori:shikimori.io` — одна группа.
+ */
+function groupOf(id: string): string {
+  const cut = id.indexOf(':')
+  return cut === -1 ? id : id.slice(0, cut)
+}
+
+/**
+ * Плашки из снимка учёта: по одной на группу и только те, кого ещё не объявляли.
+ *
+ * Три правила, все из жалоб: падение одного зеркала при живом втором молчит — человек получил
+ * данные и не заметил; на группу зеркал выходит одна плашка; повтор отвала молчит, пока
+ * источник не оживёт.
+ */
+export function pickToasts(
+  rows: readonly NetSourceHealth[],
+  announced: readonly string[],
+): NetToast[] {
+  const seen = new Set(announced)
+  const done = new Set<string>()
+  const out: NetToast[] = []
+
+  for (const row of rows) {
+    const group = groupOf(row.id)
+    if (done.has(group)) continue
+    done.add(group)
+
+    const family = rows.filter((r) => groupOf(r.id) === group)
+    // Живое зеркало делает отвал запасного незаметным: человек получил данные и не заметил.
+    if (family.some((r) => r.state === 'ok')) continue
+
+    // Ищем именно отказ, а не первую запись: порядок в учёте не задан, и живое зеркало
+    // может стоять где угодно — иначе плашка зависела бы от того, кто отчитался первым.
+    const broken = family.find((r) => r.state !== 'ok' && r.state !== 'unknown')
+    if (broken === undefined) continue
+
+    const toast = toastFor(broken)
+    if (toast === null || seen.has(toast.id)) continue
+    out.push(toast)
+  }
+
+  return out
 }
