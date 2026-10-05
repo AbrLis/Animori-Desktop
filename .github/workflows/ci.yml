@@ -33,10 +33,15 @@ jobs:
       - name: Исходный код
         uses: actions/checkout@v5
 
+      # Единая версия Node во всех трёх задачах — 24, как на машине разработчика:
+      # lock генерирует npm 11 из этой версии, а npm 10 из node 20/22 отвергает
+      # его при npm ci (требует peer esbuild у вложенного vite 8 и не находит
+      # его в lock). Раньше здесь стояли 22/20/22 — это и было причиной падения
+      # «Missing: esbuild@0.28.2 from lock file».
       - name: Node.js
         uses: actions/setup-node@v5
         with:
-          node-version: 22
+          node-version: 24
           cache: npm
 
       - name: Зависимости
@@ -73,7 +78,7 @@ jobs:
       - name: Node.js
         uses: actions/setup-node@v5
         with:
-          node-version: 20
+          node-version: 24
           cache: npm
 
       - name: Зависимости
@@ -90,7 +95,7 @@ jobs:
         working-directory: apps/windows
         run: npm test
 
-  # Приставка: свой экран, тот же код ядра. Node 20 вне поддержки с апреля 2026.
+  # Приставка: свой экран, тот же код ядра.
   android-tv:
     runs-on: ubuntu-latest
 
@@ -101,7 +106,7 @@ jobs:
       - name: Node.js
         uses: actions/setup-node@v5
         with:
-          node-version: 22
+          node-version: 24
           cache: npm
 
       - name: Зависимости
