@@ -26,12 +26,6 @@ export interface AniMoriSettings {
   enableRatings: boolean
   enableFranchise: boolean
   enableThemes: boolean
-  enableExtLinks: boolean
-  enableLinkRutracker: boolean
-  enableLinkYummy: boolean
-  enableLinkAnimego: boolean
-  yummyDomain: string
-  animegoDomain: string
   enableLogger: boolean
   accentPreset: AccentPreset
   /** Цвет пресета `custom` в hex: пустое и кривое равны теме сайта — разбор в core/accent.ts. */
@@ -85,12 +79,6 @@ const DEFAULT_SETTINGS: AniMoriSettings = {
   enableRatings: true,
   enableFranchise: true,
   enableThemes: true,
-  enableExtLinks: true,
-  enableLinkRutracker: true,
-  enableLinkYummy: true,
-  enableLinkAnimego: true,
-  yummyDomain: 'yummyanime.tv',
-  animegoDomain: 'animego.org',
   enableLogger: true,
   accentPreset: 'site',
   accentCustom: '',
@@ -125,12 +113,6 @@ async function readSettings(): Promise<AniMoriSettings> {
     enableRatings,
     enableFranchise,
     enableThemes,
-    enableExtLinks,
-    enableLinkRutracker,
-    enableLinkYummy,
-    enableLinkAnimego,
-    yummyDomain,
-    animegoDomain,
     enableLogger,
     accentPreset,
     accentCustom,
@@ -158,12 +140,6 @@ async function readSettings(): Promise<AniMoriSettings> {
     storage.get('set_ratings', DEFAULT_SETTINGS.enableRatings),
     storage.get('set_franchise', DEFAULT_SETTINGS.enableFranchise),
     storage.get('set_themes', DEFAULT_SETTINGS.enableThemes),
-    storage.get('set_extlinks', DEFAULT_SETTINGS.enableExtLinks),
-    storage.get('set_link_rutracker', DEFAULT_SETTINGS.enableLinkRutracker),
-    storage.get('set_link_yummy', DEFAULT_SETTINGS.enableLinkYummy),
-    storage.get('set_link_animego', DEFAULT_SETTINGS.enableLinkAnimego),
-    storage.get('set_yummy_domain', DEFAULT_SETTINGS.yummyDomain),
-    storage.get('set_animego_domain', DEFAULT_SETTINGS.animegoDomain),
     storage.get('set_logger', DEFAULT_SETTINGS.enableLogger),
     storage.get<AccentPreset>('am_accent', DEFAULT_SETTINGS.accentPreset),
     storage.get('am_accent_custom', DEFAULT_SETTINGS.accentCustom),
@@ -195,12 +171,6 @@ async function readSettings(): Promise<AniMoriSettings> {
     enableRatings,
     enableFranchise,
     enableThemes,
-    enableExtLinks,
-    enableLinkRutracker,
-    enableLinkYummy,
-    enableLinkAnimego,
-    yummyDomain,
-    animegoDomain,
     enableLogger,
     accentPreset,
     accentCustom,
