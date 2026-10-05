@@ -96,7 +96,10 @@ fn animori_cast_panel(app: AppHandle) -> Result<(), String> {
         let why = reasons.join("; ");
 
         // Последний заход. Тот же адрес по нажатию в самой Windows открывает проводник, и там, где плагин отказал, панель иногда всё равно появляется.
-        match std::process::Command::new("explorer.exe").arg(first).spawn() {
+        match std::process::Command::new("explorer.exe")
+            .arg(first)
+            .spawn()
+        {
             Ok(_) => {
                 log::warn!("Панель трансляции: плагин отказал ({why}), отдано проводнику: {first}");
                 Ok(())

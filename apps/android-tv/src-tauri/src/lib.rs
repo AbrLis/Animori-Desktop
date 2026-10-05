@@ -66,17 +66,15 @@ fn animori_open_external(app: AppHandle, url: String) -> Result<(), String> {
         .map_err(|e| e.to_string())
 }
 
-
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     // Мобильные плагины поднимаются отдельной переменной: память геометрии окна под Android отсутствует. Порядок важен: память должна восстановиться до setup.
     #[cfg(desktop)]
-    let builder = tauri::Builder::default()
-        .plugin(
-            tauri_plugin_window_state::Builder::default()
-                .with_state_flags(window_state_flags())
-                .build(),
-        );
+    let builder = tauri::Builder::default().plugin(
+        tauri_plugin_window_state::Builder::default()
+            .with_state_flags(window_state_flags())
+            .build(),
+    );
 
     #[cfg(mobile)]
     let builder = tauri::Builder::default();

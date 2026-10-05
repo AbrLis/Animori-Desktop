@@ -243,7 +243,7 @@ fn reply(mut stream: TcpStream, code: u16, kind: &str, body: &str) {
         "\r\nContent-Type: ",
         kind,
         "\r\nContent-Length: ",
-        &body.as_bytes().len().to_string(),
+        &body.len().to_string(),
         "\r\nCache-Control: no-store\r\nConnection: close\r\n\r\n",
     ]
     .concat();
@@ -326,8 +326,8 @@ fn serve(app: &AppHandle, stream: TcpStream) -> bool {
                 let lowered = line.to_ascii_lowercase();
 
                 // Имя заголовка сравниваем целиком с двоеточием: иначе `x-origin` сошёл бы за `origin`.
-                if lowered.starts_with("host:") {
-                    let value = lowered["host:".len()..].trim();
+                if let Some(rest) = lowered.strip_prefix("host:") {
+                    let value = rest.trim();
                     // localhost допускаем наравне: им адрес набирают и вручную, и в закладках.
                     let ours = ["127.0.0.1:", &PORT.to_string()].concat();
                     let named = ["localhost:", &PORT.to_string()].concat();

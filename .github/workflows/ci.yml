@@ -1,6 +1,6 @@
-# Проверки на каждый пуш. Ни Rust, ни Gradle, ни сборщик APK здесь не трогаются:
-# это чтение файлов, проверка типов и vitest. Полная сборка живёт в release.yml
-# и release-tv.yml и ходит по тегу.
+# Проверки на каждый пуш. Gradle и сборщик APK здесь не трогаются: это чтение
+# файлов, проверка типов, vitest и Rust-слой — cargo check / clippy / fmt на оба
+# src-tauri. Полная сборка живёт в release.yml и release-tv.yml и ходит по тегу.
 #
 # Пока эти задачи не существовали, наборы vitest не гонял вообще никто: проверки
 # краснели и тихо ждали ручного прогона. Так в приставке и дожили до семнадцати
@@ -117,3 +117,58 @@ jobs:
       - name: Наборы экранов
         working-directory: apps/android-tv
         run: npm test
+
+  # Rust-слой: оба src-tauri раньше компилировались только на релизном теге, и
+  # ошибка компиляции находилась в момент выпуска, а не на пуше. Проверки идут
+  # на Windows: боевой код (proxy_auth, webview2) живёт под cfg(windows) и на
+  # Linux не компилируется вовсе, а wry на Linux тянул бы системный webkit2gtk.
+  #
+  # Матрица по продуктам, а не один job с двумя каталогами: падение одного crate
+  # не должно прятать падение другого. fail-fast выключен — сначала видим обе картины.
+  rust:
+    strategy:
+      fail-fast: false
+      matrix:
+        app: [windows, android-tv]
+
+    runs-on: windows-latest
+
+    steps:
+      - name: Исходный код
+        uses: actions/checkout@v5
+
+      - name: Окружение Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy, rustfmt
+
+      # Компиляция зависимостей Tauri с нуля — минуты. Ключ матричный: job-id и
+      # хэш Cargo.lock у обеих строк общие, и без `key` они делили бы один кэш,
+      # затирая target-каталог друг друга. Порядок важен: кэш привязывается к
+      # версии rustc из текущего окружения, поэтому ставится после тулчейна.
+      - name: Кэш Cargo
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: apps/${{ matrix.app }}/src-tauri
+          key: ${{ matrix.app }}
+
+      # generate_context! читает frontendDist на этапе компиляции, а dist/ в
+      # .gitignore — на свежем чекауте каталога нет и check падает. Собранный
+      # фронт для проверки Rust не нужен: макросу достаточно, чтобы каталог существовал.
+      - name: Заглушка каталога сборки
+        run: New-Item -ItemType Directory -Force dist/app | Out-Null
+        working-directory: apps/${{ matrix.app }}
+
+      # Формат первым: он не компилирует и отдаёт результат за секунды.
+      # Дальше check — дешевле clippy; clippy --all-targets покрывает и тесты.
+      - name: Формат
+        working-directory: apps/${{ matrix.app }}/src-tauri
+        run: cargo fmt --check
+
+      - name: Проверка компиляции
+        working-directory: apps/${{ matrix.app }}/src-tauri
+        run: cargo check --workspace
+
+      - name: Линт
+        working-directory: apps/${{ matrix.app }}/src-tauri
+        run: cargo clippy --all-targets -- -D warnings

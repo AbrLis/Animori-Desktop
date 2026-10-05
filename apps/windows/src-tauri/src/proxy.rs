@@ -248,7 +248,7 @@ fn read_config(app: &AppHandle) -> Config {
     // Chromium ждёт список через точку с запятой; записи с пробелом отбрасываем —
     // в имени хоста его быть не может, а строку аргументов он бы разорвал.
     let bypass = raw_bypass
-        .split(|c| c == ',' || c == ';' || c == '\n' || c == '\r')
+        .split([',', ';', '\n', '\r'])
         .map(|item| item.trim())
         .filter(|item| !item.is_empty() && !item.contains(' '))
         .collect::<Vec<_>>()
