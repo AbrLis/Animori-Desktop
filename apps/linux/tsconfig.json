@@ -1,0 +1,46 @@
+{
+  "compilerOptions": {
+    "target": "ESNext",
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "lib": ["ESNext", "DOM", "DOM.Iterable"],
+    "types": ["vite/client", "node"],
+
+    "strict": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "noFallthroughCasesInSwitch": true,
+    "noUncheckedIndexedAccess": true,
+
+    "resolveJsonModule": true,
+    "esModuleInterop": true,
+    "isolatedModules": true,
+    "skipLibCheck": true,
+    "useDefineForClassFields": true,
+    "forceConsistentCasingInFileNames": true,
+
+    "jsx": "preserve",
+
+    "noEmit": true,
+    "sourceMap": true,
+
+    "baseUrl": ".",
+    // Отличие от apps/windows одно: «@» ведёт в его src, своих экранов нет.
+    "paths": {
+      "@/api/*": ["../../packages/core/src/api/*"],
+      "@/bridge": ["../../packages/core/src/bridge/index"],
+      "@/bridge/*": ["../../packages/core/src/bridge/*"],
+      "@/core/*": ["../../packages/core/src/core/*"],
+      "@/utils/*": ["../../packages/core/src/utils/*"],
+      "@/*": ["../windows/src/*"],
+      "@bridge-impl": ["../../packages/core/src/bridge/TauriBridge"]
+    }
+  },
+  "include": [
+    "../windows/src/**/*.ts",
+    "../windows/src/**/*.d.ts",
+    "../windows/src/**/*.vue",
+    "vite.config.ts"
+  ],
+  "exclude": ["node_modules", "dist", "src-tauri"]
+}

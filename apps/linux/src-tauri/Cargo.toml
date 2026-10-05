@@ -1,0 +1,49 @@
+[package]
+# Имя отдельное: рядом крейт apps/windows с тем же именем.
+name = "animori-linux"
+version = "3.1.0"
+description = "AniMori — Toolkit for AniList, desktop shell, Linux build"
+authors = ["foulnike", "AbrLis"]
+license = "MIT"
+repository = "https://github.com/AbrLis/Animori-Desktop"
+edition = "2021"
+rust-version = "1.77.2"
+
+[lib]
+name = "animori_linux_lib"
+crate-type = ["rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2.6.3", features = [] }
+
+[dependencies]
+serde_json = "1.0"
+serde = { version = "1.0", features = ["derive"] }
+log = "0.4"
+getrandom = "0.3"
+tauri = { version = "2.11.3", features = [] }
+tauri-plugin-log = "2"
+
+base64 = "0.22"
+
+tauri-plugin-http = { version = "2", default-features = false, features = [
+  "rustls-tls",
+  "http2",
+  "charset",
+  "socks",
+  "unsafe-headers",
+] }
+
+tauri-plugin-store = "2"
+tauri-plugin-clipboard-manager = "2"
+tauri-plugin-opener = "2.5.4"
+tauri-plugin-window-state = "2"
+tauri-plugin-updater = "2"
+tauri-plugin-dialog = "2"
+
+[profile.release]
+lto = "thin"
+codegen-units = 1
+strip = "symbols"
+
+# Без windows-крейтов: proxy_auth целиком WebView2 и под Linux не соберётся.
