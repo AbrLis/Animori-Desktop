@@ -1,0 +1,64 @@
+# Проверка сборки приложения под Linux. Ничего не публикует и не подписывает:
+# нужен только честный ответ, собирается ли deb на чистой машине.
+#
+# Проверки типов и наборы уже гоняет ci.yml автора. Здесь только то, чего там нет:
+# полная компиляция Rust и сборка пакета.
+
+name: ci-linux
+
+on:
+  push:
+    branches:
+      - fork/linux-app
+  pull_request:
+    paths:
+      - 'apps/linux/**'
+      - 'apps/windows/**'
+      - 'packages/core/**'
+      - 'package.json'
+      - 'package-lock.json'
+      - '.github/workflows/ci-linux.yml'
+  workflow_dispatch:
+
+jobs:
+  linux:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Исходный код
+        uses: actions/checkout@v5
+
+      - name: Node.js
+        uses: actions/setup-node@v5
+        with:
+          # Node 24: замок генерирует npm 11, младший npm на npm ci его отвергает.
+          node-version: 24
+          cache: npm
+
+      # Установка из корня: замок один на репозиторий, в каталоге приложения его нет.
+      - name: Зависимости
+        run: npm ci
+
+      - name: Системные зависимости WebKitGTK 4.1
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev build-essential curl wget file \
+            libxdo-dev libssl-dev libayatana-appindicator3-dev librsvg2-dev
+
+      - name: Кэш Cargo
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: apps/linux/src-tauri
+
+      - name: Проверка типов
+        run: npm run typecheck:linux
+
+      # Подпись не нужна: артефакты обновления выключены в конфиге, они создаются
+      # только в конвейере выпуска, где ключ доступен.
+      - name: Сборка пакета
+        run: npm --prefix apps/linux run tauri:build -- --bundles deb
+
+      - name: Проверка пакета
+        run: |
+          ls -l apps/linux/src-tauri/target/release/bundle/deb/
+          test "$(ls apps/linux/src-tauri/target/release/bundle/deb/*.deb | wc -l)" -eq 1
