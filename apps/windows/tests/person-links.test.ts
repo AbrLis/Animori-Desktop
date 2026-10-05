@@ -20,15 +20,13 @@ describe('personLinks', () => {
   })
 
   it('молчит без адреса: пустой хвост читался бы как поломка', () => {
-    expect(
-      personLinks({ kind: 'staff', siteUrl: null, shikiId: 42, fromShiki: false }),
-    ).toEqual([])
+    expect(personLinks({ kind: 'staff', siteUrl: null, shikiId: 42, fromShiki: false })).toEqual([])
   })
 
   it('пустая строка адреса равна его отсутствию', () => {
-    expect(
-      personLinks({ kind: 'staff', siteUrl: '   ', shikiId: 42, fromShiki: false }),
-    ).toEqual([])
+    expect(personLinks({ kind: 'staff', siteUrl: '   ', shikiId: 42, fromShiki: false })).toEqual(
+      [],
+    )
   })
 
   it('добавляет Шикимори, когда описание пришло оттуда', () => {
@@ -67,11 +65,9 @@ describe('personLinks', () => {
   })
 
   it('без номера ссылки нет даже с описанием', () => {
-    expect(
-      personLinks({ kind: 'staff', siteUrl: null, shikiId: null, fromShiki: true }),
-    ).toEqual([])
-    expect(
-      personLinks({ kind: 'staff', siteUrl: null, shikiId: 0, fromShiki: true }),
-    ).toEqual([])
+    expect(personLinks({ kind: 'staff', siteUrl: null, shikiId: null, fromShiki: true })).toEqual(
+      [],
+    )
+    expect(personLinks({ kind: 'staff', siteUrl: null, shikiId: 0, fromShiki: true })).toEqual([])
   })
 })
