@@ -3,6 +3,7 @@
 import { ref } from 'vue'
 
 import { Bridge } from '@/bridge'
+import { Logger } from '@/utils/logger'
 
 // Выпуски лежат в общем репозитории с настольным приложением. Старые сборки приставки смотрят в Animori-TV
 // и потому перестанут находить обновления: их адрес вшит в APK и уже не меняется.
@@ -57,18 +58,38 @@ function deviceAbi(): string {
   return bridge?.abi?.() ?? 'armeabi-v7a'
 }
 
+/**
+ * Файл выпуска — строго по имени, без запасного перебора.
+ *
+ * Раньше здесь был второй круг: «любой файл того же вида» с окончанием `_arm64.apk`.
+ * Он был опасен именно тем, что версию в имени не проверял: `AniMori_9.9.9_arm64.apk`
+ * подходил под любой номер, и переименованный или подложенный файл в выпуске приставка
+ * поставила бы молча. Теперь промах означает промах — обновление не находится, и на
+ * экране об этом сказано словами, а не молчанием.
+ *
+ * Имя задаёт выпуск: конвейер проверяет его перед выкладкой (release-tv.yml), так что
+ * правильное имя здесь не гипотеза, а договорённость сторон.
+ */
 function pickAsset(
   assets: Array<{ name: string; browser_download_url: string }>,
   version: string,
 ): string | null {
   const suffix = SUFFIX[deviceAbi()] ?? 'armv7'
   const exact = `AniMori_${version}_${suffix}.apk`
-  const named = assets.find((a) => a.name === exact)
-  if (named) return named.browser_download_url
 
-  // Имя могло смениться приставкой архитектуры: берём любой файл того же вида.
-  const any = assets.find((a) => a.name.endsWith(`_${suffix}.apk`) && a.name.startsWith('AniMori_'))
-  return any?.browser_download_url ?? null
+  const found = assets.find((asset) => asset.name === exact)
+
+  if (!found) {
+    // Имена файлов в журнал: по одной этой строке видно, что приехало и что ждали.
+    Logger(
+      'WARN',
+      `Обновление: файла ${exact} в выпуске нет, пришли: ` +
+        (assets.length > 0 ? assets.map((asset) => asset.name).join(', ') : 'ни одного'),
+    )
+    return null
+  }
+
+  return found.browser_download_url
 }
 
 /** Один вопрос к GitHub: список выпусков, из них — последний с приставкой `android-tv-v`.

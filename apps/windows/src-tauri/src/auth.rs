@@ -229,6 +229,7 @@ fn authorize_url() -> String {
 fn reply(mut stream: TcpStream, code: u16, kind: &str, body: &str) {
     let reason = match code {
         200 => "OK",
+        403 => "Forbidden",
         404 => "Not Found",
         405 => "Method Not Allowed",
         _ => "Error",
@@ -310,15 +311,48 @@ fn serve(app: &AppHandle, stream: TcpStream) -> bool {
         return false;
     }
 
-    // Остаток заголовков вычитывается и выбрасывается: ни один из них нам больше не нужен, но недочитанный запрос мешает закрыть соединение чисто.
+    // Заголовки вычитываются, а не выбрасываются: два из них решают, от кого пришёл возврат.
+    // Остальные по-прежнему не нужны, но перешагнуть пустую строку конца обязательно —
+    // недочитанный запрос мешает закрыть соединение чисто.
+    let mut host_ok = false;
+    let mut origin_present = false;
+
     loop {
         let mut line = String::new();
         match reader.read_line(&mut line) {
             Ok(0) => break,
             Ok(_) if line.trim().is_empty() => break,
-            Ok(_) => {}
+            Ok(_) => {
+                let lowered = line.to_ascii_lowercase();
+
+                // Имя заголовка сравниваем целиком с двоеточием: иначе `x-origin` сошёл бы за `origin`.
+                if lowered.starts_with("host:") {
+                    let value = lowered["host:".len()..].trim();
+                    // localhost допускаем наравне: им адрес набирают и вручную, и в закладках.
+                    let ours = ["127.0.0.1:", &PORT.to_string()].concat();
+                    let named = ["localhost:", &PORT.to_string()].concat();
+                    host_ok = value == ours || value == named;
+                } else if lowered.starts_with("origin:") {
+                    origin_present = true;
+                }
+            }
             Err(_) => break,
         }
+    }
+
+    // От чужого клиента возврат не принимаем. Правило «Origin не должно быть», а не «должно
+    // быть anilist.co»: страница AniList приходит переходом и заголовка не несёт вовсе, а
+    // скрипт с чужой страницы несёт. Сравнение с доменом связало бы вход с адресом сайта —
+    // AniList сменит форму входа, и отказ выглядел бы как «AniList сломался».
+    if !host_ok || origin_present {
+        log::warn!("Запрос к приёмнику отклонён: чужой Host или пришёл Origin");
+        reply(
+            stream,
+            403,
+            "text/plain; charset=utf-8",
+            "Так вход не работает",
+        );
+        return false;
     }
 
     let mut parts = request.split_whitespace();

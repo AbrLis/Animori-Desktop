@@ -7,6 +7,7 @@ import type { MediaBrief } from '@/api/anilist-media'
 import type { PlayAsk } from '@/core/playable'
 
 import { type MockBridgeHandle } from '@core-tests/bridge'
+import { useInstantPace } from '@core-tests/instant-pace'
 
 type Mocks = typeof import('@core-tests/bridge-module')
 type Calendar = typeof import('../src/app/screens/home-calendar')
@@ -181,6 +182,11 @@ function mine(view: ReturnType<Calendar['useHomeCalendar']>): void {
 beforeEach(async () => {
   vi.resetModules()
 
+  // Темп запросов снят: календарь делает их подряд, а ограничитель между ними честно
+  // ждёт по две секунды. Проверка экрана не про темп — он покрыт отдельно, в
+  // packages/core/tests/rate-limit.test.ts. Подмена ставится до импорта модулей.
+  useInstantPace()
+
   // Мост ставится в том же поколении реестра, что и проверяемый модуль:
   // иначе `@/bridge` внутри него окажется другим экземпляром.
   mocks = await import('@core-tests/bridge-module')
@@ -193,9 +199,10 @@ beforeEach(async () => {
 afterEach(() => {
   vi.useRealTimers()
 
-  // Подмена склада доступности снимается: подписка `vi.doMock` переживает
-  // сброс реестра и досталась бы соседним случаям.
+  // Подмены снимаются: подписка `vi.doMock` переживает сброс реестра
+  // и досталась бы соседним случаям.
   vi.doUnmock('@/core/playable')
+  vi.doUnmock('@/api/rate-limit')
 })
 
 describe('счёт дней', () => {
