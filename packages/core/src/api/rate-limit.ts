@@ -391,14 +391,6 @@ export const shikiLimiter = createRateLimiter({
   maxPerWindow: API_MAX_PER_WINDOW,
 })
 
-/** Режим тот же, что у Shikimori: источники стоят в одной цепочке резолва — иначе фоллбэк обгоняет основной. */
-export const anime365Limiter = createRateLimiter({
-  name: 'anime365',
-  minIntervalMs: API_MIN_INTERVAL_MS,
-  windowMs: API_WINDOW_MS,
-  maxPerWindow: API_MAX_PER_WINDOW,
-})
-
 /** Бюджет отдельный от Shikimori (другой IP-счёт), темп низкий — страховка от всплеска при переборе страниц. */
 export const animeThemesLimiter = createRateLimiter({
   name: 'AnimeThemes',

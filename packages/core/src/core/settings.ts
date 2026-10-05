@@ -3,7 +3,8 @@
 import { Bridge } from '@/bridge'
 import { Logger } from '../utils/logger'
 
-export type TitleSource = 'shikimori' | 'anime365' | 'off' | 'none'
+/** Источник русских тайтлов: Шикимори. Второго источника нет — см. docs/DATA.md. */
+export type TitleSource = 'shikimori' | 'off' | 'none'
 export type AccentPreset =
   'site' | 'sakura' | 'mono' | 'catppuccin' | 'nord' | 'dracula' | 'matcha' | 'sunset' | 'custom'
 
@@ -73,11 +74,11 @@ export interface AniMoriSettings {
 }
 
 /**
- * Значения НА СЛУЧАЙ ОТСУТСТВИЯ КЛЮЧА, не «сброс»: фоллбэк Shikimori, anime365 знает не все русские названия. */
+ * Значения НА СЛУЧАЙ ОТСУТСТВИЯ КЛЮЧА, не «сброс»: тайтлы берутся у Шикимори. */
 const DEFAULT_SETTINGS: AniMoriSettings = {
   translateInterface: true,
-  titlePrimary: 'anime365',
-  titleFallback: 'shikimori',
+  titlePrimary: 'shikimori',
+  titleFallback: 'none',
   translateCharacters: true,
   translateStaff: true,
   enablePlayer: true,

@@ -7,7 +7,7 @@
 ### Смотрите аниме и ведите списки AniList на русском — на ПК и ТВ
 
 Неофициальный клиент AniList для Windows и Android TV. Программа сама обращается
-к API и подставляет русские названия и описания из Shikimori и anime365 —
+к API и подставляет русские названия и описания из Shikimori —
 браузер и менеджер скриптов не нужны.
 
 [![Версия](https://img.shields.io/badge/версия-3.1.0-02A9FF?style=flat-square&labelColor=0B1622)](https://github.com/foulnike/Animori/releases)
@@ -32,7 +32,7 @@
   меняются прямо в шторке.
 - **Продолжение в один клик.** История помнит, где вы остановились.
 - **Русские названия подставляет сама программа.** AniList даёт карточку,
-  Shikimori и anime365 — русский тайтл и описание.
+  Shikimori — русский тайтл и описание.
 - **Свой плеер внутри.** Серия, озвучка, качество, два источника.
 - **Ни рекламы, ни телеметрии, ни своих серверов.** Токен, настройки и кэш лежат
   на вашей машине.
@@ -107,7 +107,8 @@ cd apps/android-tv && npm run tauri -- android dev
 
 ## Лицензия
 
-[MIT](LICENSE). Русские названия и описания приходят из [Shikimori](https://shikimori.one)
-и [anime365](https://anime365.ru); датасет собирается в
-[animori-data](https://github.com/foulnike/animori-data). Проект неофициальный и
-с командой AniList не связан.
+[MIT](LICENSE). Зависимости приходят со своими лицензиями — перечень в
+[THIRD-PARTY.md](THIRD-PARTY.md), он собирается из `package-lock.json`. Русские названия и
+описания приходят из [Shikimori](https://shikimori.one);
+датасет собирается в [animori-data](https://github.com/foulnike/animori-data). Проект
+неофициальный и с командой AniList не связан.

@@ -21,6 +21,7 @@ import { APPEARANCES, appearance, setAppearance } from '../appearance'
 import { checkUpdate, installUpdate, updateOffer } from '../update'
 import BrandMark from '../components/BrandMark.vue'
 import CloudBox from '../components/CloudBox.vue'
+import CreditsBox from '../components/CreditsBox.vue'
 import DateField from '../components/DateField.vue'
 import ProxyBox from '../components/ProxyBox.vue'
 import SettingMark from '../components/SettingMark.vue'
@@ -710,7 +711,7 @@ onMounted(() => {
             animori-data</button
           ><span v-else class="am-meta">animori-data</span>
           (лицензия CC0-1.0): номера и связки собраны перечислением каталога Шикимори, сами названия
-          — из открытых API Шикимори и anime365.
+          — из открытого API Шикимори.
         </p>
 
         <!-- Свежесть датасета — единственное, за чем человеку приходится следить руками, поэтому про просрочку говорим словами. -->
@@ -722,6 +723,9 @@ onMounted(() => {
           ><span v-else class="am-meta">animori-data</span>
           и запустите сборку кнопкой.
         </p>
+
+        <!-- Источники и права — последнее в окне: дальше читать нечего. -->
+        <CreditsBox />
       </div>
     </SettingsSheet>
   </section>

@@ -1,7 +1,7 @@
 // Внешние ссылки карточки: адреса собираются из номеров, никакой сети это не стоит.
 // Редактора своих ссылок нет сознательно: набор источников известен заранее.
 
-import { ANIME365_DOMAINS, SHIKI_DOMAINS } from '@/core/constants'
+import { SHIKI_DOMAINS } from '@/core/constants'
 
 /** Имя узла AniList. Схема добавляется кодом: так же, как у русских зеркал. */
 const ANILIST_HOST = 'anilist.co'
@@ -90,11 +90,10 @@ export function mediaLinks(input: MediaLinksInput): MediaLink[] {
     })
   }
 
-  // Второй русский источник: адрес каталога anime365 строится по своему
-  // ярлыку, а не по номеру MAL, поэтому берётся только готовый.
+  // Описание может прийти не с Шикимори — разметка AniList тоже разбирается. Свою страницу
+  // такого источника знать нельзя, поэтому адрес отдаём тот, что пришёл.
   if (sourceUrl !== '' && !fromShiki) {
-    const isAnime365 = atDomain(sourceUrl, ANIME365_DOMAINS)
-    const text = isAnime365 ? 'Anime365' : sourceName === '' ? 'Источник описания' : sourceName
+    const text = sourceName === '' ? 'Источник описания' : sourceName
 
     list.push({
       key: 'source',

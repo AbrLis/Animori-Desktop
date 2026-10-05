@@ -99,7 +99,7 @@ onBeforeUnmount(() => {
 
         <!-- tabindex у тела: с фокусом на нём пульт видит, что находится внутри окна, и не считает окно пустым. -->
         <div ref="body" class="am-modal__body" tabindex="0" data-am-seed>
-          <RichText class="am-about--zoom" :text="text" />
+          <RichText class="am-about--zoom" :text="text" plain />
         </div>
       </div>
     </div>

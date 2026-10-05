@@ -275,7 +275,7 @@ watch(card, (now) => {
               <h3 class="am-h3 am-hero__noteh">Описание</h3>
 
               <div class="am-hero__scroll">
-                <RichText v-if="about" class="am-about am-about--art" :text="about" />
+                <RichText v-if="about" class="am-about am-about--art" :text="about" plain />
                 <div v-else-if="aboutWait" class="am-about__hold" aria-hidden="true">
                   <span class="am-skeleton am-about__hold-line" />
                   <span class="am-skeleton am-about__hold-line" />
@@ -302,11 +302,13 @@ watch(card, (now) => {
               @keydown="onAboutKey"
             >
               <h3 class="am-h3">Описание</h3>
-              <!-- Разметка источника живая: ссылки, спойлеры и начертания рисует компонент, а типографика .am-about на его корне. -->
+              <!-- Разметка источника живая: спойлеры и начертания рисует компонент, а типографика .am-about остаётся на его корне. -->
               <!-- Текст раскрывается окном крупным планом: в плитке он идёт 11.5px, и с трёх метров его не читают.
      Цель — вся плитка, а не абзац: кромка фокуса обходит её контур, а не строки текста (см. `__hit`).
-     Цель, а не кнопка: внутри разметка со ссылками, и ссылку внутри кнопки браузер разбирает по-своему. -->
-              <RichText v-if="about" class="am-about" :text="about" />
+     Сплошным текстом: описания с Шикимори набиты ссылками на персонажей и другие аниме, и на
+     приставке каждая становилась целью обхода посреди абзаца — пульт вставал на неё, а толку
+     не было. На ПК те же ссылки живые, там на них есть куда идти. -->
+              <RichText v-if="about" class="am-about" :text="about" plain />
               <div v-else-if="aboutWait" class="am-about__hold" aria-hidden="true">
                 <span class="am-skeleton am-about__hold-line" />
                 <span class="am-skeleton am-about__hold-line" />

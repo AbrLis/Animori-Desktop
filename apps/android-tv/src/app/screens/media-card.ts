@@ -363,8 +363,8 @@ export function useMediaCard(mediaId: Ref<number>): MediaCardView {
     return list
   })
 
-  /** Рейтинг трёх площадок. AniList — из карточки; Шикимори и MAL — своим доходом: название мог добыть
-   *  anime365, у которого оценок нет вовсе. */
+  /** Рейтинг трёх площадок. AniList — из карточки; Шикимори и MAL — своим доходом: название мог добыться
+   *  из датасета, а он про оценки не знает. */
   const ratings = computed<Rating[]>(() => {
     const list: Rating[] = []
 

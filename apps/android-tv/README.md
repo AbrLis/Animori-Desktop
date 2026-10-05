@@ -114,7 +114,6 @@ npm run tauri -- android build -t armv7
 | :----------------------------------- | :--------------------------------------------- |
 | `graphql.anilist.co`                 | данные и списки                                |
 | `shikimori.rip`, `shikimori.io`      | русские названия, описания, персонажи, франшизы |
-| `smotret-anime.online`, `anime365.ru` | тайтлы и описания                             |
 | `anilibria.top`, `kodik-api.com`     | ссылки на видео                                |
 | `graphql.animethemes.moe`            | опенинги и эндинги                             |
 | `cloud-api.yandex.net`               | копия списка, по нажатию                       |
@@ -137,7 +136,7 @@ npm run tauri -- android build -t armv7
 
 ## Лицензия
 
-[MIT](../../LICENSE) © foulnike. Лицензия покрывает код. Данные Shikimori и anime365
+[MIT](../../LICENSE) © foulnike. Лицензия покрывает код. Данные Shikimori
 ею не покрываются: показываются со ссылкой на источник, в репозитории не
 хранятся.
 

@@ -1,6 +1,6 @@
 <script setup lang="ts">
 // Окошко персонажа или автора: русское докидывается фоном из person-title.ts и media-title.ts. Слой окошка подменяет человека ссылкой из описания, поэтому загрузка висит и на смене свойства.
-import { onBeforeUnmount, onMounted, ref, shallowReactive, watch } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref, shallowReactive, watch } from 'vue'
 
 import {
   fetchCharacterCard,
@@ -10,6 +10,7 @@ import {
   type StaffCard,
 } from '@/api/anilist-person'
 import { fetchStaffWorks, type StaffWork } from '@/api/anilist-staff-works'
+import { Bridge } from '@/bridge'
 import { keepAllowed } from '@/core/adult'
 import { peekRussianName, prefetchRussianNames } from '@/core/media-title'
 import {
@@ -22,6 +23,7 @@ import { settings } from '@/core/settings'
 import { Logger } from '@/utils/logger'
 
 import { genderWord, langWord, occupationWord } from '../labels'
+import { personLinks, type PersonLink } from '../person-links'
 import { navigate } from '../router'
 
 import RichText from './RichText.vue'
@@ -104,6 +106,36 @@ function rawDesc(): string {
  *  длина лишь признак, что описание надо сложить по высоте. */
 function longDesc(): boolean {
   return rawDesc().length > DESC_LIMIT
+}
+
+/** Ссылка на карточку AniList: своя страница из ответа, а запасная — из самой плитки. */
+function anilistUrl(): string | null {
+  const card = current.value.kind === 'character' ? charCard.value : staffCard.value
+  return card?.siteUrl ?? current.value.siteUrl
+}
+
+/** Откуда взят текст под именем. Ссылка на Шикимори честна только когда описание пришло оттуда:
+ *  номер известен из того же ответа, но страницы у источника может не быть вовсе. */
+function descSource(): { shikiId: number | null; fromShiki: boolean } {
+  const ru = ruPerson.value
+  const text = ru?.description?.trim() ?? ''
+  return { shikiId: ru?.shikiId ?? null, fromShiki: text !== '' }
+}
+
+/** Хвост под описанием: адреса, а не названия — на ПК ссылка должна быть ссылкой. */
+const descLinks = computed<PersonLink[]>(() =>
+  personLinks({
+    kind: current.value.kind,
+    siteUrl: anilistUrl(),
+    ...descSource(),
+  }),
+)
+
+/** Уводит наружу через оболочку: переход в том же окне унёс бы само приложение. */
+function onOpen(url: string): void {
+  void Bridge.shell.openExternal(url).catch((e) => {
+    Logger('WARN', `Карточка человека: внешняя ссылка не открылась (${url})`, e)
+  })
 }
 
 /** Видимые работы: отбор 18+ живёт на слое показа, а не в запросе. */
@@ -519,6 +551,21 @@ onBeforeUnmount(() => {
             Показать полностью
           </button>
 
+          <!-- Откуда взят текст и где лежит сама карточка. Без хвоста текст выглядит нашим,
+               а по источнику это не так: описание и имя приходят с Шикимори. -->
+          <p v-if="descLinks.length > 0" class="am-ps-tail">
+            <template v-for="(link, at) in descLinks" :key="link.key">
+              <span v-if="at > 0" class="am-ps-tail__dot" aria-hidden="true">·</span>
+              <a
+                v-tip="link.hint"
+                class="am-ps-tail__link"
+                :href="link.url"
+                @click.prevent="onOpen(link.url)"
+                >{{ link.text }}</a
+              >
+            </template>
+          </p>
+
           <!-- Работы (только для авторов): полка постеров с переходом внутрь -->
           <template v-if="current.kind === 'staff' && shownWorks().length">
             <h4 class="am-ps-sub">Работы</h4>
@@ -825,6 +872,33 @@ onBeforeUnmount(() => {
 
 .am-ps-names__occ {
   margin-top: 4px;
+}
+
+/* Хвост под описанием: откуда текст и где сама карточка. Тем же приёмом, что и под
+   описанием аниме, — бледная справка, подчёркивание появляется под мышью. */
+.am-ps-tail {
+  margin: 2px 0 0;
+  font-size: 12.5px;
+  color: var(--am-faint);
+}
+
+.am-ps-tail__link {
+  color: var(--am-dim);
+  text-decoration: none;
+  border-bottom: 1px solid transparent;
+  transition:
+    color var(--am-fast) var(--am-ease),
+    border-color var(--am-fast) var(--am-ease);
+}
+
+.am-ps-tail__link:hover,
+.am-ps-tail__link:focus-visible {
+  color: var(--am-accent);
+  border-bottom-color: currentcolor;
+}
+
+.am-ps-tail__dot {
+  margin: 0 7px;
 }
 
 /* Описание лежит на своей подложке: стена текста без границ не читалась.

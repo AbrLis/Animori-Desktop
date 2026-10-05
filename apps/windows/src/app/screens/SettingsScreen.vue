@@ -39,6 +39,7 @@ import {
 } from '../auth/session'
 import BrandMark from '../components/BrandMark.vue'
 import CloudBox from '../components/CloudBox.vue'
+import CreditsBox from '../components/CreditsBox.vue'
 import DateField from '../components/DateField.vue'
 import ProxyBox from '../components/ProxyBox.vue'
 import TileMark from '../components/TileMark.vue'
@@ -1192,7 +1193,7 @@ onBeforeUnmount(() => {
               Русские названия поставляет датасет
               <button class="am-link" type="button" @click="onDatasetLink">animori-data</button>
               (лицензия CC0-1.0): номера и связки собраны перечислением каталога Шикимори, сами
-              названия — из открытых API Шикимори и anime365.
+              названия — из открытого API Шикимори.
             </p>
 
             <!-- Свежесть датасета — единственное, за чем человеку приходится следить
@@ -1203,6 +1204,9 @@ onBeforeUnmount(() => {
               <button class="am-link" type="button" @click="onDatasetLink">animori-data</button>
               и запустите сборку кнопкой.
             </p>
+
+            <!-- Источники и права — последнее в панели: дальше читать нечего. -->
+            <CreditsBox />
           </div>
 
           <ProxyBox v-if="wide" />

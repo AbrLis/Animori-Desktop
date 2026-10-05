@@ -1,9 +1,8 @@
-// Резолвер русского названия и описания: основной источник, затем фоллбэк.
+// Резолвер русского названия и описания. Источник один: Шикимори.
 // Описание отдаётся с разметкой источника, разбирает её core/rich-text.ts; настройки читаются при вызове.
 
 import { settings } from '../core/settings'
 import { fetchShikiAnime } from './shikimori-media'
-import { fetchAnime365ByMal } from './anime365'
 
 export interface ResolvedTitle {
   russian: string
@@ -26,45 +25,28 @@ function textOrNull(value: string | null | undefined): string | null {
   return clean === '' ? null : clean
 }
 
-/** Резолвит русское название и описание по цепочке источников; адреса всегда анимешные — раздела манги у нас больше нет. */
+/** Резолвит русское название и описание; адреса всегда анимешные — раздела манги у нас больше нет. */
 export async function resolveTitle(malId: number | null): Promise<ResolvedTitle | null> {
-  const order = [...new Set([settings.titlePrimary, settings.titleFallback])].filter(
-    (src) => src && src !== 'off' && src !== 'none',
-  )
+  // Заглушка на «выключено»: иначе выключенная подстановка всё равно спросила бы источник.
+  if (settings.titlePrimary === 'off' || settings.titlePrimary === 'none') return null
 
-  for (const src of order) {
-    if (src === 'shikimori') {
-      // Без номера MAL спрашивать не по чему: такой вызов уезжал бы за `/api/animes/null`.
-      if (malId === null) continue
+  // Без номера MAL спрашивать не по чему: такой вызов уезжал бы за `/api/animes/null`.
+  if (malId === null) return null
 
-      const shiki = await fetchShikiAnime(malId)
-      if (shiki.data?.russian) {
-        const rawScore = Number(shiki.data.score)
-        return {
-          russian: shiki.data.russian,
-          description: textOrNull(shiki.data.description),
-          url: 'https://' + (shiki.domain ?? '') + (shiki.data.url ?? ''),
-          sourceName: 'Shikimori',
-          score: Number.isFinite(rawScore) && rawScore > 0 ? rawScore : null,
-          rates: Array.isArray(shiki.data.rates_scores_stats)
-            ? shiki.data.rates_scores_stats
-            : null,
-        }
-      }
-    } else if (src === 'anime365') {
-      const a = await fetchAnime365ByMal(malId)
-      if (a?.russian) {
-        return {
-          russian: a.russian,
-          description: textOrNull(a.description),
-          url: a.url,
-          sourceName: 'anime365',
-          score: null,
-          rates: null,
-        }
-      }
-    }
+  const shiki = await fetchShikiAnime(malId)
+  const data = shiki.data
+  if (data === null || data === undefined) return null
+
+  const russian = data.russian
+  if (russian === undefined || russian === null || russian === '') return null
+
+  const rawScore = Number(data.score)
+  return {
+    russian,
+    description: textOrNull(data.description),
+    url: 'https://' + (shiki.domain ?? '') + (data.url ?? ''),
+    sourceName: 'Shikimori',
+    score: Number.isFinite(rawScore) && rawScore > 0 ? rawScore : null,
+    rates: Array.isArray(data.rates_scores_stats) ? data.rates_scores_stats : null,
   }
-
-  return null
 }

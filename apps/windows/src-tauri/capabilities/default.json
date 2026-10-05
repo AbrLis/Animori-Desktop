@@ -33,8 +33,6 @@
         { "url": "https://graphql.anilist.co/*" },
         { "url": "https://shikimori.io/*" },
         { "url": "https://shikimori.rip/*" },
-        { "url": "https://smotret-anime.online/*" },
-        { "url": "https://anime365.ru/*" },
         { "url": "https://api.animethemes.moe/*" },
         { "url": "https://*.animethemes.moe/*" },
         { "url": "https://raw.githubusercontent.com/*" },
