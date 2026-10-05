@@ -3,8 +3,6 @@
 use std::fs;
 use std::path::{Path, PathBuf};
 
-use base64::engine::general_purpose::STANDARD as BASE64;
-use base64::Engine as _;
 use tauri::{AppHandle, WebviewWindow};
 // Выбор папки спрашивает только десктоп, на приставке свой файловый менеджер.
 #[cfg(desktop)]
@@ -13,14 +11,8 @@ use tauri_plugin_dialog::DialogExt;
 /// Потолок записи в байтах. Тот же, что у files.rs: выгрузка списка на десять тысяч записей весит около мегабайта, восемь закрывают живые случаи с запасом.
 const MAX_BYTES: usize = 8 * 1024 * 1024;
 
-/// Потолок трека. Тема в ogg тянет от двух до десяти мегабайт, полная версия песни — до сорока; шестьдесят четыре закрывают их все.
-const MAX_TRACK_BYTES: usize = 64 * 1024 * 1024;
-
 /// Разрешённое окончание имени. Выгрузка у нас одна — список в XML, и проверка расширения не даёт превратить команду в способ положить рядом что угодно.
 const ALLOWED_SUFFIX: &str = ".xml";
-
-/// Расширения трека. Список закрытый по той же причине: запись в чужую папку не должна класть исполняемый файл. AnimeThemes раздаёт ogg, прочие — на замену.
-const ALLOWED_TRACK_SUFFIXES: [&str; 6] = [".ogg", ".oga", ".opus", ".mp3", ".m4a", ".webm"];
 
 /// Проверяет, что пришло именно имя файла, а не путь. Path::file_name отсекает всё, что похоже на путь, поэтому сравнение ловит и разделители, и «..».
 fn check_shape(name: &str) -> Result<(), String> {
@@ -39,20 +31,6 @@ fn check_shape(name: &str) -> Result<(), String> {
 fn check_name(name: &str) -> Result<(), String> {
     if !name.to_ascii_lowercase().ends_with(ALLOWED_SUFFIX) {
         return Err(format!("Выгрузка бывает только {ALLOWED_SUFFIX}: {name}"));
-    }
-
-    check_shape(name)
-}
-
-/// Имя файла трека: общая проверка вида плюс расширение из закрытого списка.
-fn check_track_name(name: &str) -> Result<(), String> {
-    let lowered = name.to_ascii_lowercase();
-
-    if !ALLOWED_TRACK_SUFFIXES
-        .iter()
-        .any(|suffix| lowered.ends_with(suffix))
-    {
-        return Err(format!("Такое расширение трека не разрешено: {name}"));
     }
 
     check_shape(name)
@@ -125,15 +103,6 @@ pub async fn animori_export_pick_dir(
     ask_folder(app, window, "Куда сохранять выгрузки AniMori").await
 }
 
-/// Папка под трек: спрашивается на КАЖДОЕ скачивание и нигде не запоминается.
-#[tauri::command]
-pub async fn animori_track_pick_dir(
-    app: AppHandle,
-    window: WebviewWindow,
-) -> Result<Option<String>, String> {
-    ask_folder(app, window, "Куда сохранить трек").await
-}
-
 /// Пишет выгрузку в выбранную папку и возвращает полный путь: настройки показывают его человеку. Сначала во временный файл, потом переименованием.
 #[tauri::command]
 pub async fn animori_export_write(
@@ -158,39 +127,4 @@ pub async fn animori_export_write(
     })
     .await
     .map_err(|e| format!("Запись выгрузки не завершилась: {e}"))?
-}
-
-/// Пишет трек в выбранную папку и возвращает полный путь: карточка показывает его человеку. Раскодировка идёт на рабочем потоке, темповая запись несёт .part.
-#[tauri::command]
-pub async fn animori_track_write(
-    dir: String,
-    // Имя параметра одним словом: Tauri переводит имена аргументов из camelCase, и bytesBase64 — лишний повод для тихого «invalid args».
-    name: String,
-    bytes: String,
-) -> Result<String, String> {
-    check_track_name(&name)?;
-
-    tauri::async_runtime::spawn_blocking(move || {
-        let body = BASE64
-            .decode(bytes.as_bytes())
-            .map_err(|e| format!("Тело трека не разобрать: {e}"))?;
-
-        if body.len() > MAX_TRACK_BYTES {
-            return Err(format!("Трек слишком большой: {} байт", body.len()));
-        }
-
-        if body.is_empty() {
-            return Err("Тело трека пустое".to_string());
-        }
-
-        let path = check_dir(&dir)?.join(&name);
-        let temp = path.with_extension("part");
-
-        fs::write(&temp, &body).map_err(|e| format!("Не записать файл: {e}"))?;
-        fs::rename(&temp, &path).map_err(|e| format!("Не заменить файл: {e}"))?;
-
-        Ok(path.to_string_lossy().into_owned())
-    })
-    .await
-    .map_err(|e| format!("Запись трека не завершилась: {e}"))?
 }

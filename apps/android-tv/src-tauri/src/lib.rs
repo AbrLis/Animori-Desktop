@@ -104,8 +104,6 @@ pub fn run() {
             files::animori_file_write,
             export::animori_export_pick_dir,
             export::animori_export_write,
-            export::animori_track_pick_dir,
-            export::animori_track_write,
             proxy::animori_proxy_status,
             proxy::animori_proxy_probe
         ])

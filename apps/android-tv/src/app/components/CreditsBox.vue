@@ -23,7 +23,6 @@ const body = ref<HTMLElement | null>(null)
 const SOURCES = [
   { name: 'AniList', what: 'каталог, списки, расписание выхода' },
   { name: 'Шикимори', what: 'русские названия, описания, персонажи и персонал' },
-  { name: 'AnimeThemes', what: 'опенинги и эндинги' },
   { name: 'Kodik, Anilibria', what: 'ссылки на видео' },
   { name: 'animori-data', what: 'датасет русских названий, CC0-1.0' },
 ]

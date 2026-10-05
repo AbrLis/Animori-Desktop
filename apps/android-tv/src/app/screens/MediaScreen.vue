@@ -10,7 +10,6 @@ import EntrySheet from '../components/EntrySheet.vue'
 import PeopleBox from '../components/PeopleBox.vue'
 import RichText from '../components/RichText.vue'
 import ShotBox from '../components/ShotBox.vue'
-import TuneBox from '../components/TuneBox.vue'
 import { genreWord } from '../labels'
 import { isWeakPlatform } from '../platform'
 import { currentRoute, navigate } from '../router'
@@ -424,9 +423,6 @@ watch(card, (now) => {
             <PeopleBox :media-id="mediaId" />
           </div>
         </div>
-
-        <!-- Музыка последней в странице и липнет к низу окна: под низом уже оставлено поле (padding у .am-view), в которое полоса и встаёт. -->
-        <TuneBox :mal-id="card.malId" />
 
         <!-- Описание крупным планом: своё окно, а не второй вид той же плитки. -->
         <AboutBox v-if="about" :open="aboutOpen" :text="about" @close="aboutOpen = false" />

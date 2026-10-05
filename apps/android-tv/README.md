@@ -115,7 +115,6 @@ npm run tauri -- android build -t armv7
 | `graphql.anilist.co`                 | данные и списки                                |
 | `shikimori.rip`, `shikimori.io`      | русские названия, описания, персонажи, франшизы |
 | `anilibria.top`, `kodik-api.com`     | ссылки на видео                                |
-| `graphql.animethemes.moe`            | опенинги и эндинги                             |
 | `cloud-api.yandex.net`               | копия списка, по нажатию                       |
 | `github.com`                         | датасет русских названий                       |
 | `api.github.com`                     | список выпусков                                |

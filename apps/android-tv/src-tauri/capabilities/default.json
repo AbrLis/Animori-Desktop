@@ -20,8 +20,6 @@
     "allow-animori-file-write",
     "allow-animori-export-pick-dir",
     "allow-animori-export-write",
-    "allow-animori-track-pick-dir",
-    "allow-animori-track-write",
     "allow-animori-proxy-status",
     "allow-animori-proxy-probe",
     {
@@ -30,8 +28,6 @@
         { "url": "https://graphql.anilist.co/*" },
         { "url": "https://shikimori.io/*" },
         { "url": "https://shikimori.rip/*" },
-        { "url": "https://api.animethemes.moe/*" },
-        { "url": "https://*.animethemes.moe/*" },
         { "url": "https://raw.githubusercontent.com/*" },
         { "url": "https://github.com/foulnike/animori-data/*" },
         { "url": "https://objects.githubusercontent.com/*" },
