@@ -112,3 +112,8 @@ cd apps/android-tv && npm run tauri -- android dev
 описания приходят из [Shikimori](https://shikimori.one);
 датасет собирается в [animori-data](https://github.com/foulnike/animori-data). Проект
 неофициальный и с командой AniList не связан.
+
+## Правовые документы
+
+- [Политика обработки персональных данных](docs/PRIVACY.md) (русская и английская версии)
+- [Условия использования](docs/TERMS.md) (русская и английская версии)

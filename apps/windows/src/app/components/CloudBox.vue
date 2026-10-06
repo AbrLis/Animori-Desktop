@@ -230,6 +230,11 @@ function onCloudHelp(): void {
   void Bridge.shell.openExternal(YANDEX_OAUTH_URL)
 }
 
+/** Политика обработки: копия уходит на серверы Яндекса по кнопке — условия должны быть под рукой. */
+function onPrivacy(): void {
+  void Bridge.shell.openExternal('https://github.com/foulnike/Animori/blob/main/docs/PRIVACY.md')
+}
+
 /** Проверка связи по кнопке: пропуск можно отозвать со стороны, и узнать об этом лучше сейчас. */
 function onCloudCheck(): void {
   void cloudGuard(async () => {
@@ -554,7 +559,10 @@ onMounted(() => {
         Пропуск выдаёт сам Яндекс: заведите приложение с правом «Приложения на Диске» на
         <button class="am-link" type="button" @click="onCloudHelp">oauth.yandex.com</button>
         и вставьте выданный токен сюда. Он останется на этом устройстве. Порядок по шагам — под
-        кнопкой «i».
+        кнопкой «i». Копия уходит на серверы Яндекса только по кнопке; условия обработки — в
+        <button class="am-link" type="button" @click="onPrivacy">
+          Политике обработки персональных данных</button
+        >.
       </p>
 
       <div class="am-row">

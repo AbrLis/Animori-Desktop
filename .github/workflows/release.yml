@@ -88,6 +88,8 @@ jobs:
           if ($body.Length -gt 3000) {
             $body = $body.Substring(0, 3000).TrimEnd() + "`n`n…полный список изменений — в CHANGELOG.md"
           }
+          # Подвал после обрезки, чтобы она его не съела: правовые документы на странице выпуска.
+          $body = $body + "`n`n— Политика: https://github.com/foulnike/Animori/blob/main/docs/PRIVACY.md · Условия: https://github.com/foulnike/Animori/blob/main/docs/TERMS.md"
           Add-Content -Path $env:GITHUB_OUTPUT -Encoding utf8 -Value 'body<<ANIMORI_NOTES'
           Add-Content -Path $env:GITHUB_OUTPUT -Encoding utf8 -Value $body
           Add-Content -Path $env:GITHUB_OUTPUT -Encoding utf8 -Value 'ANIMORI_NOTES'

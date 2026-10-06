@@ -30,6 +30,14 @@ const SOURCES = [
   },
 ] as const
 
+/** Адреса правовых документов. Один источник правды — файлы в репозитории. */
+const PRIVACY_URL = 'https://github.com/foulnike/Animori/blob/main/docs/PRIVACY.md'
+const TERMS_URL = 'https://github.com/foulnike/Animori/blob/main/docs/TERMS.md'
+const DOCS = [
+  { name: 'Политика обработки персональных данных', url: PRIVACY_URL },
+  { name: 'Условия использования', url: TERMS_URL },
+] as const
+
 /** Открыть адрес источника. У Kodik и Anilibria адреса нет: это названия сервисов, а не адреса,
  *  по которым программа ходит, и ссылка смотрелась бы обещанием, которого нет. */
 function onSource(url: string): void {
@@ -95,6 +103,15 @@ function onSource(url: string): void {
         <li>
           Код распространяется по лицензии MIT, перечень зависимостей и их лицензий приведён в
           THIRD-PARTY.md. Данные датасета animori-data публикуются по CC0-1.0.
+        </li>
+      </ul>
+
+      <!-- Правовые документы: полные тексты живут в репозитории, здесь — только вход к ним. -->
+      <ul class="am-credits__list am-credits__docs">
+        <li v-for="doc in DOCS" :key="doc.url" class="am-credits__row">
+          <button class="am-chip am-credits__chip" type="button" @click="onSource(doc.url)">
+            {{ doc.name }}
+          </button>
         </li>
       </ul>
     </div>
@@ -219,5 +236,11 @@ function onSource(url: string): void {
 
 .am-credits__terms li::marker {
   color: var(--am-line);
+}
+
+/* Правовые документы — отдельным списком под оговорками: вход к полным текстам,
+   а не ещё одна оговорка. */
+.am-credits__docs {
+  margin-top: 10px;
 }
 </style>

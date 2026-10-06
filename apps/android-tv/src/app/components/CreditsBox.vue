@@ -12,9 +12,14 @@
 import { nextTick, onBeforeUnmount, ref, watch } from 'vue'
 
 import { pushBackStop } from '../back-stop'
+import { canOpenOutside } from '../platform'
+import { Bridge } from '@/bridge'
 
 /** Открыто ли окно. */
 const open = ref(false)
+
+/** Есть ли куда уводить ссылки: на приставке браузера нет, адрес показывается текстом. */
+const outside = canOpenOutside()
 
 /** Тело окна: его листают стрелками. */
 const body = ref<HTMLElement | null>(null)
@@ -38,8 +43,25 @@ const TERMS = [
   'Код распространяется по лицензии MIT, перечень зависимостей и их лицензий приведён в THIRD-PARTY.md. Данные датасета animori-data публикуются по CC0-1.0.',
 ]
 
+/** Правовые документы: полные тексты живут в репозитории. */
+const DOCS = [
+  {
+    name: 'Политика обработки персональных данных',
+    url: 'https://github.com/foulnike/Animori/blob/main/docs/PRIVACY.md',
+  },
+  {
+    name: 'Условия использования',
+    url: 'https://github.com/foulnike/Animori/blob/main/docs/TERMS.md',
+  },
+]
+
 function onClose(): void {
   open.value = false
+}
+
+/** Открыть правовой документ: внешний адрес — только через оболочку. */
+function onDoc(url: string): void {
+  void Bridge.shell.openExternal(url)
 }
 
 /// Сколько прокручивать за нажатие. Шестьдесят пикселей — примерно две строки: с трёх метров видно, что текст поехал.
@@ -145,6 +167,17 @@ onBeforeUnmount(() => {
               Ссылки на видео ведут на сторонние сервисы. Программа ничего не скачивает и не хранит,
               лицензии на видеоматериал не получает, прав на его распространение не имеет.
             </div>
+
+            <!-- Правовые документы: на приставке браузера нет — адрес показывается текстом. -->
+            <h4 class="am-modal__h">Правовые документы</h4>
+            <ul>
+              <li v-for="doc in DOCS" :key="doc.url">
+                <button v-if="outside" class="am-modal__link" type="button" @click="onDoc(doc.url)">
+                  {{ doc.name }}
+                </button>
+                <template v-else>{{ doc.name }} — {{ doc.url }}</template>
+              </li>
+            </ul>
           </div>
         </div>
       </div>
@@ -283,6 +316,16 @@ onBeforeUnmount(() => {
   gap: 6px;
   margin: 0;
   padding-left: 20px;
+}
+
+/* Ссылка-кнопка правового документа: тот же приём, что в справке про облако. */
+.am-modal__link {
+  padding: 0;
+  font: inherit;
+  color: var(--am-accent);
+  cursor: pointer;
+  background: none;
+  border: 0;
 }
 
 /* Короткое предупреждение — рамкой, теми же средствами, что и в справке: в отличие от оговорок его

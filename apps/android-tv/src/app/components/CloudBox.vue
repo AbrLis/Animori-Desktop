@@ -4,12 +4,24 @@
 
 import { ref } from 'vue'
 
+import { Bridge } from '@/bridge'
 import { linkInfo, pullByLink, type CloudLink } from '@/core/cloud'
 import type { PullMode } from '@/core/collection'
 
 import { restoreFocus } from '../focus-return'
+import { canOpenOutside } from '../platform'
 import BrandMark from './BrandMark.vue'
 import CloudHelp from './CloudHelp.vue'
+
+/** Есть ли куда уводить ссылки: на приставке браузера нет, адрес показывается текстом. */
+const canDocs = canOpenOutside()
+
+/** Адрес Политики: один источник правды — файл в репозитории. */
+const DOCS = { privacy: 'https://github.com/foulnike/Animori/blob/main/docs/PRIVACY.md' }
+
+function onDoc(url: string): void {
+  void Bridge.shell.openExternal(url)
+}
 
 defineProps<{
   /** Записей в списке сейчас: это число стоит в вопросе перед заменой. */
@@ -162,6 +174,18 @@ function pullText(got: {
           <span class="am-serv__note">Ссылку создаёт компьютер, здесь набирают её хвост.</span>
         </span>
       </div>
+
+      <!-- Правовые документы: на приставке браузера нет — адрес показывается текстом. -->
+      <p class="am-meta">
+        Условия обработки данных копии — в
+        <template v-if="canDocs">
+          <button class="am-link" type="button" @click="onDoc(DOCS.privacy)">
+            Политике обработки персональных данных
+          </button>
+        </template>
+        <template v-else>{{ DOCS.privacy }}</template
+        >.
+      </p>
 
       <div class="am-row">
         <label class="am-field">

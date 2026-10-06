@@ -72,6 +72,18 @@ function onRepoLink(): void {
   void Bridge.shell.openExternal(REPO_URL)
 }
 
+// Правовые документы: адреса общие для всех точек входа в UI, живут рядом с ссылкой на репозиторий.
+const PRIVACY_URL = 'https://github.com/foulnike/Animori/blob/main/docs/PRIVACY.md'
+const TERMS_URL = 'https://github.com/foulnike/Animori/blob/main/docs/TERMS.md'
+
+function onPrivacy(): void {
+  void Bridge.shell.openExternal(PRIVACY_URL)
+}
+
+function onTerms(): void {
+  void Bridge.shell.openExternal(TERMS_URL)
+}
+
 /**
  * Журнал отладки: экран живёт и зарегистрирован в роутере — пропал лишь путь к нему. Вход вернули отдельной плиткой «Отладка» под облачной копией, а не в меню: в рельсе отладка читалась бы разделом.
  */
@@ -719,6 +731,18 @@ onBeforeUnmount(() => {
                   >
                     Подключить аккаунт
                   </button>
+
+                  <!-- Правовые документы рядом с входом: применение условий — до нажатия, а не после. -->
+                  <p v-if="!authStatus.authorized" class="am-meta">
+                    При входе применяются
+                    <button class="am-link" type="button" @click="onPrivacy">
+                      Политика обработки персональных данных
+                    </button>
+                    и
+                    <button class="am-link" type="button" @click="onTerms">
+                      Условия использования</button
+                    >.
+                  </p>
                   <template v-else>
                     <button
                       v-tip="'Забрать список с AniList: слиянием или с заменой'"

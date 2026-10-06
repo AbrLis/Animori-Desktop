@@ -297,6 +297,9 @@ jobs:
           if len(body) > 1200:
               body = body[:1200].rstrip() + '…'
 
+          # Подвал после обрезки, чтобы она его не съела: правовые документы на странице выпуска.
+          body += '\n\n— Политика: https://github.com/foulnike/Animori/blob/main/docs/PRIVACY.md · Условия: https://github.com/foulnike/Animori/blob/main/docs/TERMS.md'
+
           print('body<<ANIMORI_NOTES')
           print(body)
           print('ANIMORI_NOTES')
