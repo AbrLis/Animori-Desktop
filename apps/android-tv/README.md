@@ -87,7 +87,7 @@ AniList с живой проверкой, обновление по кнопке
 умеется.
 
 **Управлять с пульта.** Фокус ходит стрелками, рельс вынесен отдельной полосой,
-окна поверх экрана закрываются «Назад» — `docs/INTERFACE.md`.
+окна поверх экрана закрываются «Назад» — `docs/dev/android-tv/INTERFACE.md`.
 
 Разделы — **Главная**, **Моё**, **История**, **Поиск**, **Настройки**; из них
 открываются **Тайтл**, **Студия** и **Просмотр**. Приложение ведёт только аниме и
@@ -95,8 +95,8 @@ AniList с живой проверкой, обновление по кнопке
 Запросы к API идут из процесса приложения, а не из веб-части, поэтому ограничения
 браузера не мешают, а заголовки запросов под контролем.
 
-Источники — `docs/DATA.md`, плеер — `docs/VIDEO.md`, список и облако —
-`docs/STORAGE.md`.
+Источники — `docs/dev/android-tv/DATA.md`, плеер — `docs/dev/android-tv/VIDEO.md`, список и облако —
+`docs/dev/android-tv/STORAGE.md`.
 
 ## Сборка
 
@@ -106,7 +106,7 @@ npm run build:app
 npm run tauri -- android build -t armv7
 ```
 
-Подпись и грабли инструментов — в `docs/BUILD.md`.
+Подпись и грабли инструментов — в `docs/dev/android-tv/BUILD.md`.
 
 ## Источники данных
 
@@ -123,15 +123,15 @@ npm run tauri -- android build -t armv7
 
 | Документ                                 | Вопрос                        |
 | :--------------------------------------- | :---------------------------- |
-| [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) | слои, ядро, мост, экраны |
-| [`docs/INTERFACE.md`](docs/INTERFACE.md) | пульт, фокус, рельс, темы     |
-| [`docs/DATA.md`](docs/DATA.md)           | источники, датасет, сеть, темп |
-| [`docs/VIDEO.md`](docs/VIDEO.md)         | плеер и источники видео       |
-| [`docs/STORAGE.md`](docs/STORAGE.md)     | что и где лежит               |
-| [`docs/BUILD.md`](docs/BUILD.md)         | сборка APK                    |
-| [`docs/CONVENTIONS.md`](docs/CONVENTIONS.md) | правила кода и документации |
+| [`docs/dev/android-tv/ARCHITECTURE.md`](../../docs/dev/android-tv/ARCHITECTURE.md) | слои, ядро, мост, экраны |
+| [`docs/dev/android-tv/INTERFACE.md`](../../docs/dev/android-tv/INTERFACE.md) | пульт, фокус, рельс, темы     |
+| [`docs/dev/android-tv/DATA.md`](../../docs/dev/android-tv/DATA.md)           | источники, датасет, сеть, темп |
+| [`docs/dev/android-tv/VIDEO.md`](../../docs/dev/android-tv/VIDEO.md)         | плеер и источники видео       |
+| [`docs/dev/android-tv/STORAGE.md`](../../docs/dev/android-tv/STORAGE.md)     | что и где лежит               |
+| [`docs/dev/android-tv/BUILD.md`](../../docs/dev/android-tv/BUILD.md)         | сборка APK                    |
+| [`docs/dev/android-tv/CONVENTIONS.md`](../../docs/dev/android-tv/CONVENTIONS.md) | правила кода и документации |
 
-Полный список — [`docs/README.md`](docs/README.md).
+Полный список — [`docs/dev/android-tv/README.md`](../../docs/dev/android-tv/README.md).
 
 ## Лицензия
 

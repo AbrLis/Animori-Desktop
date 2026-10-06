@@ -1,4 +1,4 @@
-// Клиент Kodik. Открытого API для ссылок нет — цепочка из трёх шагов (docs/ARCHITECTURE.md): поиск
+// Клиент Kodik. Открытого API для ссылок нет — цепочка из трёх шагов (docs/dev/windows/ARCHITECTURE.md): поиск
 // по номеру Шикимори → страница серии (подписи d_sign/pd_sign/ref_sign) → POST /ftor…
 
 import { Bridge, type HttpResponse } from '@/bridge'

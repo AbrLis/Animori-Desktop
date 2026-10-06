@@ -26,7 +26,7 @@
 на «вы»; таблицы там, где перечисление; без эмодзи. Вещь называют своим именем,
 уточнений и пояснений «зачем» не пишут.
 
-Состав `docs/`: `README.md` (вход), `ARCHITECTURE.md`, `INTERFACE.md`, `DATA.md`,
+Состав `docs/dev/android-tv/`: `README.md` (вход), `ARCHITECTURE.md`, `INTERFACE.md`, `DATA.md`,
 `VIDEO.md`, `STORAGE.md`, `BUILD.md`, этот файл. Новая тема, не влезающая ни в один
 файл, — новый файл и строка в `README.md`.
 

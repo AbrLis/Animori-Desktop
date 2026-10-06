@@ -322,7 +322,7 @@ tauri-action, режим установки `passive`, ключи подписи
 
 Адрес `releases/latest` остаётся за настольным приложением: сборки 3.0.x и старше
 вшили его в бильник и сменить уже не могут. Кто ещё занимает его — в
-[docs/RELEASES.md](../../../docs/RELEASES.md).
+[docs/RELEASES.md](../RELEASES.md).
 
 Профиль программы — `AppData\Roaming\com.foulnike.animori`:
 `animori-settings.json` (настройки, пропуск, ключ облака), `animori-snapshot.json`,

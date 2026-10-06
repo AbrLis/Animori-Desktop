@@ -5,7 +5,7 @@ import { Bridge } from '@/bridge'
 import { Logger } from '../utils/logger'
 import { githubLimiter } from './rate-limit'
 
-/** Постоянный адрес файлов последнего выпуска; зеркала нет: jsDelivr выпуски не раздаёт (docs/DATA.md). */
+/** Постоянный адрес файлов последнего выпуска; зеркала нет: jsDelivr выпуски не раздаёт (docs/dev/windows/DATA.md). */
 const RELEASE_BASE = 'https://github.com/foulnike/animori-data/releases/latest/download'
 
 /** Таймауты: опись крошечная, файлы — до полутора мегабайтов в сжатом виде. */

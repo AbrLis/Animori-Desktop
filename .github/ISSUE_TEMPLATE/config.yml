@@ -12,8 +12,8 @@ contact_links:
     url: https://github.com/foulnike/animori-data
     about: Русские названия, описания и соответствия номеров собирает отдельный репозиторий.
   - name: Устройство приложения на ПК
-    url: https://github.com/foulnike/Animori/blob/main/apps/windows/docs/README.md
+    url: https://github.com/foulnike/Animori/blob/main/docs/dev/windows/README.md
     about: Интерфейс, данные, видео, хранение, сборка.
   - name: Устройство приложения на приставке
-    url: https://github.com/foulnike/Animori/blob/main/apps/android-tv/docs/README.md
+    url: https://github.com/foulnike/Animori/blob/main/docs/dev/android-tv/README.md
     about: Интерфейс, пульт и фокус, данные, видео, хранение, сборка APK.
