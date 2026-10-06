@@ -45,9 +45,10 @@ jobs:
       - name: Node.js
         uses: actions/setup-node@v4
         with:
-          # Node 20 вне поддержки с апреля 2026: в релиз собираем на 22.
-          # Правило уже стоит в release-tv.yml и ci.yml — Windows на нём отставал.
-          node-version: 22
+          # Node 24 — та же версия, что в ci.yml и release-tv.yml: lock генерирует
+          # npm 11, а npm 10 из node 22 отвергает его на npm ci —
+          # «Missing: esbuild@0.28.2 from lock file».
+          node-version: 24
           cache: npm
 
       # Номер версии из имени тега и сверка с package.json. Номер берётся образцом, а не отрезанием
