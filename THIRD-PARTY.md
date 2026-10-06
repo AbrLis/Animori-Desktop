@@ -23,7 +23,7 @@ AniMori.
 
 ## Состав
 
-Всего пакетов с указанной лицензией: **246**.
+Всего пакетов с указанной лицензией: **245**.
 
 ### Apache-2.0 (18)
 
@@ -290,13 +290,12 @@ AniMori.
 | ws | 8.22.0 |
 | yocto-queue | 0.1.0 |
 
-### MIT OR Apache-2.0 (3)
+### MIT OR Apache-2.0 (2)
 
 | Пакет | Версия |
 | --- | --- |
 | @tauri-apps/plugin-clipboard-manager | 2.4.1 |
 | @tauri-apps/plugin-http | 2.8.0 |
-| @tauri-apps/plugin-store | 2.5.0 |
 
 ### MPL-2.0 (13)
 

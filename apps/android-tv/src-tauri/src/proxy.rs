@@ -8,7 +8,7 @@ use serde::Serialize;
 use tauri::{AppHandle, Manager, State};
 use tauri_plugin_store::StoreExt;
 
-/// То же имя, что у LazyStore в packages/core/src/bridge/TauriBridge.ts: файл один на обе стороны.
+/// То же имя, что у storage.rs и auth.rs: файл один на все стороны.
 const STORE_FILE: &str = "animori-settings.json";
 
 /// Проверка идёт в setup() и задерживает появление окна; местному прокси хватает.

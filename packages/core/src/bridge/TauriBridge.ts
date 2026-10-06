@@ -3,7 +3,6 @@
 import { invoke } from '@tauri-apps/api/core'
 import { writeText } from '@tauri-apps/plugin-clipboard-manager'
 import { fetch as tauriFetch } from '@tauri-apps/plugin-http'
-import { LazyStore } from '@tauri-apps/plugin-store'
 
 import {
   DEFAULT_PROXY,
@@ -33,14 +32,14 @@ import { tauriProxyDiagnostics } from './TauriProxyDiagnostics'
 
 // ==== storage ====
 
-// LazyStore не требует await при создании. autoSave — только сетка безопасности: он пишет файл уже после разрешения set().
-const store = new LazyStore('animori-settings.json', { autoSave: true })
-
-/** Снимок файла настроек в памяти: один entries() вместо трёх десятков get() на старте. */
+/** Снимок файла настроек в памяти: одно чтение вместо трёх десятков get() на старте. */
 let snapshot: Map<string, unknown> | null = null
 
-/** Незавершённая загрузка снимка: параллельные чтения не дёргают entries() повторно. */
+/** Незавершённая загрузка снимка: параллельные чтения не дёргают команду повторно. */
 let snapshotLoading: Promise<Map<string, unknown> | null> | null = null
+
+/** Закрытые ключи оболочки: дубль запрета, основной живёт в команде хранилища. */
+const CLOSED_KEYS = new Set(['auth_token', 'auth_expires_at'])
 
 async function loadSnapshot(): Promise<Map<string, unknown> | null> {
   if (snapshot) return snapshot
@@ -48,11 +47,11 @@ async function loadSnapshot(): Promise<Map<string, unknown> | null> {
 
   snapshotLoading = (async () => {
     try {
-      const entries = await store.entries()
-      snapshot = new Map(entries)
+      const entries = await invoke<Record<string, unknown>>('animori_storage_read')
+      snapshot = new Map(Object.entries(entries))
       return snapshot
     } catch (e) {
-      // Падать незачем: ниже есть путь через store.get() по одному ключу.
+      // Падать незачем: чтение повторится при следующем обращении.
       Logger('ERROR', 'Файл настроек не прочитан целиком', e)
       return null
     } finally {
@@ -75,10 +74,12 @@ async function storageGet<T = unknown>(key: string): Promise<T | undefined>
 async function storageGet<T>(key: string, defaultValue?: T): Promise<T | undefined> {
   const hasDefault = arguments.length >= 2
 
-  const cache = await loadSnapshot()
-  const value = cache ? (cache.get(key) as T | undefined) : await store.get<T>(key)
+  // Закрытые ключи минуют снимок: вторая сетка поверх запрета в оболочке.
+  if (CLOSED_KEYS.has(key)) return defaultValue as T
 
-  // store.get дефолт не принимает — подставляем сами.
+  const cache = await loadSnapshot()
+  const value = cache?.get(key) as T | undefined
+
   if (value === undefined && hasDefault) return defaultValue as T
   return value
 }
@@ -88,9 +89,7 @@ async function writeValue(key: string, value: unknown): Promise<void> {
   // Снимок правится сразу: чтение сразу после set() обязано видеть новое значение.
   if (snapshot) snapshot.set(key, value)
 
-  await store.set(key, value)
-  // Явный save(): контракт IStorage.set требует долговечности к моменту разрешения.
-  await store.save()
+  await invoke('animori_storage_write', { key, value })
 }
 
 const tauriStorage: IStorage = {

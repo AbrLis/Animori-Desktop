@@ -26,9 +26,6 @@ const SERVER_FAIL_MAX_PAUSE_MS = 900000
  */
 const MAX_INLINE_WAIT_MS = 10000
 
-/** Ключ хранилища для токена. Имя сохранено из монолита ради совместимости. */
-const TOKEN_KEY = 'AL_TOKEN'
-
 /**
  * Ключи хранилища отступа: два числа, а не одна запись — меняются и читаются по отдельности.
  */
@@ -40,9 +37,6 @@ let alRateLimitPause = 0
 
 /** Сколько отказов сервера подряд. Любой успешный ответ обнуляет. */
 let serverFailStreak = 0
-
-/** Копия токена в памяти: заполняется loadAlToken() до первого запроса. */
-let alTokenCache = ''
 
 /**
  * Есть ли пропуск у самой оболочки: в десктопе токен лежит в Rust и разметке не виден — без флажка клиент считал бы, что входа нет.
@@ -144,36 +138,6 @@ export interface GraphQLResponse<T = unknown> {
 }
 
 /**
- * Готовит клиент к работе (токен в память, отступ из прошлого запуска), один раз на старте; ошибки чтения запуск не роняют.
- */
-export async function loadAlToken(): Promise<void> {
-  try {
-    const stored = await Bridge.storage.get<unknown>(TOKEN_KEY, '')
-    alTokenCache = typeof stored === 'string' ? stored : ''
-  } catch (e) {
-    Logger('ERROR', 'Ошибка чтения AL_TOKEN', e)
-    alTokenCache = ''
-  }
-
-  await restoreAniListPause()
-}
-
-/** Сохраняет токен: сначала в память, потом в хранилище. Никогда не отклоняется. */
-export function setAlToken(token: string): void {
-  alTokenCache = token
-  void Bridge.storage.set(TOKEN_KEY, token).catch((e: unknown) => {
-    Logger('ERROR', 'Ошибка записи AL_TOKEN', e)
-  })
-}
-
-/**
- * Токен из настроек: его вписывают руками; второго источника нет — чужой сессии у своего окна не бывает.
- */
-export function getAlToken(): string | null {
-  return alTokenCache || null
-}
-
-/**
  * Сообщает, есть ли пропуск у оболочки; зовёт src/app/auth/session.ts. Сам токен не передаётся — пропуск не должен
  * появляться в разметке, а для выбора запроса достаточно самого факта.
  */
@@ -185,11 +149,10 @@ export function setShellSigned(value: boolean): void {
 }
 
 /**
- * Есть ли чем подписать запрос: главный источник — пропуск оболочки, токен из настроек — второй. Спрашивают те,
- * кому без подписи идти в сеть незачем: список и очередь правок.
+ * Есть ли чем подписать запрос: спрашивают те, кому без подписи идти в сеть незачем — список и очередь правок.
  */
 export function canSignAniList(): boolean {
-  return shellSigned || getAlToken() !== null
+  return shellSigned
 }
 
 /**

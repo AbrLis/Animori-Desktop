@@ -15,6 +15,9 @@ const COMMANDS: &[&str] = &[
     // Дубль снимка в файл приватного каталога. Имя файла проверяется по списку в files.rs, каталог выбирает сама оболочка.
     "animori_file_read",
     "animori_file_write",
+    // Настройки окна: вместо плагина store в разметке, закрытые ключи в ответ не попадают.
+    "animori_storage_read",
+    "animori_storage_write",
     // Выгрузка списка в папку, выбранную человеком. Окно выбора открывает сам Rust: разрешение dialog разметке не выдано и не будет.
     "animori_export_pick_dir",
     "animori_export_write",

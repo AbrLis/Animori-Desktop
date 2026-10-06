@@ -29,7 +29,7 @@ packages/core/src/          api, bridge, core, utils
 
 | Группа             | Как устроено                                       |
 | ------------------ | -------------------------------------------------- |
-| `storage`          | плагин store, файл `animori-settings.json`         |
+| `storage`          | `animori_storage_read` / `animori_storage_write`   |
 | `http`             | плагин http, запрос идёт из Rust, без CORS         |
 | `anilist`          | команда `animori_anilist_query`                    |
 | `clipboard`        | плагин clipboard-manager                           |
@@ -457,7 +457,6 @@ PlayerScreen.vue         — путь между плеером и списко�
 | `vue` 3.5                                                        | каркас экранов: `ref` и `computed`    |
 | `hls.js`                                                         | MPEG-DASH и HLS                        |
 | `@tauri-apps/api`                                                | команды и окна                         |
-| `@tauri-apps/plugin-store`                                       | `animori-settings.json` и ключи        |
 | `@tauri-apps/plugin-http`                                        | запросы из Rust, без CORS              |
 | `@tauri-apps/plugin-clipboard-manager`                           | буфер обмена                           |
 | `@tauri-apps/cli`, `vite`, `@vitejs/plugin-vue`, `vue-tsc`, `typescript` | сборка и проверка типов     |

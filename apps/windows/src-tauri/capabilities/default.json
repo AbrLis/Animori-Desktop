@@ -6,7 +6,6 @@
   "local": true,
   "permissions": [
     "core:default",
-    "store:default",
     "clipboard-manager:allow-write-text",
     "allow-animori-reload",
     "allow-animori-restart",
@@ -21,6 +20,8 @@
     "allow-animori-anilist-query",
     "allow-animori-file-read",
     "allow-animori-file-write",
+    "allow-animori-storage-read",
+    "allow-animori-storage-write",
     "allow-animori-export-pick-dir",
     "allow-animori-export-write",
     "allow-animori-track-pick-dir",

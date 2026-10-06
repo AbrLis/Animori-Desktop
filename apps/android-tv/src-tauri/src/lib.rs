@@ -25,6 +25,9 @@ mod anilist;
 // Дубль снимка в файл приватного каталога. Без cfg: работа с файлом одинакова везде, а на Android она нужнее всего.
 mod files;
 
+// Чтение и запись настроек окна. Файл у разметки не отдан: закрытые ключи команда не выдаёт.
+mod storage;
+
 // Выгрузка списка в папку, выбранную человеком. Отдельно от files.rs: там служебный каталог, здесь чужая папка. Здесь же трек темы из карточки.
 mod export;
 
@@ -100,6 +103,8 @@ pub fn run() {
             anilist::animori_anilist_query,
             files::animori_file_read,
             files::animori_file_write,
+            storage::animori_storage_read,
+            storage::animori_storage_write,
             export::animori_export_pick_dir,
             export::animori_export_write,
             proxy::animori_proxy_status,
