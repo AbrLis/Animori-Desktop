@@ -58,7 +58,8 @@ export default defineConfig({
     outDir: fileURLToPath(new URL('./dist/app', import.meta.url)),
     // Теперь можно без оглядки: в dist пишет один продукт, а тауринная сборка не сносит уже собранный animori.user.js.
     emptyOutDir: true,
-    minify: 'esbuild',
+    // oxc — дефолтный минификатор vite 8; 'esbuild' в v8 устарел и потребовал бы отдельной установки esbuild.
+    minify: 'oxc',
     target: 'es2022',
   },
 })

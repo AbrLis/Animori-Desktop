@@ -23,7 +23,7 @@ AniMori.
 
 ## Состав
 
-Всего пакетов с указанной лицензией: **297**.
+Всего пакетов с указанной лицензией: **267**.
 
 ### (MIT OR CC0-1.0) (1)
 
@@ -31,7 +31,7 @@ AniMori.
 | --- | --- |
 | type-fest | 0.20.2 |
 
-### Apache-2.0 (18)
+### Apache-2.0 (19)
 
 | Пакет | Версия |
 | --- | --- |
@@ -45,6 +45,7 @@ AniMori.
 | @humanfs/types | 0.15.0 |
 | @humanwhocodes/module-importer | 1.0.1 |
 | @humanwhocodes/retry | 0.4.3 |
+| aria-query | 5.3.2 |
 | detect-libc | 2.1.2 |
 | eslint-visitor-keys | 3.4.3 |
 | eslint-visitor-keys | 4.2.1 |
@@ -87,11 +88,14 @@ AniMori.
 | nth-check | 2.1.1 |
 | uri-js | 4.4.1 |
 
-### BSD-3-Clause (2)
+### BSD-3-Clause (5)
 
 | Пакет | Версия |
 | --- | --- |
 | esquery | 1.7.0 |
+| istanbul-lib-coverage | 3.2.2 |
+| istanbul-lib-report | 3.0.1 |
+| istanbul-reports | 3.2.0 |
 | source-map-js | 1.2.2 |
 
 ### BlueOak-1.0.0 (1)
@@ -115,7 +119,7 @@ AniMori.
 | siginfo | 2.0.0 |
 | which | 2.0.2 |
 
-### MIT (226)
+### MIT (191)
 
 | Пакет | Версия |
 | --- | --- |
@@ -123,35 +127,14 @@ AniMori.
 | @babel/helper-validator-identifier | 7.29.7 |
 | @babel/parser | 7.29.9 |
 | @babel/types | 7.29.8 |
-| @esbuild/aix-ppc64 | 0.21.5 |
-| @esbuild/android-arm | 0.21.5 |
-| @esbuild/android-arm64 | 0.21.5 |
-| @esbuild/android-x64 | 0.21.5 |
-| @esbuild/darwin-arm64 | 0.21.5 |
-| @esbuild/darwin-x64 | 0.21.5 |
-| @esbuild/freebsd-arm64 | 0.21.5 |
-| @esbuild/freebsd-x64 | 0.21.5 |
-| @esbuild/linux-arm | 0.21.5 |
-| @esbuild/linux-arm64 | 0.21.5 |
-| @esbuild/linux-ia32 | 0.21.5 |
-| @esbuild/linux-loong64 | 0.21.5 |
-| @esbuild/linux-mips64el | 0.21.5 |
-| @esbuild/linux-ppc64 | 0.21.5 |
-| @esbuild/linux-riscv64 | 0.21.5 |
-| @esbuild/linux-s390x | 0.21.5 |
-| @esbuild/linux-x64 | 0.21.5 |
-| @esbuild/netbsd-x64 | 0.21.5 |
-| @esbuild/openbsd-x64 | 0.21.5 |
-| @esbuild/sunos-x64 | 0.21.5 |
-| @esbuild/win32-arm64 | 0.21.5 |
-| @esbuild/win32-ia32 | 0.21.5 |
-| @esbuild/win32-x64 | 0.21.5 |
+| @bcoe/v8-coverage | 1.0.2 |
 | @eslint-community/eslint-utils | 4.10.1 |
 | @eslint-community/regexpp | 4.12.2 |
 | @eslint/eslintrc | 3.3.7 |
 | @eslint/js | 9.39.5 |
+| @jridgewell/resolve-uri | 3.1.2 |
 | @jridgewell/sourcemap-codec | 1.6.0 |
-| @napi-rs/lzma-linux-x64-gnu | 1.5.1 |
+| @jridgewell/trace-mapping | 0.3.31 |
 | @oxc-project/types | 0.152.0 |
 | @rolldown/binding-android-arm-eabi | 1.2.12 |
 | @rolldown/binding-android-arm64 | 1.2.12 |
@@ -169,31 +152,6 @@ AniMori.
 | @rolldown/binding-win32-arm64-msvc | 1.2.12 |
 | @rolldown/binding-win32-x64-msvc | 1.2.12 |
 | @rolldown/pluginutils | 1.0.1 |
-| @rollup/rollup-android-arm-eabi | 4.64.0 |
-| @rollup/rollup-android-arm64 | 4.64.0 |
-| @rollup/rollup-darwin-arm64 | 4.64.0 |
-| @rollup/rollup-darwin-x64 | 4.64.0 |
-| @rollup/rollup-freebsd-arm64 | 4.64.0 |
-| @rollup/rollup-freebsd-x64 | 4.64.0 |
-| @rollup/rollup-linux-arm-gnueabihf | 4.64.0 |
-| @rollup/rollup-linux-arm-musleabihf | 4.64.0 |
-| @rollup/rollup-linux-arm64-gnu | 4.64.0 |
-| @rollup/rollup-linux-arm64-musl | 4.64.0 |
-| @rollup/rollup-linux-loong64-gnu | 4.64.0 |
-| @rollup/rollup-linux-loong64-musl | 4.64.0 |
-| @rollup/rollup-linux-ppc64-gnu | 4.64.0 |
-| @rollup/rollup-linux-ppc64-musl | 4.64.0 |
-| @rollup/rollup-linux-riscv64-gnu | 4.64.0 |
-| @rollup/rollup-linux-riscv64-musl | 4.64.0 |
-| @rollup/rollup-linux-s390x-gnu | 4.64.0 |
-| @rollup/rollup-linux-x64-gnu | 4.64.0 |
-| @rollup/rollup-linux-x64-musl | 4.64.0 |
-| @rollup/rollup-openbsd-x64 | 4.64.0 |
-| @rollup/rollup-openharmony-arm64 | 4.64.0 |
-| @rollup/rollup-win32-arm64-msvc | 4.64.0 |
-| @rollup/rollup-win32-ia32-msvc | 4.64.0 |
-| @rollup/rollup-win32-x64-gnu | 4.64.0 |
-| @rollup/rollup-win32-x64-msvc | 4.64.0 |
 | @standard-schema/spec | 1.1.0 |
 | @types/chai | 5.2.3 |
 | @types/deep-eql | 4.0.2 |
@@ -212,7 +170,8 @@ AniMori.
 | @typescript-eslint/typescript-estree | 8.71.0 |
 | @typescript-eslint/utils | 8.71.0 |
 | @typescript-eslint/visitor-keys | 8.71.0 |
-| @vitejs/plugin-vue | 5.2.4 |
+| @vitejs/plugin-vue | 6.0.9 |
+| @vitest/coverage-v8 | 4.1.11 |
 | @vitest/expect | 4.1.11 |
 | @vitest/mocker | 4.1.11 |
 | @vitest/pretty-format | 4.1.11 |
@@ -240,6 +199,7 @@ AniMori.
 | alien-signals | 1.0.13 |
 | ansi-styles | 4.3.0 |
 | assertion-error | 2.0.1 |
+| ast-v8-to-istanbul | 1.0.7 |
 | balanced-match | 1.0.2 |
 | balanced-match | 4.0.4 |
 | brace-expansion | 1.1.21 |
@@ -249,6 +209,7 @@ AniMori.
 | callsites | 3.1.0 |
 | chai | 6.3.0 |
 | chalk | 4.1.2 |
+| chalk | 5.6.2 |
 | color-convert | 2.0.1 |
 | color-name | 1.1.4 |
 | concat-map | 0.0.1 |
@@ -259,8 +220,8 @@ AniMori.
 | de-indent | 1.0.2 |
 | debug | 4.4.3 |
 | deep-is | 0.1.4 |
+| dom-accessibility-api | 0.5.16 |
 | es-module-lexer | 2.3.2 |
-| esbuild | 0.21.5 |
 | escape-string-regexp | 4.0.0 |
 | eslint | 9.39.5 |
 | eslint-config-prettier | 9.1.2 |
@@ -280,12 +241,15 @@ AniMori.
 | happy-dom | 20.14.5 |
 | has-flag | 4.0.0 |
 | he | 1.2.0 |
+| html-escaper | 2.0.2 |
 | ignore | 5.3.2 |
 | ignore | 7.0.12 |
 | import-fresh | 3.3.1 |
 | imurmurhash | 0.1.4 |
+| indent-string | 4.0.0 |
 | is-extglob | 2.1.1 |
 | is-glob | 4.0.3 |
+| js-tokens | 10.0.0 |
 | js-yaml | 4.3.2 |
 | json-buffer | 3.0.1 |
 | json-schema-traverse | 0.4.1 |
@@ -294,8 +258,12 @@ AniMori.
 | levn | 0.4.1 |
 | locate-path | 6.0.0 |
 | lodash | 4.18.1 |
+| lodash-es | 4.18.1 |
 | lodash.merge | 4.6.2 |
 | magic-string | 0.30.21 |
+| magicast | 0.5.5 |
+| make-dir | 4.0.0 |
+| min-indent | 1.0.1 |
 | ms | 2.1.3 |
 | muggle-string | 0.4.1 |
 | nanoid | 3.3.19 |
@@ -315,13 +283,14 @@ AniMori.
 | prelude-ls | 1.2.1 |
 | prettier | 3.9.9 |
 | punycode | 2.3.1 |
+| redent | 3.0.0 |
 | resolve-from | 4.0.0 |
 | rolldown | 1.2.12 |
-| rollup | 4.64.0 |
 | shebang-command | 2.0.0 |
 | shebang-regex | 3.0.0 |
 | stackback | 0.0.2 |
 | std-env | 4.3.0 |
+| strip-indent | 3.0.0 |
 | strip-json-comments | 3.1.1 |
 | supports-color | 7.2.0 |
 | tinybench | 2.9.0 |
@@ -333,9 +302,9 @@ AniMori.
 | typescript-eslint | 8.71.0 |
 | undici-types | 8.9.0 |
 | util-deprecate | 1.0.2 |
-| vite | 5.4.21 |
 | vite | 8.3.2 |
 | vitest | 4.1.11 |
+| vitest-axe | 0.1.0 |
 | vscode-uri | 3.2.0 |
 | vue | 3.5.43 |
 | vue-eslint-parser | 9.4.3 |
@@ -354,10 +323,11 @@ AniMori.
 | @tauri-apps/plugin-http | 2.8.0 |
 | @tauri-apps/plugin-store | 2.5.0 |
 
-### MPL-2.0 (12)
+### MPL-2.0 (13)
 
 | Пакет | Версия |
 | --- | --- |
+| axe-core | 4.14.0 |
 | lightningcss | 1.33.0 |
 | lightningcss-android-arm64 | 1.33.0 |
 | lightningcss-darwin-arm64 | 1.33.0 |
