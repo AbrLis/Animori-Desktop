@@ -3,6 +3,7 @@
 use std::io::{BufRead, BufReader, Write};
 use std::net::{Ipv4Addr, TcpListener, TcpStream};
 use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::Mutex;
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 use serde::Serialize;
@@ -49,6 +50,9 @@ const TOKEN_MAX_LEN: usize = 8192;
 
 /// Приёмник поднят? Он один на приложение: второй попытался бы занять тот же порт и упал бы с отказом ровно там, где человек нажал кнопку.
 static RUNNING: AtomicBool = AtomicBool::new(false);
+
+/// Одноразовый nonce текущего входа: уезжает в запрос входа как state и возвращается приёмнику. Пусто — вход не запрашивался или уже закрыт.
+static NONCE: Mutex<Option<String>> = Mutex::new(None);
 
 /// Всё, что разметка знает о входе. Самого пропуска здесь нет сознательно.
 #[derive(Serialize, Clone, Debug)]
@@ -214,13 +218,55 @@ fn relay_url() -> String {
     ["http://127.0.0.1:", &PORT.to_string(), RELAY_PATH].concat()
 }
 
-/// Адрес страницы входа AniList. Ни redirect_uri, ни state здесь нет: в неявном потоке AniList берёт адрес возврата только из настроек клиента.
-fn authorize_url() -> String {
+/// Новый nonce входа: шестнадцать случайных байт в hex — в адресе посторонних символов быть не должно.
+fn fresh_nonce() -> Result<String, String> {
+    let mut bytes = [0u8; 16];
+    getrandom::fill(&mut bytes).map_err(|e| ["Случайность не вышла: ", &e.to_string()].concat())?;
+
+    let mut nonce = String::with_capacity(bytes.len() * 2);
+    for byte in bytes {
+        nonce.push_str(&format!("{byte:02x}"));
+    }
+
+    Ok(nonce)
+}
+
+/// Запомнить nonce текущего входа.
+fn remember_nonce(nonce: &str) -> Result<(), String> {
+    let mut current = NONCE
+        .lock()
+        .map_err(|_| "Состояние входа потеряно".to_string())?;
+    *current = Some(nonce.to_string());
+    Ok(())
+}
+
+/// Забыть nonce: возвраты с прежним state больше не принимаются.
+fn forget_nonce() {
+    if let Ok(mut current) = NONCE.lock() {
+        *current = None;
+    }
+}
+
+/// Присланный state совпадает с текущим nonce. Входа нет или state чужой — отказ.
+fn state_matches(given: Option<&str>) -> bool {
+    let Ok(current) = NONCE.lock() else {
+        return false;
+    };
+
+    match (given, current.as_deref()) {
+        (Some(given), Some(current)) => given == current,
+        _ => false,
+    }
+}
+
+/// Адрес страницы входа AniList. redirect_uri не передаётся: в неявном потоке адрес возврата берётся из настроек клиента — лишний redirect_uri отвергался ответом unsupported_grant_type. state — одноразовый nonce текущего входа, приёмник сверяет его на `/token`.
+fn authorize_url(nonce: &str) -> String {
     [
         AUTHORIZE_BASE,
         "?client_id=",
         CLIENT_ID,
-        "&response_type=token",
+        "&response_type=token&state=",
+        nonce,
     ]
     .concat()
 }
@@ -381,6 +427,18 @@ fn serve(app: &AppHandle, stream: TcpStream) -> bool {
         return false;
     }
 
+    // Без совпадения с текущим nonce возврат не принимается: иначе приёмник ловит адрес, присланный кем угодно.
+    if !state_matches(param(query, "state").as_deref()) {
+        log::warn!("Возврат не принят: state не совпал с текущим входом");
+        page(
+            stream,
+            "Не вышло",
+            "Вход не распознан. Попробуй ещё раз.",
+            "",
+        );
+        return false;
+    }
+
     let token = param(query, "access_token");
     let expires_in = param(query, "expires_in").and_then(|v| v.parse::<u64>().ok());
 
@@ -391,6 +449,7 @@ fn serve(app: &AppHandle, stream: TcpStream) -> bool {
 
     match accept_token(app, &token, expires_in) {
         Ok(_) => {
+            forget_nonce();
             page(stream, "Готово", "Вход выполнен, окно закроется само.", "");
             close_login_window(app);
             true
@@ -453,6 +512,7 @@ fn start_receiver(app: &AppHandle) -> Result<(), String> {
         }
 
         RUNNING.store(false, Ordering::SeqCst);
+        forget_nonce();
     });
 
     // Адрес возврата в журнал: сверить его с консолью клиента больше негде.
@@ -508,8 +568,11 @@ fn close_login_window(app: &AppHandle) {
 /// Начать вход. Поднимает приёмник и открывает окно с формой входа AniList. async здесь несёт смысл, а не форму: синхронная команда исполняется в главном потоке.
 #[tauri::command]
 pub async fn animori_auth_start(app: AppHandle) -> Result<LoginStart, String> {
+    // Новый вход — новый nonce: прежний перестаёт действовать немедленно.
+    let nonce = fresh_nonce()?;
+    remember_nonce(&nonce)?;
     start_receiver(&app)?;
-    open_login_window(&app, &authorize_url())?;
+    open_login_window(&app, &authorize_url(&nonce))?;
 
     Ok(LoginStart {
         wait_secs: WAIT_SECS,
