@@ -244,6 +244,17 @@ function askLater(field: LookupField, wanted: number[]): Promise<Map<number, Med
   })
 }
 
+/** Снять незакрытые пачки без запроса: таймер пачки не должен переживать конец прогона проверок. */
+export function flushLookups(): void {
+  for (const batch of batches.values()) {
+    window.clearTimeout(batch.timer)
+    // Пустой ответ, а не отказ: ждущие возвращаются к своим делам, а фоновый зов — не повод валить прогон.
+    for (const waiter of batch.waiters) waiter.resolve(new Map())
+  }
+
+  batches.clear()
+}
+
 /** Выписки тайтлов по номерам MAL; порядок ответа — порядок спрошенных: сортировка поиска живёт у того, кто искал. */
 export async function fetchBriefsByMal(malIds: number[]): Promise<MediaBrief[]> {
   const wanted = cleanIds(malIds)

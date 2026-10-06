@@ -196,8 +196,12 @@ beforeEach(async () => {
   looks = await import('@/core/media-looks')
 })
 
-afterEach(() => {
+afterEach(async () => {
   vi.useRealTimers()
+
+  // Фон календаря закрывает пачки выписок с опозданием, а окружение сносится сразу после файла.
+  const lookup = await import('@/api/anilist-lookup')
+  lookup.flushLookups()
 
   // Подмены снимаются: подписка `vi.doMock` переживает сброс реестра
   // и досталась бы соседним случаям.
