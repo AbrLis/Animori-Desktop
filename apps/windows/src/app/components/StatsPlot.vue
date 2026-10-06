@@ -1,7 +1,7 @@
 <script setup lang="ts">
 // Столбчатая гистограмма экрана статистики: одна на «Оценки», «Год просмотра» и «Год выпуска». Числа и
 // кривую присылает экран (график — декорация, а не источник чисел), масштаб и сетку считает сам.
-import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref, useId } from 'vue'
 
 interface PlotBar {
   key: string
@@ -38,9 +38,10 @@ const props = defineProps<{
 
 const emit = defineEmits<{ pick: [year: number] }>()
 
-// На экране три графика: имена градиентов не должны совпадать.
-let plots = 0
-const gradId = `am-plot-grad-${(plots += 1)}`
+// На экране три графика, и имена градиентов не должны совпадать: url(#…) ищет градиент
+// по всему документу, и с общим именем два графика из трёх раскрасились бы краской первого.
+// Счётчик инстансов в script setup не считал бы — он свой у каждого вызова, потому useId.
+const gradId = `am-plot-grad-${useId()}`
 
 /** Потолок шкалы: последнее деление, от него считаются высоты столбиков и положение сетки. */
 const ceiling = computed(() => props.ticks[props.ticks.length - 1]?.value ?? 0)

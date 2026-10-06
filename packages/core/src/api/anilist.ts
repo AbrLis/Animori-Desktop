@@ -384,6 +384,7 @@ export async function anilistQuery<T = unknown>(
     Logger('ERROR', 'AniList Network Error', e)
     throw new Error(
       'AniList недоступен: нет связи с сервером. Проверьте интернет или включите VPN.',
+      { cause: e },
     )
   }
 
@@ -458,7 +459,9 @@ export async function anilistQuery<T = unknown>(
     payload = JSON.parse(res.text) as GraphQLResponse<T>
   } catch (e) {
     Logger('ERROR', 'AniList: не удалось разобрать ответ', e)
-    throw new Error('AniList вернул ответ, который не читается. Обновите карточку.')
+    throw new Error('AniList вернул ответ, который не читается. Обновите карточку.', {
+      cause: e,
+    })
   }
 
   if (payload.errors) {

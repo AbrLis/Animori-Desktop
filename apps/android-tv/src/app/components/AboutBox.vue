@@ -38,7 +38,7 @@ function onKey(e: KeyboardEvent): void {
   const box = body.value
   if (box === null) return
 
-  let step = 0
+  let step: number
   if (e.key === 'ArrowDown') step = STEP
   else if (e.key === 'ArrowUp') step = -STEP
   else if (e.key === 'PageDown') step = STEP * 4

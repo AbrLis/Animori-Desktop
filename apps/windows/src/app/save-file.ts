@@ -40,7 +40,7 @@ function saveByWindow(name: string, text: string): void {
     Logger('DB', `Выгрузка отдана окну: ${name}, байт ${blob.size}`)
   } catch (e) {
     Logger('WARN', `Выгрузку не начать: ${String(e)}`)
-    throw new Error('Окно не приняло файл. Подробности в журнале.')
+    throw new Error('Окно не приняло файл. Подробности в журнале.', { cause: e })
   } finally {
     // Отзыв откладывается даже при ошибке ниже по тексту: адрес уже создан,
     // и без отзыва Blob остался бы в памяти до перезагрузки окна.

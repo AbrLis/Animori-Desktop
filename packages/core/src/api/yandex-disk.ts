@@ -461,7 +461,7 @@ export async function publicInfo(
 export async function downloadPublic(key: string): Promise<DiskResult<string>> {
   const what = 'Чтение копии по ссылке'
 
-  let href = ''
+  let href: string
 
   try {
     const res = await Bridge.http.request({

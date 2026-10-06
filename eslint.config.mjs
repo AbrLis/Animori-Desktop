@@ -25,9 +25,12 @@ export default tseslint.config(
   // Vue-правила и правила TS живут в разных слоях: включение TS-конфига глобально
   // тянет линтер на .vue и .json, где typescript-eslint нечего проверять.
   {
+    // Конфиги plugin-vue 10 больше не объявляют браузерные globals (#2674):
+    // без этого window, setTimeout и прочее вспыхивают как no-undef в .vue.
     files: ['**/*.vue'],
     languageOptions: {
       parserOptions: { parser: tseslint.parser, extraFileExtensions: ['.vue'] },
+      globals: { ...globals.browser },
     },
   },
   {
