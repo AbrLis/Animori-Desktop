@@ -40,10 +40,10 @@ jobs:
 
     steps:
       - name: Исходный код
-        uses: actions/checkout@v4
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
 
       - name: Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
         with:
           # Node 24 — та же версия, что в ci.yml и release-tv.yml: lock генерирует
           # npm 11, а npm 10 из node 22 отвергает его на npm ci —
@@ -94,12 +94,12 @@ jobs:
           Write-Host "Взято строк описания: $($to - $from + 1)"
 
       - name: Окружение Rust
-        uses: dtolnay/rust-toolchain@stable
+        uses: dtolnay/rust-toolchain@89b12181fb390509a0842a86cc55eeb8eb928c1d # stable
 
       # Компиляция зависимостей Tauri с нуля — это минуты. Кэш привязан к Cargo.lock,
       # который у нас закоммичен, поэтому попадание будет стабильным.
       - name: Кэш Cargo
-        uses: Swatinem/rust-cache@v2
+        uses: Swatinem/rust-cache@49a0bdc70d2e1b713ca9e2869b211fcce03d3c1c # v2
         with:
           workspaces: src-tauri
 
@@ -126,7 +126,7 @@ jobs:
 
       - name: Сборка приложения и публикация релиза
         if: github.event_name == 'push' || !inputs.dry
-        uses: tauri-apps/tauri-action@v0
+        uses: tauri-apps/tauri-action@fce9c6108b31ea247710505d3aaaa893ee6768d4 # v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
@@ -197,7 +197,7 @@ jobs:
       # Пробный прогон сюда не доходит: сборка и подпись уже проверены, а публиковать нечего.
       - name: Доложить артефакты в релиз
         if: ${{ github.event_name == 'push' || !inputs.dry }}
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@3bb12739c298aeb8a4eeaf626c5b8d85266b0e65 # v2
         with:
           tag_name: ${{ inputs.tag || github.ref_name }}
           # Пути от корня репозитория: JavaScript-шаги не знают про
