@@ -1,6 +1,6 @@
 <div align="center">
 
-<img src="https://raw.githubusercontent.com/foulnike/Animori/main/src-tauri/icons/128x128@2x.png" width="128" alt="AniMori">
+<img src="https://raw.githubusercontent.com/foulnike/Animori/main/apps/windows/src-tauri/icons/128x128@2x.png" width="128" alt="AniMori">
 
 # AniMori — приложение для AniList
 
