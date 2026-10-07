@@ -184,18 +184,21 @@ jobs:
         run: cargo clippy --all-targets -- -D warnings
 
       # Лицензии и запреты двух Cargo.lock: расхождение здесь, а не инцидентом
-      # у пользователя. Конфиг — deny.toml в корне репозитория.
-      - name: Запреты и лицензии
-        uses: EmbarkStudios/cargo-deny-action@3c6349835b2b7b196a839186cb8b78e02f7b5f25 # v2.1.1
+      # у пользователя. Конфиг — deny.toml в корне, ищется восхождением от
+      # каталога манифеста. Официальный cargo-deny-action — контейнерный и на
+      # windows-latest не стартует («Container action is only supported on
+      # Linux»), поэтому бинарь ставит install-action — JS-действие.
+      - name: Установка cargo-deny
+        uses: taiki-e/install-action@f7e5d7c961414b23f5b25b2da9294395d08513ad # v2.87.26
         with:
-          command: check bans licenses sources
-          manifest-path: ./apps/${{ matrix.app }}/src-tauri/Cargo.toml
+          tool: cargo-deny@0.20.2
 
-      # Уязвимости отдельно: свежий advisory виден, но общий прогон не роняет
-      # (рекомендация авторов action).
+      - name: Запреты и лицензии
+        working-directory: apps/${{ matrix.app }}/src-tauri
+        run: cargo deny check bans licenses sources
+
+      # Уязвимости отдельно: свежий advisory виден, но общий прогон не роняет.
       - name: Уязвимости
-        uses: EmbarkStudios/cargo-deny-action@3c6349835b2b7b196a839186cb8b78e02f7b5f25 # v2.1.1
-        with:
-          command: check advisories
-          manifest-path: ./apps/${{ matrix.app }}/src-tauri/Cargo.toml
+        working-directory: apps/${{ matrix.app }}/src-tauri
+        run: cargo deny check advisories
         continue-on-error: true
