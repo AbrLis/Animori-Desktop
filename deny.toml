@@ -1,0 +1,66 @@
+# Запреты для Rust-дерева: лицензии, уязвимости, дубли, источники.
+# Запуск: cargo deny check из каталога crate — конфиг ищется восхождением
+# до корня репозитория (проверено фактом; ci.yml, job rust).
+
+[graph]
+# Одинаковый граф локально и в CI (action передаёт --all-features).
+all-features = true
+
+[advisories]
+# RUSTSEC-2024-0370, RUSTSEC-2025-0075/0080/0081/0098/0100 — транзит tauri:
+# proc-macro-error и unicode-стек rust-unic заброшены апстримом, безопасного
+# апгрейда нет (так в advisory-db). Уязвимостей нет — только статус
+# unmaintained; ждём замены этих крейтов в апстриме.
+ignore = [
+    "RUSTSEC-2024-0370",
+    "RUSTSEC-2025-0075",
+    "RUSTSEC-2025-0080",
+    "RUSTSEC-2025-0081",
+    "RUSTSEC-2025-0098",
+    "RUSTSEC-2025-0100",
+]
+
+[licenses]
+# Перечень снят по факту из кэша registry 07.10.2026: 569 пакетов, всё
+# перmissive, GPL/AGPL нет. MPL-2.0 — файловый copyleft транзита рендера
+# (cssparser, selectors, dtoa-short, option-ext): obligation покрывает только
+# их исходники, наш бинарь остаётся MIT. LGPL встречается лишь как
+# неактивируемая OR-ветка (MIT OR Apache-2.0 OR LGPL-2.1-or-later).
+allow = [
+    "0BSD",
+    "Apache-2.0",
+    "Apache-2.0 WITH LLVM-exception",
+    "BSD-2-Clause",
+    "BSD-3-Clause",
+    "BSL-1.0",
+    "CC0-1.0",
+    "CDLA-Permissive-2.0",
+    "ISC",
+    "MIT",
+    "MPL-2.0",
+    "Unicode-3.0",
+    "Unlicense",
+    "Zlib",
+]
+confidence-threshold = 0.8
+
+[licenses.private]
+ignore = false
+registries = []
+
+[bans]
+# 37 пакетов с несколькими версиями — структурная норма дерева (windows-sys,
+# syn, toml, getrandom…): deny сломал бы CI без выигрыша, рост контролируется
+# прогоном.
+multiple-versions = "warn"
+wildcards = "allow"
+deny = []
+skip = []
+skip-tree = []
+
+[sources]
+# В git-зависимостях lock не содержит ни одной — чужие источники запрещены.
+unknown-registry = "deny"
+unknown-git = "deny"
+allow-registry = ["https://github.com/rust-lang/crates.io-index"]
+allow-git = []

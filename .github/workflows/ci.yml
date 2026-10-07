@@ -182,3 +182,20 @@ jobs:
       - name: Линт
         working-directory: apps/${{ matrix.app }}/src-tauri
         run: cargo clippy --all-targets -- -D warnings
+
+      # Лицензии и запреты двух Cargo.lock: расхождение здесь, а не инцидентом
+      # у пользователя. Конфиг — deny.toml в корне репозитория.
+      - name: Запреты и лицензии
+        uses: EmbarkStudios/cargo-deny-action@3c6349835b2b7b196a839186cb8b78e02f7b5f25 # v2.1.1
+        with:
+          command: check bans licenses sources
+          manifest-path: ./apps/${{ matrix.app }}/src-tauri/Cargo.toml
+
+      # Уязвимости отдельно: свежий advisory виден, но общий прогон не роняет
+      # (рекомендация авторов action).
+      - name: Уязвимости
+        uses: EmbarkStudios/cargo-deny-action@3c6349835b2b7b196a839186cb8b78e02f7b5f25 # v2.1.1
+        with:
+          command: check advisories
+          manifest-path: ./apps/${{ matrix.app }}/src-tauri/Cargo.toml
+        continue-on-error: true
