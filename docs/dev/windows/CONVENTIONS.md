@@ -51,7 +51,7 @@ packages/core/src/          api → bridge, core, utils
 10. Новая команда оболочки заводится в трёх местах: `#[tauri::command]` и
     `invoke_handler` в `lib.rs`, `AppManifest::commands` в `build.rs`, разрешение в
     `capabilities/default.json`. Пропуск третьего даёт отказ в рантайме без ошибки
-    компиляции.
+    компиляции. Проверяет `npm run sync:check`.
 11. Для вызова команды из разметки добавляются тип в `IBridge`
     и реализация в `TauriBridge`.
 12. Файл в приватном каталоге программы пишется только по имени из белого
@@ -142,9 +142,10 @@ packages/core/src/          api → bridge, core, utils
 Тело коммита — три-восемь строк о том, что было не так и что отвергнуто.
 Заголовок описывает результат, тело — причину.
 
-Алиасы слоёв живут в трёх местах и правятся только вместе: `resolve.alias` в
-`vite.config.ts`, `paths` в `tsconfig.json` и в `tsconfig.shared.json`. Расхождение даёт
-зелёную сборку при красном тайпчеке или наоборот.
+Алиасы слоёв живут в четырёх местах и правятся только вместе: `resolve.alias` в
+`vite.config.ts` и в `vitest.config.ts`, `paths` в `tsconfig.json` и в
+`tsconfig.shared.json`. Расхождение даёт зелёную сборку при красном тайпчеке или
+наоборот. Проверяет `npm run sync:check`.
 
 `npm run fix:lock` возвращает признак `optional` платформенным пакетам в
 `package-lock.json`. npm ставит его только вариантам, совпавшим с его собственной

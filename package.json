@@ -22,6 +22,7 @@
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "drift": "node scripts/drift.mjs",
+    "sync:check": "node scripts/check-sync.mjs",
     "third-party": "node tools/gen-third-party.mjs",
     "drift:accept": "node scripts/drift.mjs --accept",
     "fix:lock": "node scripts/fix-lock-optional.mjs"
