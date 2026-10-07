@@ -3,7 +3,7 @@
 # до корня репозитория (проверено фактом; ci.yml, job rust).
 
 [graph]
-# Одинаковый граф локально и в CI (action передаёт --all-features).
+# Флаг в конфиге: граф строится с --all-features и локально, и в CI.
 all-features = true
 
 [advisories]
