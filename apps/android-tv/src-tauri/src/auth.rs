@@ -541,22 +541,14 @@ fn open_login_window(app: &AppHandle, url: &str) -> Result<(), String> {
 
     #[cfg(desktop)]
     {
-        let window =
-            WebviewWindowBuilder::new(app, LOGIN_WINDOW_LABEL, WebviewUrl::External(address))
-                .title("Вход в AniList")
-                .inner_size(520.0, 720.0)
-                .min_inner_size(420.0, 560.0)
-                .resizable(true)
-                .center()
-                .build()
-                .map_err(|e| ["Окно входа не открылось: ", &e.to_string()].concat())?;
-
-        // Прокси с паролем спрашивает учётные данные на первом же соединении, а подписка действует только вперёд — потому сразу после создания окна.
-        #[cfg(windows)]
-        crate::proxy_auth::install(app, &window);
-
-        #[cfg(not(windows))]
-        let _ = &window;
+        WebviewWindowBuilder::new(app, LOGIN_WINDOW_LABEL, WebviewUrl::External(address))
+            .title("Вход в AniList")
+            .inner_size(520.0, 720.0)
+            .min_inner_size(420.0, 560.0)
+            .resizable(true)
+            .center()
+            .build()
+            .map_err(|e| ["Окно входа не открылось: ", &e.to_string()].concat())?;
 
         log::info!("Открыто окно входа AniList");
         Ok(())

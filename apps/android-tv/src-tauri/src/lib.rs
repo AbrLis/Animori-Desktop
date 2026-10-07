@@ -12,10 +12,6 @@ use tauri::{AppHandle, WebviewWindow};
 #[cfg(desktop)]
 use tauri::{WebviewUrl, WebviewWindowBuilder};
 
-// Авторизация окна у прокси. Только Windows: целиком событие WebView2. Потребитель один — окно входа в AniList (auth.rs): оно грузит чужую страницу.
-#[cfg(windows)]
-mod proxy_auth;
-
 // Вход в аккаунт AniList отдельным окном.
 mod auth;
 
@@ -46,14 +42,14 @@ fn animori_reload(window: WebviewWindow) -> Result<(), String> {
     window.reload().map_err(|e| e.to_string())
 }
 
-/// Перезапускает приложение: нужно там, где перезагрузки страницы мало — ключи запуска WebView2 читаются один раз, и новый адрес доходит до движка только новым процессом.
+/// Перезапускает приложение: перезагрузки страницы мало, когда изменениям нужно пройти через весь процесс, а не только через страницу.
 #[tauri::command]
 fn animori_restart(app: AppHandle) -> Result<(), String> {
     log::info!("Перезапуск приложения по просьбе окна");
     app.restart()
 }
 
-/// Открывает адрес в браузере по умолчанию. В WebView2 target="_blank" и window.open() без обработчика отбрасываются молча; схема проверяется здесь, а не на доверии к вызывающему.
+/// Открывает адрес в браузере по умолчанию. Схема проверяется здесь, а не на доверии к вызывающему: разметка не должна открыть что угодно.
 #[tauri::command]
 fn animori_open_external(app: AppHandle, url: String) -> Result<(), String> {
     let trimmed = url.trim();

@@ -1,4 +1,4 @@
-// Прокси для канала САМОГО ОКНА; наши запросы к API идут мимо, через TauriBridge.ts. WebView2 читает адрес один раз: смена адреса — только перезапуск, ошибки при промахе нет.
+// Прокси для канала САМОГО ОКНА; наши запросы к API идут мимо, через TauriBridge.ts. Окно через прокси НЕ идёт — см. decide(): здесь движку адрес не передаётся, а запросам приложения прокси настраивает anilist.rs.
 
 use std::net::{SocketAddr, TcpStream, ToSocketAddrs};
 use std::sync::Mutex;
@@ -26,11 +26,6 @@ const KEY_KIND: &str = "set_proxy_kind";
 const KEY_HOST: &str = "set_proxy_host";
 const KEY_PORT: &str = "set_proxy_port";
 const KEY_LOGIN: &str = "set_proxy_login";
-const KEY_PASSWORD: &str = "set_proxy_pass";
-const KEY_BYPASS: &str = "set_proxy_bypass";
-
-/// Совпадает с DEFAULT_PROXY.bypass в packages/core/src/core/proxy.ts и подставляется только при отсутствии ключа: пустая строка в файле — осознанный выбор человека.
-const DEFAULT_BYPASS: &str = "localhost, 127.0.0.1";
 
 /// Applied значит лишь «движок получил адрес»: пускающий соединение, но не наружу, прокси TCP-щуп не отличит. WindowUnsupported разведён с Unreachable нарочно.
 #[derive(Clone, Copy, PartialEq, Eq, Serialize)]
@@ -39,24 +34,16 @@ pub enum ProxyOutcome {
     Off,
     Invalid,
     Unreachable,
-    /// Собирается только вне Windows, поэтому на Windows предупреждение «никогда не строится» снимается — приём тот же, что у WindowAuth ниже.
-    #[cfg_attr(windows, allow(dead_code))]
     WindowUnsupported,
     Applied,
 }
 
-/// Как окно живёт с авторизацией у прокси. Accepted косвенный: кода ошибки в событии нет, и принятие видно лишь по отсутствию повторного запроса.
+/// Как окно живёт с авторизацией у прокси. На этой платформе окно через прокси не ходит
+/// (см. decide()), поэтому состояние всегда None; тип сохранён — контракт с панелью общий.
 #[derive(Clone, Copy, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub enum ProxyAuth {
     None,
-    // Три состояния собираются только на Windows, где живёт окно авторизации.
-    #[cfg_attr(not(windows), allow(dead_code))]
-    Pending,
-    #[cfg_attr(not(windows), allow(dead_code))]
-    Accepted,
-    #[cfg_attr(not(windows), allow(dead_code))]
-    Rejected,
 }
 
 /// Что действует в окне прямо сейчас. Снимок делается один раз, при запуске.
@@ -68,7 +55,7 @@ pub struct ProxyStatus {
     server: String,
     /// По этому полю панель объясняет разницу в поведении окна и наших запросов.
     has_credentials: bool,
-    /// Собирается при вызове команды: авторизация случается позже снимка.
+    /// Панель показывает подпись «логин задан»; авторизации окна здесь нет — всегда none.
     auth: ProxyAuth,
 }
 
@@ -87,30 +74,13 @@ pub struct ProxyProbe {
 /// Состояние живёт в приложении: команда status вызывается из окна, а окно про setup() не знает. Mutex — требование Tauri, запись всё равно одна.
 pub struct ProxyState(Mutex<ProxyStatus>);
 
-/// Всё, что нужно обработчику авторизации окна. bypass здесь потому, что на этих адресах трафик идёт мимо прокси и подставлять учётные данные нельзя.
-#[derive(Clone)]
-#[cfg_attr(not(windows), allow(dead_code))]
-pub struct WindowAuth {
-    pub login: String,
-    pub password: String,
-    pub bypass: Vec<String>,
-}
-
-/// Пароль живёт только в памяти процесса: файл настроек в обработчике события читать нельзя, а в журнал он не попадает никогда.
-pub struct ProxyCredentials(Mutex<Option<WindowAuth>>);
-
-/// Разобранная настройка в том виде, в каком её принимает движок окна.
+/// Разобранная настройка в том виде, в каком её принимает проверка связи и панель.
 struct ProxyArgs {
     /// Адрес без схемы и порт отдельно: только так их принимает проверка связи.
     host: String,
     port: u16,
-    /// Для --proxy-server, например http://10.0.0.1:8080 или socks5://127.0.0.1:1080.
+    /// Схема://хост:порт — отдаётся панели как есть.
     server: String,
-    /// Для --proxy-bypass-list. Пусто, если исключений нет.
-    bypass: String,
-    /// Учётные данные движку не передать аргументом: они уходят в ProxyCredentials.
-    login: String,
-    password: String,
     /// Влияет на предупреждение в журнале и на подпись в панели.
     has_credentials: bool,
 }
@@ -126,15 +96,6 @@ enum Config {
 fn read_string(value: Option<serde_json::Value>) -> String {
     match value {
         Some(serde_json::Value::String(s)) => s.trim().to_string(),
-        Some(serde_json::Value::Number(n)) => n.to_string(),
-        _ => String::new(),
-    }
-}
-
-/// Пароль без обрезки пробелов, как и в карточке настроек: пробел по краям законен, а тихая правка дала бы отказ авторизации.
-fn read_password(value: Option<serde_json::Value>) -> String {
-    match value {
-        Some(serde_json::Value::String(s)) => s,
         Some(serde_json::Value::Number(n)) => n.to_string(),
         _ => String::new(),
     }
@@ -229,69 +190,22 @@ fn read_config(app: &AppHandle) -> Config {
         "http"
     };
 
-    // Отсутствие ключа и пустое значение — разные вещи, см. DEFAULT_BYPASS.
-    let raw_bypass = match store.get(KEY_BYPASS) {
-        None => DEFAULT_BYPASS.to_string(),
-        Some(value) => read_string(Some(value)),
-    };
-
-    // Chromium ждёт список через точку с запятой; записи с пробелом отбрасываем — в имени хоста его быть не может, а строку аргументов он бы разорвал.
-    let bypass = raw_bypass
-        .split([',', ';', '\n', '\r'])
-        .map(|item| item.trim())
-        .filter(|item| !item.is_empty() && !item.contains(' '))
-        .collect::<Vec<_>>()
-        .join(";");
-
+    // Логин читается только для подписи «логин задан» в панели: окно через прокси не ходит,
+    // подставлять учётные данные движку здесь нечем и незачем.
     let login = read_string(store.get(KEY_LOGIN));
 
     Config::On(Box::new(ProxyArgs {
         server: format!("{scheme}://{host}:{port}"),
         host,
         port,
-        bypass,
         has_credentials: !login.is_empty(),
-        password: read_password(store.get(KEY_PASSWORD)),
-        login,
     }))
 }
 
 /// Вызывается ОДИН раз, в начале setup() и до создания окна. Состояние заводится здесь же: его нельзя забыть, и команда status найдёт готовый ответ.
 pub fn apply_to_webview(app: &AppHandle) {
-    // app.restart() отдаёт потомку окружение родителя: без сноса старый --proxy-server переживает выключение прокси.
-    #[cfg(windows)]
-    std::env::remove_var("WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS");
-
-    // Заводится ДО decide(): учётные данные складывает он сам, по месту решения.
-    app.manage(ProxyCredentials(Mutex::new(None)));
-
     let status = decide(app);
     app.manage(ProxyState(Mutex::new(status)));
-}
-
-/// Складывает учётные данные для обработчика авторизации окна. Только при Applied: без прокси в окне подставлять их некому и незачем.
-fn remember_credentials(app: &AppHandle, args: &ProxyArgs) {
-    if args.login.is_empty() {
-        return;
-    }
-
-    let Some(state) = app.try_state::<ProxyCredentials>() else {
-        log::warn!("Прокси: учётные данные некуда сложить, окно останется без авторизации");
-        return;
-    };
-
-    let mut guard = state.0.lock().unwrap_or_else(|e| e.into_inner());
-
-    *guard = Some(WindowAuth {
-        login: args.login.clone(),
-        password: args.password.clone(),
-        bypass: args
-            .bypass
-            .split(';')
-            .filter(|item| !item.is_empty())
-            .map(|item| item.to_string())
-            .collect(),
-    });
 }
 
 fn decide(app: &AppHandle) -> ProxyStatus {
@@ -331,88 +245,20 @@ fn decide(app: &AppHandle) -> ProxyStatus {
         };
     }
 
-    // Событие авторизации приходит позже и только если прокси его спросит.
-    if args.has_credentials {
-        log::info!("У прокси задан логин: окно авторизуется через обработчик в proxy_auth.rs");
-    }
-
-    let mut value = format!("--proxy-server={}", args.server);
-    if !args.bypass.is_empty() {
-        value.push_str(&format!(" --proxy-bypass-list={}", args.bypass));
-    }
-
-    // Только Windows: переменную читает WebView2. Под Linux окно рисует WebKitGTK, и это работа ветки linux-dev, а не молчаливое бездействие здесь.
-    #[cfg(windows)]
-    {
-        std::env::set_var("WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS", &value);
-        log::info!("Прокси для окна: {}", args.server);
-
-        remember_credentials(app, &args);
-
-        ProxyStatus {
-            outcome: ProxyOutcome::Applied,
-            server: args.server,
-            has_credentials: args.has_credentials,
-            auth: ProxyAuth::None,
-        }
-    }
-
-    #[cfg(not(windows))]
-    {
-        let _ = &value;
-        let _ = remember_credentials;
-        log::warn!("Прокси для окна на этой платформе пока не поддержан — страница идёт напрямую");
-
-        // Не Applied: адрес движку никто не отдавал. И не Unreachable: щуп до адреса достучался, а «не ответил» сказало бы неправду. Беда не в адресе, а в платформе.
-        ProxyStatus {
-            outcome: ProxyOutcome::WindowUnsupported,
-            server: args.server,
-            has_credentials: args.has_credentials,
-            auth: ProxyAuth::None,
-        }
+    // Не Applied: адрес движку никто не отдавал. И не Unreachable: щуп до адреса достучался, а «не ответил» сказало бы неправду. Беда не в адресе, а в платформе.
+    log::warn!("Прокси для окна здесь не поддерживается — страница идёт напрямую, запросы приложения ходят через прокси сами");
+    ProxyStatus {
+        outcome: ProxyOutcome::WindowUnsupported,
+        server: args.server,
+        has_credentials: args.has_credentials,
+        auth: ProxyAuth::None,
     }
 }
 
-/// Живой опрос обработчика: снимок запуска об авторизации знать не может.
-fn auth_state(has_credentials: bool) -> ProxyAuth {
-    if !has_credentials {
-        return ProxyAuth::None;
-    }
-
-    #[cfg(windows)]
-    {
-        if crate::proxy_auth::was_rejected() {
-            ProxyAuth::Rejected
-        } else if crate::proxy_auth::was_asked() {
-            ProxyAuth::Accepted
-        } else {
-            ProxyAuth::Pending
-        }
-    }
-
-    // За пределами Windows прокси в окно не попадает, значит и спрашивать некому.
-    #[cfg(not(windows))]
-    {
-        ProxyAuth::None
-    }
-}
-
-/// Что действует в окне прямо сейчас: в сеть команда не ходит, адрес неизменен до перезапуска, а вот авторизация меняется по ходу сеанса.
+/// Что действует в окне прямо сейчас: в сеть команда не ходит, адрес неизменен до перезапуска.
 #[tauri::command]
 pub fn animori_proxy_status(state: State<'_, ProxyState>) -> ProxyStatus {
     // Отравленный мьютекс не повод отказывать: внутри структура без инвариантов.
-    let guard = state.0.lock().unwrap_or_else(|e| e.into_inner());
-
-    let mut status = guard.clone();
-    status.auth = auth_state(status.has_credentials);
-    status
-}
-
-/// Учётные данные для обработчика авторизации окна. None — подставлять нечего: прокси выключен, задан
-/// негодно, молчит или логина у него нет. За пределами Windows обработчика нет.
-#[cfg(windows)]
-pub fn window_auth(app: &AppHandle) -> Option<WindowAuth> {
-    let state = app.try_state::<ProxyCredentials>()?;
     let guard = state.0.lock().unwrap_or_else(|e| e.into_inner());
     guard.clone()
 }

@@ -3,6 +3,8 @@
  *  Файлы двух приложений намеренно разные (у приставки меньше настроек, своя вёрстка), поэтому
  *  расхождение само по себе не ошибка. Ошибка — рост сверх зафиксированного в drift.json.
  *  Комментарии и пустые строки в расчёт не входят: правка формулировки — не расхождение.
+ *  Под сторожем и интерфейсы (apps-каталоги продуктов), и Rust-слой оболочки (src-tauri/src,
+ *  ключи с префиксом src-tauri/).
  *  Запуск: npm run drift (проверка, в CI), npm run drift:accept (зафиксировать как задуманное). */
 
 import { existsSync, readdirSync, readFileSync, writeFileSync } from 'node:fs'
@@ -10,12 +12,22 @@ import { fileURLToPath } from 'node:url'
 import { dirname, join, relative, sep } from 'node:path'
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..')
-const PAIRS = [
-  { name: 'windows', dir: join(root, 'apps', 'windows', 'src', 'app') },
-  { name: 'android-tv', dir: join(root, 'apps', 'android-tv', 'src', 'app') },
+// Две пары корней: интерфейсы продуктов и Rust-слой оболочки. Ключ пары — путь относительно
+// корня; префикс src-tauri/ держит два пространства имён раздельными в одном снимке.
+const GROUPS = [
+  {
+    left: join(root, 'apps', 'windows', 'src', 'app'),
+    right: join(root, 'apps', 'android-tv', 'src', 'app'),
+    prefix: '',
+  },
+  {
+    left: join(root, 'apps', 'windows', 'src-tauri', 'src'),
+    right: join(root, 'apps', 'android-tv', 'src-tauri', 'src'),
+    prefix: 'src-tauri/',
+  },
 ]
 const SNAPSHOT = join(root, 'drift.json')
-const EXT = new Set(['.ts', '.vue', '.mts', '.cts'])
+const EXT = new Set(['.ts', '.vue', '.mts', '.cts', '.rs'])
 
 // Копии, которые намеренно держатся одинаковыми. Код у них совпадает, а расходятся
 // пояснения — они описывают одно решение с двух сторон, и это ценность, а не мусор.
@@ -30,18 +42,24 @@ const KEPT_IN_SYNC = [
   'screens/player-keep.ts',
   'see-tile.ts',
   'splash.ts',
+  'src-tauri/anilist.rs',
+  'src-tauri/files.rs',
+  'src-tauri/main.rs',
+  'src-tauri/storage.rs',
   'star.ts',
   'tag-words.ts',
 ]
 
-/** Всё, что не код: комментарии разных стилей и пустые строки. */
+/** Всё, что не код: комментарии разных стилей и пустые строки.
+ *  Звёздочка в начале строки — шум только как продолжение блочного комментария (с пробелом
+ *  или одна-закрывающая); Rust-разыменование `*guard = …` в начале строки — код. */
 function isNoise(line) {
   const t = line.trim()
   return (
     t === '' ||
     t.startsWith('//') ||
     t.startsWith('/*') ||
-    t.startsWith('*') ||
+    /^\*(\s|\/|$)/.test(t) ||
     t.startsWith('<!--')
   )
 }
@@ -73,21 +91,24 @@ function measure(a, b) {
   return onlyA + onlyB
 }
 
-const [first, second] = PAIRS
-if (!existsSync(first.dir) || !existsSync(second.dir)) {
-  console.error('Каталог приложения не найден — скрипту не с чем сравнивать.')
-  process.exit(1)
+for (const group of GROUPS) {
+  if (!existsSync(group.left) || !existsSync(group.right)) {
+    console.error('Каталог пары не найден — скрипту не с чем сравнивать.')
+    process.exit(1)
+  }
 }
 
-// Ключ пары — путь относительно каталога приложения: он одинаков у обеих копий.
+// Ключ пары — путь относительно корня пары: он одинаков у обеих копий.
 const relKey = (full, dir) => relative(dir, full).split(sep).join('/')
-const left = new Map(walk(first.dir).map((f) => [relKey(f, first.dir), f]))
 
 const current = {}
-for (const [key, file] of left) {
-  const twin = join(second.dir, ...key.split('/'))
-  if (!existsSync(twin)) continue
-  current[key] = measure(codeLines(file), codeLines(twin))
+for (const { left, right, prefix } of GROUPS) {
+  for (const file of walk(left)) {
+    const key = relKey(file, left)
+    const twin = join(right, ...key.split('/'))
+    if (!existsSync(twin)) continue
+    current[prefix + key] = measure(codeLines(file), codeLines(twin))
+  }
 }
 
 const saved = existsSync(SNAPSHOT) ? JSON.parse(readFileSync(SNAPSHOT, 'utf8')) : { files: {} }
