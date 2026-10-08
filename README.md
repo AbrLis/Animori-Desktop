@@ -90,7 +90,8 @@ APK в [выпусках](https://github.com/foulnike/Animori/releases):
 
 ## Сборка
 
-Нужен Node.js 20 или новее; для Android дополнительно Android SDK и NDK.
+Нужен Node.js 24 или новее (npm 11): lock репозитория сгенерирован npm 11 и не
+встаёт под npm 10 с Node 20/22. Для Android дополнительно Android SDK и NDK.
 
 ```bash
 npm ci

@@ -179,6 +179,13 @@ jobs:
         working-directory: apps/${{ matrix.app }}/src-tauri
         run: cargo check --workspace
 
+      # Юнит-тесты чистой логики: валидация путей (export), разбор прокси (proxy),
+      # пропуск и nonce (auth), тела запросов к AniList (anilist). Падение тестов
+      # валит задачу — раньше эта логика не проверялась вовсе.
+      - name: Тесты
+        working-directory: apps/${{ matrix.app }}/src-tauri
+        run: cargo test --workspace
+
       - name: Линт
         working-directory: apps/${{ matrix.app }}/src-tauri
         run: cargo clippy --all-targets -- -D warnings
