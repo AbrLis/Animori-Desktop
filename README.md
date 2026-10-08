@@ -10,7 +10,7 @@
 к API и подставляет русские названия и описания из Shikimori —
 браузер и менеджер скриптов не нужны.
 
-[![Версия](https://img.shields.io/badge/версия-3.1.0-02A9FF?style=flat-square&labelColor=0B1622)](https://github.com/foulnike/Animori/releases)
+[![Версия](https://img.shields.io/badge/версия-3.1.1-02A9FF?style=flat-square&labelColor=0B1622)](https://github.com/foulnike/Animori/releases)
 [![Лицензия](https://img.shields.io/badge/лицензия-MIT-02A9FF?style=flat-square&labelColor=0B1622)](LICENSE)
 [![Windows](https://img.shields.io/badge/Windows%2010%2F11-0078D4?style=flat-square&logo=windows&logoColor=white)](apps/windows)
 [![Android TV](https://img.shields.io/badge/Android%20TV%207.0%2B-3DDC84?style=flat-square&logo=androidtv&logoColor=black)](apps/android-tv)
@@ -84,7 +84,7 @@
 <p align="center"><sub>Календарь · Рекомендации · Списки · Карточка</sub></p>
 
 APK в [выпусках](https://github.com/foulnike/Animori/releases):
-`AniMori_3.1.0_armv7.apk` для 32-разрядных приставок и `AniMori_3.1.0_arm64.apk`
+`AniMori_3.1.1_armv7.apk` для 32-разрядных приставок и `AniMori_3.1.1_arm64.apk`
 для 64-разрядных. Установка из неизвестных источников, ставится с пульта.
 Подробности — в [apps/android-tv](apps/android-tv).
 
@@ -105,7 +105,7 @@ cd apps/windows   && npm run tauri dev
 cd apps/android-tv && npm run tauri -- android dev
 ```
 
-Выпуск делается тегом: `windows-v3.1.0` или `android-tv-v3.1.0`.
+Выпуск делается тегом: `windows-v3.1.1` или `android-tv-v3.1.1`.
 
 ## Устройство репозитория
 
