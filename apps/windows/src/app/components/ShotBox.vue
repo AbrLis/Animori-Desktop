@@ -9,6 +9,8 @@ import { Bridge } from '@/bridge'
 import type { MediaClip, MediaShot, MediaTrailer } from '@/core/types'
 import { Logger } from '@/utils/logger'
 
+import { holdDialog } from '../dialog-focus'
+
 const props = defineProps<{
   mediaId: number
   malId: number | null
@@ -35,6 +37,24 @@ const reel = ref(false)
 
 /** Открыта ли галерея всех кадров. */
 const gal = ref(false)
+
+/** Корня трёх окон и снятие их ловушек фокуса: кадр и трейлер открываются поверх галереи. */
+const galRoot = ref<HTMLElement | null>(null)
+const lookRoot = ref<HTMLElement | null>(null)
+const reelRoot = ref<HTMLElement | null>(null)
+const galHold = { release: null as (() => void) | null }
+const lookHold = { release: null as (() => void) | null }
+const reelHold = { release: null as (() => void) | null }
+
+/** Снимает старую ловушку и — если окно открыто — ставит новую. */
+function track(
+  open: boolean,
+  root: HTMLElement | null,
+  slot: { release: (() => void) | null },
+): void {
+  slot.release?.()
+  slot.release = open && root !== null ? holdDialog(root) : null
+}
 
 /** Картинки, уже отработавшие (приехали или отвалились): файлы едут с чужого CDN,
  *  и без заглушки пустые клетки читались бы поломкой. Ключ — адрес картинки. */
@@ -199,12 +219,24 @@ onMounted(() => {
 
 onBeforeUnmount(() => {
   window.removeEventListener('keydown', onKey)
+  track(false, null, galHold)
+  track(false, null, lookHold)
+  track(false, null, reelHold)
   // Показ прекращается вместе с уходом с тайтла: ответ, пришедший следом,
   // к показу уже не относится.
   run++
 })
 
 watch(() => [props.mediaId, props.malId], load)
+
+// Flush post: корень окна появляется в DOM раньше, чем watch срабатывает.
+watch(gal, (open) => track(open, galRoot.value, galHold), { flush: 'post' })
+watch(
+  () => look.value >= 0 && nowShot.value !== null,
+  (open) => track(open, lookRoot.value, lookHold),
+  { flush: 'post' },
+)
+watch(reel, (open) => track(open, reelRoot.value, reelHold), { flush: 'post' })
 </script>
 
 <template>
@@ -294,7 +326,7 @@ watch(() => [props.mediaId, props.malId], load)
 
   <!-- ГАЛЕРЕЯ. Все кадры сеткой в отдельном окне; кадры уменьшенные и грузятся лениво. -->
   <Teleport to="body">
-    <div v-if="gal" class="am-sheet am-shots__gal">
+    <div v-if="gal" ref="galRoot" class="am-sheet am-shots__gal">
       <button class="am-sheet__veil" type="button" aria-label="Закрыть" @click="gal = false" />
 
       <div
@@ -340,7 +372,7 @@ watch(() => [props.mediaId, props.malId], load)
   <!-- ПРОСМОТР КАДРА. Один кадр во весь экран, шаг по стрелкам и счёт.
        Полный кадр грузится только здесь — в сетке стоят уменьшенные. -->
   <Teleport to="body">
-    <div v-if="look >= 0 && nowShot" class="am-look">
+    <div v-if="look >= 0 && nowShot" ref="lookRoot" class="am-look">
       <button class="am-look__veil" type="button" aria-label="Закрыть" @click="look = -1" />
 
       <div class="am-look__box" role="dialog" aria-modal="true" aria-label="Кадр">
@@ -386,7 +418,7 @@ watch(() => [props.mediaId, props.malId], load)
   <!-- ОКНО ТРЕЙЛЕРА. Ролик играет здесь же, а ссылка наружу остаётся:
        ютюб вправе отказать во встраивании отдельному видео. -->
   <Teleport to="body">
-    <div v-if="reel && reelTrailer" class="am-reel">
+    <div v-if="reel && reelTrailer" ref="reelRoot" class="am-reel">
       <button class="am-reel__veil" type="button" aria-label="Закрыть" @click="reel = false" />
 
       <div class="am-reel__box" role="dialog" aria-modal="true" :aria-label="reelTrailer.title">

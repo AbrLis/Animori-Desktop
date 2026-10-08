@@ -1,7 +1,7 @@
 <script setup lang="ts">
 // Меню отбора для главной. Правит черновик и отдаёт одним «Готово», чтобы нажатия не били в сеть.
 // Группы тэгов закрыты (справочник ~1000), взрослое режется в core/adult, у года свои стрелки.
-import { computed, onBeforeUnmount, ref, watch } from 'vue'
+import { computed, nextTick, onBeforeUnmount, ref, watch } from 'vue'
 
 import { emptyPick, type CatalogPick, type CatalogTag, type FeedSort } from '@/api/anilist-catalog'
 import { genreAllowed, tagAllowed } from '@/core/adult'
@@ -9,6 +9,7 @@ import { tagChoices } from '@/core/recs'
 
 import { formatWord, GENRE_CHOICES, genreWord } from '../labels'
 import { tagGroupWord, tagWord } from '../tag-words'
+import { holdDialog } from '../dialog-focus'
 
 import SakuraBloom from './SakuraBloom.vue'
 
@@ -78,6 +79,9 @@ let tagsAsked = false
 
 /** Прежний запрет прокрутки тела: возвращается как было, а не в пустоту. */
 let bodyKeep = ''
+/** Корень окна и снятие ловушки фокуса. */
+const root = ref<HTMLElement | null>(null)
+let unhold: (() => void) | null = null
 
 const yearMax = new Date().getFullYear() + 1
 
@@ -340,9 +344,15 @@ watch(
       document.body.style.overflow = 'hidden'
       window.addEventListener('keydown', onKey)
       void loadTags()
+      // Фокус — после отрисовки: корень окна появляется вместе с v-if.
+      void nextTick(() => {
+        if (props.open && root.value !== null) unhold = holdDialog(root.value)
+      })
       return
     }
 
+    unhold?.()
+    unhold = null
     document.body.style.overflow = bodyKeep
     window.removeEventListener('keydown', onKey)
   },
@@ -352,12 +362,14 @@ onBeforeUnmount(() => {
   // Снятие экрана при открытом меню оставило бы тело без прокрутки навсегда.
   if (props.open) document.body.style.overflow = bodyKeep
   window.removeEventListener('keydown', onKey)
+  unhold?.()
+  unhold = null
 })
 </script>
 
 <template>
   <Teleport to="body">
-    <div v-if="open" class="am-sheet">
+    <div v-if="open" ref="root" class="am-sheet">
       <button class="am-sheet__veil" type="button" aria-label="Закрыть" @click="onClose" />
 
       <div class="am-sheet__box" role="dialog" aria-modal="true" aria-label="Настройка подбора">

@@ -25,6 +25,7 @@ import { Logger } from '@/utils/logger'
 import { genderWord, langWord, occupationWord } from '../labels'
 import { personLinks, type PersonLink } from '../person-links'
 import { navigate } from '../router'
+import { holdDialog } from '../dialog-focus'
 
 import RichText from './RichText.vue'
 import SakuraBloom from './SakuraBloom.vue'
@@ -406,8 +407,13 @@ watch(
   },
 )
 
+/** Корень окна и снятие ловушки фокуса. */
+const root = ref<HTMLElement | null>(null)
+let unhold: (() => void) | null = null
+
 onMounted(() => {
   window.addEventListener('keydown', onKey)
+  if (root.value !== null) unhold = holdDialog(root.value)
   void load(props.start).catch((e) => {
     Logger('WARN', 'Карточка персоны: загрузка не удалась', e)
   })
@@ -416,11 +422,20 @@ onMounted(() => {
 onBeforeUnmount(() => {
   alive = false
   window.removeEventListener('keydown', onKey)
+  unhold?.()
+  unhold = null
 })
 </script>
 
 <template>
-  <div class="am-sheet" role="dialog" aria-modal="true" @click.self="emit('close')">
+  <div
+    ref="root"
+    class="am-sheet"
+    role="dialog"
+    aria-modal="true"
+    aria-label="Карточка персоны"
+    @click.self="emit('close')"
+  >
     <div class="am-sheet__box">
       <!-- Шапка стоит на месте: прокручивается только тело ниже. -->
       <header class="am-sheet__head">

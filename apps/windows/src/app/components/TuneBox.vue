@@ -7,6 +7,8 @@ import { fetchMalThemes, type ThemeItem, type ThemeLink } from '@/api/animetheme
 import { Bridge } from '@/bridge'
 import { Logger } from '@/utils/logger'
 
+import { holdDialog } from '../dialog-focus'
+
 import BrandMark from './BrandMark.vue'
 import SakuraBloom from './SakuraBloom.vue'
 
@@ -82,6 +84,10 @@ const drag = ref(false)
  * досталась одна строка, и всё остальное уехало в окно за кнопкой.
  */
 const sheet = ref(false)
+
+/** Корень окна тем и снятие ловушки фокуса. */
+const sheetRoot = ref<HTMLElement | null>(null)
+let unhold: (() => void) | null = null
 
 /** Ключи строк в работе и с отметками: отметка горит у своей кнопки, не у всех. */
 const saving = ref<string | null>(null)
@@ -571,7 +577,30 @@ watch(
 
 watch(pick, showPick)
 
-onBeforeUnmount(stop)
+/** Escape закрывает окно тем; ловушка фокуса живёт вместе с ним. */
+function onSheetKey(e: KeyboardEvent): void {
+  if (e.key === 'Escape') sheet.value = false
+}
+
+watch(sheet, (open) => {
+  if (open) {
+    window.addEventListener('keydown', onSheetKey)
+    void nextTick(() => {
+      if (sheet.value && sheetRoot.value !== null) unhold = holdDialog(sheetRoot.value)
+    })
+    return
+  }
+  window.removeEventListener('keydown', onSheetKey)
+  unhold?.()
+  unhold = null
+})
+
+onBeforeUnmount(() => {
+  stop()
+  window.removeEventListener('keydown', onSheetKey)
+  unhold?.()
+  unhold = null
+})
 </script>
 
 <template>
@@ -677,7 +706,7 @@ onBeforeUnmount(stop)
   <!-- Окно тем: пульт целиком и полный список. Уезжает в body — окно поверх
        всего, и с полосой по разметке оно не соседствует. -->
   <Teleport to="body">
-    <div v-if="sheet && rows.length > 0" class="am-sheet am-tune__sheet">
+    <div v-if="sheet && rows.length > 0" ref="sheetRoot" class="am-sheet am-tune__sheet">
       <button class="am-sheet__veil" type="button" aria-label="Закрыть" @click="sheet = false" />
 
       <div

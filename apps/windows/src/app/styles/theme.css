@@ -340,6 +340,12 @@ html {
   outline-offset: 2px;
 }
 
+/* Контейнер окна держит фокус только до первого Tab: обводка на нём читалась
+   бы рамкой всего экрана, а не местом, где стоит человек. */
+[role='dialog']:focus-visible {
+  outline: none;
+}
+
 .am-page {
   display: flex;
   flex-direction: column;

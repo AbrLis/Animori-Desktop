@@ -3,6 +3,7 @@
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 
 import { partsWord, statusList, statusWord } from '../labels'
+import { holdDialog } from '../dialog-focus'
 
 import DateField from './DateField.vue'
 import SakuraBloom from './SakuraBloom.vue'
@@ -262,12 +263,19 @@ function onKey(event: KeyboardEvent): void {
   if (event.key === 'Escape') onDrop()
 }
 
+/** Корень окна и снятие ловушки фокуса. */
+const root = ref<HTMLElement | null>(null)
+let unhold: (() => void) | null = null
+
 onMounted(() => {
   window.addEventListener('keydown', onKey)
+  if (root.value !== null) unhold = holdDialog(root.value)
 })
 
 onBeforeUnmount(() => {
   window.removeEventListener('keydown', onKey)
+  unhold?.()
+  unhold = null
   // Таймер держит ссылку на шторку: без снятия он дотянет до закрытия уже убранного окна, а emit('close') после этого — лишний.
   if (hold !== null) clearTimeout(hold)
 
@@ -280,7 +288,14 @@ onBeforeUnmount(() => {
   <!-- Перенос в body: причина в шапке файла, коротко — fixed внутри экрана
        мерился от списка, а не от окна браузера. -->
   <Teleport to="body">
-    <div class="am-sheet" role="dialog" aria-modal="true" @click.self="onDrop">
+    <div
+      ref="root"
+      class="am-sheet"
+      role="dialog"
+      aria-modal="true"
+      aria-label="Правка записи"
+      @click.self="onDrop"
+    >
       <div class="am-sheet__box">
         <header class="am-sheet__top">
           <div class="am-sheet__text">

@@ -1,9 +1,11 @@
 <script setup lang="ts">
 // Инструкция к облачной копии: отдельной модалкой, а не абзацами в панели — её читают один раз.
 // Своего состояния нет; уводится в body: fixed внутри предка с transform считался бы от предка.
-import { onBeforeUnmount, watch } from 'vue'
+import { nextTick, onBeforeUnmount, ref, watch } from 'vue'
 
 import { Bridge } from '@/bridge'
+
+import { holdDialog } from '../dialog-focus'
 
 const props = defineProps<{
   /** Открыта ли модалка. */
@@ -13,6 +15,10 @@ const props = defineProps<{
 }>()
 
 const emit = defineEmits<{ close: [] }>()
+
+/** Корень окна и снятие ловушки фокуса. */
+const root = ref<HTMLElement | null>(null)
+let unhold: (() => void) | null = null
 
 /** Где человек заводит своё приложение Яндекса и берёт пропуск. */
 const YANDEX_OAUTH_URL = 'https://oauth.yandex.com/client/new/'
@@ -38,13 +44,23 @@ function onKey(e: KeyboardEvent): void {
 watch(
   () => props.open,
   (open) => {
-    if (open) document.addEventListener('keydown', onKey)
-    else document.removeEventListener('keydown', onKey)
+    if (open) {
+      document.addEventListener('keydown', onKey)
+      void nextTick(() => {
+        if (props.open && root.value !== null) unhold = holdDialog(root.value)
+      })
+      return
+    }
+    document.removeEventListener('keydown', onKey)
+    unhold?.()
+    unhold = null
   },
 )
 
 onBeforeUnmount(() => {
   document.removeEventListener('keydown', onKey)
+  unhold?.()
+  unhold = null
 })
 </script>
 
@@ -52,6 +68,7 @@ onBeforeUnmount(() => {
   <Teleport to="body">
     <div
       v-if="open"
+      ref="root"
       class="am-modal"
       role="dialog"
       aria-modal="true"

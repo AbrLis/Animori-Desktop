@@ -2,7 +2,7 @@
 // Календарик активности за год: колонки недель по семь дней, квадрат — день и число дел, щелчок раскрывает каких.
 // Всё считает home-activity; месяцы не разделены; день — модалкой поверх всего.
 
-import { computed, nextTick, onBeforeUnmount, onMounted, ref } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 
 import {
   activityOf,
@@ -20,6 +20,7 @@ import { Logger } from '@/utils/logger'
 import { getPlural } from '@/utils/dom'
 
 import SakuraBloom from '../components/SakuraBloom.vue'
+import { holdDialog } from '../dialog-focus'
 import { statusWord } from '../labels'
 import { navigate } from '../router'
 import { hourText } from './home-calendar'
@@ -268,6 +269,39 @@ function closeDay(): void {
   picked.value = 0
 }
 
+/** Корень модалки дня и снятие ловушки фокуса. */
+const dayRoot = ref<HTMLElement | null>(null)
+let unhold: (() => void) | null = null
+
+/** Открытый день: ячейка перерисовывается вместе с сеткой, возврат ищет её заново. */
+let openDay = 0
+
+// Ячейка перерисовывается вместе с сеткой, поэтому возврат ищет её заново по data-at.
+watch(
+  () => picked.value > 0,
+  (open) => {
+    if (open) {
+      openDay = picked.value
+      void nextTick(() => {
+        if (picked.value > 0 && dayRoot.value !== null) {
+          unhold = holdDialog(dayRoot.value, restoreCell)
+        }
+      })
+      return
+    }
+    unhold?.()
+    unhold = null
+  },
+  { flush: 'post' },
+)
+
+/** Живая ячейка открытого дня; null — ячейка ушла из сетки. */
+function restoreCell(): HTMLElement | null {
+  const at = cells.value.find((cell) => cell.day === openDay)?.at
+  if (at === undefined) return null
+  return document.querySelector<HTMLElement>(`.am-act__cell[data-at="${at}"]`)
+}
+
 /** Добывает подписи тайтлов дня: после перезахода кэши пусты, и без этого в чипсах стояло бы «Без
  * названия». Найденное ложится в журнал намертво — следующий заход возьмёт имена из самого события. */
 async function raiseTitles(day: number): Promise<void> {
@@ -349,6 +383,8 @@ onBeforeUnmount(() => {
   stopWatching?.()
   document.removeEventListener('keydown', onKey)
   window.removeEventListener('resize', onResize)
+  unhold?.()
+  unhold = null
 })
 </script>
 
@@ -466,9 +502,11 @@ onBeforeUnmount(() => {
     <Teleport to="body">
       <div
         v-if="picked > 0"
+        ref="dayRoot"
         class="am-sheet"
         role="dialog"
         aria-modal="true"
+        aria-label="День активности"
         @click.self="closeDay"
       >
         <div class="am-sheet__box">
