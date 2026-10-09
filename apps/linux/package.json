@@ -1,7 +1,7 @@
 {
   "name": "@animori/linux",
   "private": true,
-  "version": "3.1.0",
+  "version": "3.1.1",
   "type": "module",
   "description": "AniMori — Toolkit for AniList. Сборка под Linux.",
   "license": "MIT",

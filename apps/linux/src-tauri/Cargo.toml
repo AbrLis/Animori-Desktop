@@ -1,7 +1,7 @@
 [package]
 # Имя отдельное: рядом крейт apps/windows с тем же именем.
 name = "animori-linux"
-version = "3.1.0"
+version = "3.1.1"
 description = "AniMori — Toolkit for AniList, desktop shell, Linux build"
 authors = ["foulnike", "AbrLis"]
 license = "MIT"
