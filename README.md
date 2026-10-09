@@ -25,6 +25,13 @@
   <img src="apps/windows/assets/screenshots/home.png" width="92%" alt="Главная: календарь выхода, продолжение просмотра, полки">
 </p>
 
+## Актуальные версии
+
+| Приложение | Версия | Скачать |
+| :--- | :--- | :--- |
+| **Windows** 10/11 | 3.1.1 | [установщик, MSI, портативный архив](https://github.com/foulnike/Animori/releases/latest) |
+| **Android TV** 7.0+ | 3.1.1 | [APK armv7 и arm64](https://github.com/foulnike/Animori/releases/tag/android-tv-v3.1.1) |
+
 ## Почему это удобно
 
 - **Список открывается без сети.** Правки хранятся на устройстве: AniList не
