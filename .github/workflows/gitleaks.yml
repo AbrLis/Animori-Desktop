@@ -21,9 +21,14 @@ jobs:
     steps:
       - name: Исходный код
         uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          fetch-depth: 0
 
       # Закреплено по коммиту, не по тегу — так принято во всех workflow проекта.
       - name: Секреты
         uses: gitleaks/gitleaks-action@ff98106e4c7b2bc287b24eaf42907196329070c7 # v2.3.9
         env:
+          # Без токена действие спрашивает владельца анонимно и упирается в общий лимит API,
+          # не распознаёт личный аккаунт, включает проверку лицензии и падает без GITLEAKS_LICENSE.
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GITLEAKS_ENABLE_COMMENTS: false
