@@ -25,7 +25,9 @@ fn read_for_window(key: &str, value: serde_json::Value) -> serde_json::Value {
                 return match res {
                     Ok(text) => serde_json::Value::String(text),
                     Err(e) => {
-                        log::warn!("Пропуск облака не расшифрован ({e}) — потребуется повторный вход.");
+                        log::warn!(
+                            "Пропуск облака не расшифрован ({e}) — потребуется повторный вход."
+                        );
                         serde_json::Value::String(String::new())
                     }
                 };

@@ -64,6 +64,7 @@
     "src-tauri/lib.rs": 99,
     "src-tauri/main.rs": 0,
     "src-tauri/proxy.rs": 99,
+    "src-tauri/secrets.rs": 0,
     "src-tauri/storage.rs": 0,
     "star.ts": 0,
     "tag-words.ts": 0,
