@@ -363,9 +363,8 @@ tauri-action, режим установки `passive`, ключи подписи
 `data-am-skin` на `<html>`, выбор хранится ключом `am_appearance`.
 
 Акцент живёт дважды: `--am-accent` и `--am-accent-2` — готовые цвета, рядом
-`--am-accent-rgb` и `--am-accent-2-rgb` — триплеты для альфы.
-`amApplyAccentToDom()` из `packages/core/src/core/accent.ts` в слое приложения звать нельзя:
-она подменяет цвет на триплет. Стекло не кладут на списковые строки — сотня
+`--am-accent-rgb` и `--am-accent-2-rgb` — триплеты для альфы. Акцент — часть темы,
+рантайм-подмены цвета нет. Стекло не кладут на списковые строки — сотня
 `backdrop-filter` за кадр; полоса музыки исключение, у неё `--am-glass-deep`.
 `@media (prefers-reduced-motion: reduce)` гасит всё движение.
 
