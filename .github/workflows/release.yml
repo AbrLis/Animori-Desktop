@@ -128,7 +128,7 @@ jobs:
 
       - name: РЎР±РѕСЂРєР° РїСЂРёР»РѕР¶РµРЅРёСЏ Рё РїСѓР±Р»РёРєР°С†РёСЏ СЂРµР»РёР·Р°
         if: github.event_name == 'push' || !inputs.dry
-        uses: tauri-apps/tauri-action@fce9c6108b31ea247710505d3aaaa893ee6768d4 # v0
+        uses: tauri-apps/tauri-action@1deb371b0cd8bd54025b384f1cd735e725c4060f # v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
