@@ -192,7 +192,7 @@ jobs:
           Copy-Item ../../LICENSE (Join-Path $stage 'LICENSE')
           # Перечень зависимостей с лицензиями: MPL-2.0 требует уведомления, а портабл
           # разбирают без репозитория под рукой — значит, перечень едет вместе с программой.
-          Copy-Item ../../THIRD-PARTY.md (Join-Path $stage 'THIRD-PARTY.md')
+          Copy-Item ../../docs/THIRD-PARTY.md (Join-Path $stage 'THIRD-PARTY.md')
           Compress-Archive -Path "$stage/*" -DestinationPath "artifacts/AniMori_${version}_x64-portable.zip" -Force
           Write-Host "Портабл собран из: $($exe.FullName)"
 

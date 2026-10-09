@@ -120,7 +120,7 @@ cd apps/android-tv && npm run tauri -- android dev
 ## Лицензия
 
 [MIT](LICENSE). Зависимости приходят со своими лицензиями — перечень в
-[THIRD-PARTY.md](THIRD-PARTY.md), он собирается из `package-lock.json`. Русские названия и
+[THIRD-PARTY.md](docs/THIRD-PARTY.md), он собирается из `package-lock.json`. Русские названия и
 описания приходят из [Shikimori](https://shikimori.one);
 датасет собирается в [animori-data](https://github.com/foulnike/animori-data). Проект
 неофициальный и с командой AniList не связан.
@@ -129,3 +129,4 @@ cd apps/android-tv && npm run tauri -- android dev
 
 - [Политика обработки персональных данных](docs/PRIVACY.md) (русская и английская версии)
 - [Условия использования](docs/TERMS.md) (русская и английская версии)
+- [Безопасность](docs/SECURITY.md) — как сообщить об уязвимости
